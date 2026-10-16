@@ -1,0 +1,95 @@
+# Native GPU canvas contracts (0.3)
+
+The public Graphics.h is standard C++23 and uses no native/Qt types. Host
+owns one optional canvas. Existing text-only applications do not initialize
+Metal, D3D or EGL. Core remains the runtime/scheduling dependency; Builder
+orchestrates compilation and is not linked into the GUI application.
+
+## Rendering and resource use
+
+Each panel is a rectangle with a logical radius and two linear-light sRGB
+colors. Six unit-square vertices per instance and a 64-byte panel record
+produce ordered triangles in a single instanced draw. The fragment shader
+evaluates rounded-rectangle signed distance and derivative-based coverage.
+It interpolates the gradient in linear space and premultiplies by alpha.
+ONE/ONE_MINUS_SRC_ALPHA blending occurs into an sRGB attachment, which
+decodes the destination before blending and encodes the result afterward.
+The canvas background is opaque, so captures are also opaque.
+
+| Platform | Rendering | Retained attachment / presentation |
+|---|---|---|
+| macOS | Metal native device, compiled MSL vertex/fragment pipeline | Private BGRA8Unorm_sRGB texture; GPU blit to CAMetalLayer, display-synced, two drawables |
+| Windows | D3D11 feature level 11.0, HLSL Shader Model 5 | Typeless RGBA8 texture with sRGB view; GPU copy to two-buffer DXGI flip-sequential swapchain, sync interval 1 |
+| Linux | EGL X11 window surface, GLES3 GLSL ES 300 pipeline | GL_SRGB8_ALPHA8 framebuffer; GPU blit to verified sRGB EGL surface, swap interval 1 |
+
+Shaders are private driver-compiled GPU programs. The application itself is a
+native C++ binary; no common application VM, interpreter, Qt plugin or WebView
+is involved. Text uses AppKit/CoreText, DirectWrite/Direct2D or Pango/Cairo.
+Linux does not depend on the GTK widget toolkit.
+
+`set_canvas` validates and admits the latest value snapshot. The end of a
+bounded Core dispatch flushes it once. A hundred replacements in one callback
+render only the final value. Equal snapshots do not re-render or present.
+Pipelines/device/attachment persist. Physical size changes reallocate the
+attachment; input updates replace only the small instance data. This API does
+not promise partial panel damage tracking or a general retained scene graph.
+No CPU pixel loop is used during rendering/presentation. GPU copy/blit and
+swapchain buffers still consume device bandwidth/storage.
+
+An exposed Linux canvas presents its cached attachment. Cocoa/DWM retain the
+last presented surface. Resize/backing changes request a flush; there is no
+idle animation timer. Occluded Metal windows may temporarily have no drawable;
+offscreen rendering/capture still works and presentation can resume on a later
+native invalidation or changed scene. Continuous animation is application
+scheduling, not an always-running SDK frame loop.
+
+## Bounds, policy and errors
+
+- Viewport/panel origins: finite, absolute logical value <=32767. Their width
+  and height: finite, 0 < value <=8192. Viewport device-pixel origins must also
+  fit +/-32767. Physical canvas width/height are ceil(logical*backing_scale),
+  each <=8192; allocation can still fail on a lower-limit device or low memory.
+- At most 4096 ordered panels. Radius is finite, 0..min(width,height)/2.
+  Color components must be finite 0..1, and background alpha must equal 1.
+  Panels clip to the viewport. Colors are SDR sRGB, not ICC/HDR/wide gamut.
+- `prefer_hardware`: Metal GPU, D3D hardware (WARP permitted when unavailable),
+  or the driver's EGL GLES implementation. CPU software graphics is not an
+  application interpreter; its availability is reported explicitly.
+- `require_hardware`: reject an unavailable/unverified hardware device. Metal
+  identifies its MTLDevice; Windows checks the selected driver and DXGI software
+  adapter flag. Linux requires a driver-reported DRM device via EGL device
+  queries and excludes software-device/known software renderer reports. An
+  unknown EGL device is conservatively `hardware=false`, even if its renderer
+  name sounds accelerated. Driver reports cannot establish physical GPU
+  isolation or performance guarantees.
+- Text-only hosting does not require a working GPU. Failed canvas initialization
+  returns `unsupported`; invalid input returns `invalid_argument` and physical
+  coordinate overflow `out_of_range`. Rejected replacement preserves the prior
+  canvas. Device/allocation failures during deferred drawing enter Host's
+  guarded failure/normal cleanup path. Automatic GPU device-loss recovery,
+  context migration and hot GPU switching are not provided in this release.
+
+Canvas methods require the open host's owning UI thread. A missing canvas has
+GraphicsApi::none, while capture returns not_found. Closing/clearing releases
+native resources on that thread. clear is idempotent; frame_requests is the
+host's cumulative admitted request counter. Other device counters reset when
+the device is recreated/cleared. `graphics_info` inspects current counters and
+does not implicitly flush deferred work.
+
+## Capture and measurement
+
+`capture_canvas` is an explicit synchronous GPU readback after flushing pending
+work. It returns top-left-origin tightly packed RGBA8 sRGB bytes in memory;
+it may stall the UI and must not be used for normal frame presentation. Metal
+uses a shared staging buffer (256-byte aligned rows), D3D a staging texture,
+and GLES a framebuffer read. Tests use captures to verify sRGB 0.5 -> about
+188, alpha compositing, gradient direction and fractional corner coverage.
+They also check coalescing, stable identical-scene render count, physical
+resize, invalid update preservation, strict policy and teardown.
+
+GraphicsInfo reports the actual selected API/adapter and physical size.
+cached_texture_bytes counts the retained offscreen color attachment only
+(width*height*4); it excludes swapchain buffers, driver/pipeline/instance data
+and capture staging storage. A counter or compiled binary is not proof of
+target execution or a Qt performance comparison. See Verification.md for
+the recorded hardware/runtime evidence and deferred platforms.

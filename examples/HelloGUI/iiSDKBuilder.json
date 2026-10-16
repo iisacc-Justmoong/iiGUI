@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "app": {
+    "name": "HelloGUI",
+    "source": ".",
+    "depends": ["iiGUI"],
+    "cache": {"BUILD_TESTING": "ON"},
+    "targets": ["HelloGUI"]
+  },
+  "sdkRoot": "../../..",
+  "sdks": [
+    {
+      "name": "iiSDKCore",
+      "source": "../../../iiSDKCore",
+      "cache": {"BUILD_SHARED_LIBS": "OFF"}
+    },
+    {
+      "name": "iiGUI",
+      "source": "../..",
+      "depends": ["iiSDKCore"],
+      "cache": {"BUILD_TESTING": "ON", "BUILD_SHARED_LIBS": "OFF"}
+    }
+  ],
+  "buildRoot": "../../build/desktop",
+  "cmake": "cmake",
+  "configuration": "Release",
+  "jobs": 4,
+  "parallelKits": 1,
+  "timeoutSeconds": 1800,
+  "kits": [{
+    "id": "windows",
+    "platform": "windows",
+    "environment": {"CPATH": "", "CPLUS_INCLUDE_PATH": "", "C_INCLUDE_PATH": "", "LIBRARY_PATH": ""},
+    "cache": {
+      "CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON"
+    }
+  }, {
+    "id": "macos",
+    "platform": "macos",
+    "environment": {"CPATH": "", "CPLUS_INCLUDE_PATH": "", "C_INCLUDE_PATH": "", "LIBRARY_PATH": ""},
+    "cache": {
+      "CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON"
+    }
+  }, {
+    "id": "linux",
+    "platform": "linux",
+    "environment": {"CPATH": "", "CPLUS_INCLUDE_PATH": "", "C_INCLUDE_PATH": "", "LIBRARY_PATH": ""},
+    "cache": {
+      "CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON",
+      "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON"
+    }
+  }]
+}

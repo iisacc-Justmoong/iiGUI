@@ -1,0 +1,107 @@
+cmake_minimum_required(VERSION 3.31)
+project(iiGUI VERSION 0.4.0 LANGUAGES CXX)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    enable_language(OBJCXX)
+    set(_host_source src/Host.mm)
+    set(_graphics_source src/CanvasMetal.mm)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(_host_source src/HostWindows.cpp)
+    set(_graphics_source src/CanvasWindows.cpp)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
+    find_package(X11 REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(NativeGraphics REQUIRED IMPORTED_TARGET pangocairo egl glesv2)
+    set(_host_source src/HostLinux.cpp)
+    set(_graphics_source src/CanvasLinux.cpp)
+else()
+    message(FATAL_ERROR "iiGUI supports native Windows, macOS and Linux/X11 desktop hosts")
+endif()
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(GenerateExportHeader)
+include(CTest)
+set(_iigui_user_home "$ENV{HOME}")
+if(WIN32 AND _iigui_user_home STREQUAL "")
+    set(_iigui_user_home "$ENV{USERPROFILE}")
+endif()
+if(PROJECT_IS_TOP_LEVEL AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND NOT _iigui_user_home STREQUAL "")
+    set(CMAKE_INSTALL_PREFIX "${_iigui_user_home}/.local/SDK/iiGUI" CACHE PATH "SDK install prefix" FORCE)
+endif()
+option(BUILD_SHARED_LIBS "Build a shared iiGUI library" OFF)
+option(IIGUI_SANITIZE "Enable address/undefined behavior sanitizers" OFF)
+find_package(iiSDKCore 0.16 CONFIG REQUIRED COMPONENTS Runtime)
+
+add_library(iiGUI src/Dispatch.cpp src/Graphics.cpp ${_host_source} ${_graphics_source})
+add_library(iiGUI::iiGUI ALIAS iiGUI)
+target_compile_features(iiGUI PUBLIC cxx_std_23)
+target_link_libraries(iiGUI PUBLIC iiSDKCore::Runtime)
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(iiGUI PRIVATE "-framework AppKit" "-framework CoreFoundation" "-framework Metal" "-framework QuartzCore")
+    set_source_files_properties(src/Host.mm src/CanvasMetal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+elseif(WIN32)
+    target_link_libraries(iiGUI PRIVATE user32 gdi32 d3d11 dxgi d3dcompiler d2d1 dwrite)
+    target_compile_definitions(iiGUI PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
+else()
+    target_link_libraries(iiGUI PRIVATE X11::X11 PkgConfig::NativeGraphics)
+endif()
+target_include_directories(iiGUI PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+generate_export_header(iiGUI BASE_NAME IIGUI
+    EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/include/iiGUI/Export.h")
+if(NOT BUILD_SHARED_LIBS)
+    target_compile_definitions(iiGUI PUBLIC IIGUI_STATIC_DEFINE)
+endif()
+if(MSVC)
+    target_compile_options(iiGUI PRIVATE /W4 PUBLIC /Zc:__cplusplus /utf-8)
+else()
+    target_compile_options(iiGUI PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+set_target_properties(iiGUI PROPERTIES CXX_EXTENSIONS OFF OBJCXX_EXTENSIONS OFF
+    OBJCXX_STANDARD 23 OBJCXX_STANDARD_REQUIRED YES
+    CXX_VISIBILITY_PRESET hidden OBJCXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN YES VERSION ${PROJECT_VERSION} SOVERSION 0)
+if(IIGUI_SANITIZE)
+    if(MSVC)
+        message(FATAL_ERROR "IIGUI_SANITIZE requires Clang/GCC address and undefined behavior sanitizers")
+    endif()
+    target_compile_options(iiGUI PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(iiGUI PUBLIC -fsanitize=address,undefined)
+endif()
+
+set(_package "${CMAKE_INSTALL_LIBDIR}/cmake/iiGUI")
+install(TARGETS iiGUI EXPORT iiGUITargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(DIRECTORY include/iiGUI DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/iiGUI/Export.h"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iiGUI)
+install(EXPORT iiGUITargets NAMESPACE iiGUI:: DESTINATION "${_package}")
+configure_package_config_file(cmake/iiGUIConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfig.cmake" INSTALL_DESTINATION "${_package}")
+write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION} COMPATIBILITY SameMajorVersion)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfigVersion.cmake" DESTINATION "${_package}")
+install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI)
+install(DIRECTORY docs/ DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI/docs)
+
+if(BUILD_TESTING)
+    add_executable(iiGUIIOFixture tests/io_fixture.cpp)
+    target_link_libraries(iiGUIIOFixture PRIVATE iiSDKCore::Runtime)
+    add_executable(iiGUIHostTests tests/host.cpp)
+    target_link_libraries(iiGUIHostTests PRIVATE iiGUI::iiGUI)
+    foreach(_case contracts lifecycle wakeup earlier_deadline close_veto failure close_failure shutdown_race producer_race full_queue wrong_thread graphics_contracts graphics core_io core_operation core_frame core_stop)
+        add_test(NAME iiGUI.${_case} COMMAND iiGUIHostTests ${_case} $<TARGET_FILE:iiGUIIOFixture>)
+        set_tests_properties(iiGUI.${_case} PROPERTIES TIMEOUT 15 RUN_SERIAL TRUE)
+    endforeach()
+    find_package(Python3 3.9 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME iiGUI.boundary COMMAND "${Python3_EXECUTABLE}" -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/boundary.py" "${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME iiGUI.tooling COMMAND "${Python3_EXECUTABLE}" -B
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/tooling.py" "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
