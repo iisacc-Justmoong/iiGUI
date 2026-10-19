@@ -1,6 +1,11 @@
 # iiGUI
 
-iiGUI 0.4.0 is a C++23 native desktop GUI host and retained GPU canvas above iiSDKCore 0.16. The same
+Package release: **0.4.1** (2026-10-19). This patch packages the current
+source snapshot; build, test and installation evidence is recorded in the SDK
+patch-release report. Earlier versioned feature notes remain historical.
+
+
+iiGUI 0.4.1 is a C++23 native desktop GUI host and retained GPU canvas above iiSDKCore 0.16. The same
 public API and HelloGUI source build on Windows, macOS and Linux. Each backend
 uses its platform window system directly. Qt, SDL, a WebView, JavaScript engine
 and an application interpreter are not used. Standard C/C++ runtime libraries
