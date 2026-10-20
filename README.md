@@ -171,3 +171,11 @@ For cross consumption add `-DTOOLCHAIN=/path/to/toolchain.cmake` and
 [architecture](docs/Architecture.md), [usage](docs/Usage.md) and
 [verification](docs/Verification.md), [GPU contracts](docs/Graphics.md) and
 [Qt GUI comparison](docs/QtGuiComparison.md) for contracts and evidence boundaries.
+
+## License
+
+SPDX-License-Identifier: MIT
+
+The original code and documentation in this repository are licensed under the
+[MIT License](LICENSE). Third-party code, libraries, fonts, tools, and model
+weights retain their respective licenses.
