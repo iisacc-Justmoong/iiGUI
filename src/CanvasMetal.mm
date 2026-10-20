@@ -2,6 +2,7 @@
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include "NativeCanvas.h"
+#include "NativeText.h"
 #include <optional>
 
 namespace ii::gui::detail {
@@ -29,6 +30,14 @@ fragment float4 fragment_main(Varying v [[stage_in]]) {
     float4 color = mix(v.top,v.bottom,clamp(v.local.y/v.size.y,0.0,1.0));
     color.a *= coverage; return float4(color.rgb*color.a,color.a);
 }
+vertex float4 text_vertex(uint index [[vertex_id]]) {
+    const float2 corners[]={float2(-1,1),float2(1,1),float2(-1,-1),float2(-1,-1),float2(1,1),float2(1,-1)};
+    return float4(corners[index],0,1);
+}
+fragment float4 text_fragment(float4 position [[position]], texture2d<float> glyphs [[texture(0)]]) {
+    float4 color=glyphs.read(uint2(position.xy));
+    return float4(color.rgb*color.a,color.a);
+}
 )metal";
 void require(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
 std::runtime_error metal_error(NSError* error) {
@@ -37,12 +46,13 @@ std::runtime_error metal_error(NSError* error) {
 }
 }
 
-struct NativeCanvas::Impl final {
+struct PlatformCanvas::Impl final {
     NSView* view = nil;
     CAMetalLayer* layer = nil;
     id<MTLDevice> device = nil;
     id<MTLCommandQueue> queue = nil;
     id<MTLRenderPipelineState> pipeline = nil;
+    id<MTLRenderPipelineState> text_pipeline = nil;
     id<MTLTexture> texture = nil;
     id<MTLCommandBuffer> submitted = nil;
     std::optional<CanvasFrame> previous;
@@ -70,6 +80,10 @@ struct NativeCanvas::Impl final {
         color.destinationRGBBlendFactor = color.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         pipeline = [device newRenderPipelineStateWithDescriptor:descriptor error:&error];
         if (!pipeline) throw metal_error(error);
+        descriptor.vertexFunction=[library newFunctionWithName:@"text_vertex"];
+        descriptor.fragmentFunction=[library newFunctionWithName:@"text_fragment"];
+        text_pipeline=[device newRenderPipelineStateWithDescriptor:descriptor error:&error];
+        if (!text_pipeline) throw metal_error(error);
         layer = [CAMetalLayer layer];
         layer.device = device;
         layer.pixelFormat = MTLPixelFormatBGRA8Unorm_sRGB;
@@ -132,6 +146,19 @@ struct NativeCanvas::Impl final {
                 [encoder setVertexBytes:size length:sizeof(size) atIndex:1];
                 [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:panels.size()];
             }
+            if (!frame.texts.empty()) {
+                const auto bitmap=rasterize_text(frame,scale);
+                auto descriptor=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB
+                    width:width height:pixels_high mipmapped:NO];
+                descriptor.usage=MTLTextureUsageShaderRead; descriptor.storageMode=MTLStorageModeShared;
+                auto glyphs=[device newTextureWithDescriptor:descriptor];
+                require(glyphs!=nil,"Cannot allocate Metal text texture");
+                [glyphs replaceRegion:MTLRegionMake2D(0,0,width,pixels_high) mipmapLevel:0
+                    withBytes:bitmap.rgba.data() bytesPerRow:std::size_t(width)*4];
+                [encoder setRenderPipelineState:text_pipeline];
+                [encoder setFragmentTexture:glyphs atIndex:0];
+                [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+            }
             [encoder endEncoding];
             ++statistics.scene_renders;
         }
@@ -174,12 +201,12 @@ struct NativeCanvas::Impl final {
         return result;
     }
 };
-NativeCanvas::NativeCanvas(void* parent, void*, Acceleration) : impl_(std::make_unique<Impl>()) {
+PlatformCanvas::PlatformCanvas(void* parent, void*, Acceleration) : impl_(std::make_unique<Impl>()) {
     impl_->initialize((__bridge NSView*)parent);
 }
-NativeCanvas::~NativeCanvas() = default;
-void NativeCanvas::draw(const CanvasFrame& f,double s,double h) { impl_->draw(f,s,h); }
-PixelBuffer NativeCanvas::capture() { return impl_->capture(); }
-GraphicsInfo NativeCanvas::info() const { return impl_->statistics; }
-bool NativeCanvas::native_event(const void*) { return false; }
+PlatformCanvas::~PlatformCanvas() = default;
+void PlatformCanvas::draw(const CanvasFrame& f,double s,double h) { impl_->draw(f,s,h); }
+PixelBuffer PlatformCanvas::capture() { return impl_->capture(); }
+GraphicsInfo PlatformCanvas::info() const { return impl_->statistics; }
+bool PlatformCanvas::native_event(const void*) { return false; }
 } // namespace ii::gui::detail

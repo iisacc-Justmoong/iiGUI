@@ -17,8 +17,8 @@ struct CanvasState final {
         if (!valid_canvas(value)) return core::fail(core::ErrorCode::invalid_argument, "Invalid GPU canvas geometry, color or acceleration policy");
         try {
             (void)canvas_pixels(value, backing_scale);
-            if (!native || frame->acceleration != value.acceleration) {
-                auto replacement = std::make_unique<NativeCanvas>(parent, display, value.acceleration);
+            if (!native || frame->acceleration != value.acceleration || frame->renderer!=value.renderer) {
+                auto replacement = std::make_unique<NativeCanvas>(parent, display, value.acceleration,value.renderer);
                 native = std::move(replacement);
                 dirty = true;
             }

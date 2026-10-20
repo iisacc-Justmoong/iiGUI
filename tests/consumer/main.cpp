@@ -10,8 +10,11 @@
 
 static_assert(__cplusplus >= 202302L, "Consumer must inherit C++23 from the installed SDK");
 using namespace std::chrono_literals;
-int main() {
+int main(int argc,char** argv) {
     try {
+        const bool vulkan=argc==2 && std::string_view(argv[1])=="--vulkan";
+        if (argc>1 && !vulkan) throw std::runtime_error("Usage: installed consumer [--vulkan]");
+        const auto renderer=vulkan?ii::gui::Renderer::vulkan:ii::gui::Renderer::automatic;
         ii::gui::Host host({.title="iiGUI installed consumer"});
         auto ui = host.executor();
         ii::runtime::Runtime workers({.workers=1});
@@ -19,7 +22,7 @@ int main() {
         ii::runtime::TaskScope view;
         std::unique_ptr<ii::runtime::FrameLoop> frames;
         int ticks = 0, value = 0;
-        bool resized = false, closed = false, gpu = false, scoped = false;
+        bool resized = false, closed = false, gpu = false, scoped = false, lvui_rendered = false;
         int frame_updates=0;
         auto result = host.run({
             .opened=[&] {
@@ -30,7 +33,16 @@ int main() {
                     throw std::runtime_error("Installed structural timed scope failed");
                 if (!host.set_text("Installed iiGUI consumer\nC++23 · no source-tree headers") ||
                     !host.set_content_size({760, 480})) throw std::runtime_error("Native setup failed");
+                auto document=lvui::parse("<view style='padding:20px; background:#123456'><p style='color:white'>Installed LVUI 한글</p></view>");
+                if (!document || !host.set_view(*document,renderer)) throw std::runtime_error("Installed LVUI package failed");
+                auto view_pixels=host.capture_canvas();
+                if (!view_pixels) throw std::runtime_error("Installed LVUI rendering failed");
+                std::size_t glyph_pixels=0;
+                for (std::size_t i=0;i<view_pixels->rgba.size();i+=4)
+                    if (view_pixels->rgba[i]>200 && view_pixels->rgba[i+1]>200 && view_pixels->rgba[i+2]>200) ++glyph_pixels;
+                lvui_rendered=glyph_pixels>20;
                 ii::gui::CanvasFrame frame{.viewport={28,150,320,180},.background={0,0,0,1}};
+                frame.renderer=renderer;
                 frame.panels.push_back({.bounds={16,16,288,148},.top={0.02f,0.1f,0.9f,1},
                     .bottom={0.01f,0.65f,0.2f,1},.radius=20});
                 if (!ii::gui::valid_canvas(frame) || !host.set_canvas(std::move(frame)))
@@ -40,6 +52,7 @@ int main() {
                     if (++ticks >= 3 && value == 42 && resized && scoped && frame_updates>=3) {
                         const auto pixels=host.capture_canvas(); const auto info=host.graphics_info();
                         gpu=pixels && info && info->srgb_attachment && info->scene_renders>0 && !info->adapter.empty();
+                        if (vulkan) gpu=gpu && info->api==ii::gui::GraphicsApi::vulkan && info->presentations>0;
                         if (!gpu) throw std::runtime_error("Installed native GPU failed");
                         (void)host.request_close();
                     }
@@ -59,11 +72,11 @@ int main() {
         });
         const auto stopped=operations.close(); const auto released=view.close();
         frames.reset();
-        if (!workers.join() || !stopped || !released || !result || ticks < 3 || value != 42 || !resized || !closed || !gpu || !scoped)
+        if (!workers.join() || !stopped || !released || !result || ticks < 3 || value != 42 || !resized || !closed || !gpu || !scoped || !lvui_rendered)
             throw std::runtime_error("Installed consumer acceptance failed");
         std::cout << "INSTALLED_GUI_OK ticks=" << ticks << " background=" << value
                   << " resize=" << std::boolalpha << resized << " closed=" << closed << " gpu=" << gpu
-                  << " core_frames=" << frame_updates << " scoped=" << scoped << '\n';
+                  << " core_frames=" << frame_updates << " scoped=" << scoped << " lvui=" << lvui_rendered << " vulkan=" << vulkan << '\n';
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

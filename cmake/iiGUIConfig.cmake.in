@@ -1,10 +1,12 @@
 @PACKAGE_INIT@
 include(CMakeFindDependencyMacro)
 find_dependency(iiSDKCore 0.16 CONFIG COMPONENTS Runtime)
+find_dependency(LVUI 0.1 CONFIG)
+find_dependency(Vulkan 1.1)
 if("@CMAKE_SYSTEM_NAME@" STREQUAL "Linux")
     find_dependency(X11)
     find_dependency(PkgConfig)
-    pkg_check_modules(NativeGraphics REQUIRED IMPORTED_TARGET pangocairo egl glesv2)
+    pkg_check_modules(NativeGraphics REQUIRED IMPORTED_TARGET pangocairo)
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/iiGUITargets.cmake")
 check_required_components(iiGUI)

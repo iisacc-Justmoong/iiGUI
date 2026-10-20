@@ -1,5 +1,8 @@
 # C++23 host usage
 
+For declarative `.lvui` views with inline styles, start with [LVUI](LVUI.md)
+and `Host::set_view`. The imperative host/canvas API below remains available.
+
 ```cmake
 find_package(iiGUI 0.4 CONFIG REQUIRED)
 add_executable(MyApp WIN32 MACOSX_BUNDLE main.cpp)
@@ -116,3 +119,11 @@ scene; the native host submits it after Core dispatch. Destroy FrameLoop after
 run returns while Host remains alive. The installed consumer checks the same
 path through relocated packages. Channel watch/read/write callbacks use the same
 UI endpoint and ownership rules; use Runtime/AsyncIO for blocking transfers.
+
+## Graphics backend selection
+
+`CanvasFrame::renderer` selects `Renderer::automatic`, `Renderer::native` or
+`Renderer::vulkan`. The default tries Metal/Direct3D hardware, then Vulkan.
+Linux starts with Vulkan. `Host::set_view(document, renderer)` forwards the
+same selection. Inspect `GraphicsInfo::fallback` and `fallback_reason` alongside
+`api`/`adapter` for the actual outcome. See [Renderers](Renderers.md).

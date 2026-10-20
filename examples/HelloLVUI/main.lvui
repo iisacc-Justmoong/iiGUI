@@ -1,0 +1,17 @@
+<main style="padding:32px; gap:20px; background:#101827; color:#eaf1ff; font-size:16px">
+  <h1>LVUI · Native by design</h1>
+  <p style="color:#a6b8d4">HTML-shaped views. Inline styles. Drawn directly by iiGUI.</p>
+  <div style="flex-direction:row; gap:16px">
+    <section id="language" style="padding:24px; gap:12px; background:#1c304e; border-radius:18px">
+      <text style="font-size:22px; font-weight:bold">One view language</text>
+      <p>태그와 인라인 스타일로 작성한 독립적인 선언적 UI이다.</p>
+      <p style="color:#a9c8ff">UTF-8 · native text shaping · responsive rows</p>
+    </section>
+    <section id="graphics" style="padding:24px; gap:12px; background:#204137; border-radius:18px">
+      <text style="font-size:22px; font-weight:bold">Native graphics</text>
+      <p>iiSDKCore drives the host. iiGUI lays out boxes and presents native GPU graphics.</p>
+      <p style="color:#a5e5bf">Metal · Direct3D 11 · Vulkan</p>
+    </section>
+  </div>
+  <p style="color:#a6b8d4; font-size:14px">Resize the window to reflow the view. Close the window to exit.</p>
+</main>

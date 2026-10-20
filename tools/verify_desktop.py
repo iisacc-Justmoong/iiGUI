@@ -46,7 +46,9 @@ def make_manifest(source, output, platform, toolchain=None, cache=None):
 
 def build_environment(toolchain, original=None):
     environment = dict(os.environ if original is None else original)
-    for key in ('CPATH', 'CPLUS_INCLUDE_PATH', 'C_INCLUDE_PATH', 'LIBRARY_PATH'):
+    for key in ('CPATH', 'CPLUS_INCLUDE_PATH', 'C_INCLUDE_PATH', 'LIBRARY_PATH',
+                'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH', 'DYLD_FALLBACK_LIBRARY_PATH',
+                'DYLD_FRAMEWORK_PATH', 'DYLD_FALLBACK_FRAMEWORK_PATH'):
         environment.pop(key, None)
     if toolchain:
         environment.pop('PKG_CONFIG_PATH', None)
@@ -124,6 +126,7 @@ def main(argv=None):
             report['helloGUI'] = 'passed'
         package = [cmake, '-DSOURCE='+source.as_posix(), '-DBUILD='+run.as_posix(),
                    '-DCORE_BUILD='+(kit/'sdk/iiSDKCore/build').as_posix(),
+                   '-DLVUI_BUILD='+(kit/'sdk/LVUI/build').as_posix(),
                    '-DGUI_BUILD='+gui_build.as_posix()]
         if args.toolchain:
             package.append('-DTOOLCHAIN='+args.toolchain.resolve().as_posix())

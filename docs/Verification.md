@@ -258,3 +258,82 @@ WASM compilations are not iiGUI mobile/web backends or target execution proof.
 Global SDK installs, previous validation runs and running product applications
 remain untouched. Source/native-runtime and cross-compilation evidence are kept
 separate in both module reports.
+
+## LVUI implementation verification — 2026-10-20
+
+The working-tree LVUI addition was built and executed on macOS with an Apple
+M1 Max Metal device. The source package version remains the previously released
+iiGUI 0.4.1; these results describe the new source, not an already published SDK.
+
+- LVUI parser: 4/4 tests passed, including grammar, styles, diagnostics and limits.
+- iiGUI: 23/23 tests passed, including the previous host/Core/GPU suite,
+  LVUI layout/invalid/native tests and HelloLVUI's real native self-test.
+- A separately copied consumer built and ran against relocated installed
+  Core/LVUI/iiGUI packages. It verified actual LVUI glyph pixels in GPU capture
+  and printed `lvui=true` in its acceptance result.
+- LVUI native rendering verified sRGB source colors, shaped glyph pixels,
+  linear-light text alpha, explicit rectangular glyph clipping, resize/reflow,
+  retained equal-scene reuse and preservation after invalid view replacement.
+- HelloLVUI's `--capture` output was converted to PNG and visually inspected:
+  Korean/Latin text, native wrapping, inline colors and rounded backgrounds.
+
+Evidence is under the canonical iiGUI `build/`: `lvui-full-tests.xml`,
+`lvui-full-tests.log`, `lvui-package-check.log`, `lvui-preview.png`, and the
+final `lvui-verification.json`. Parser evidence is under the sibling LVUI
+`build/`: `lvui-parser-tests.xml` and `lvui-parser-tests.log`.
+
+The executable's direct links and undefined symbols contain no Qt, WebKit or
+WebView API. The actual dyld inventory on macOS 27.0.1 does include OS WebKit
+images: a separate minimal AppKit window with no LVUI, Core, iiGUI, text label
+or GPU renderer loads the same images. Merely linking AppKit, running parser
+contracts, or measuring LVUI fonts does not load them. This is observed native
+window-system behavior on this host, not a WebView used for LVUI parsing or
+rendering. The report preserves the actual and baseline module inventories;
+it does not claim that the macOS process maps no browser-related system image.
+
+Windows and Linux have corresponding native text/composition implementations,
+but this LVUI change has not been built or executed on those targets. Earlier
+platform results above describe earlier source snapshots. No installed global
+SDK, Congregation UI or running user application was replaced by this check.
+
+## Native acceleration and Vulkan fallback verification
+
+The subsequent working-tree renderer addition uses Cocoa/AppKit + Metal on
+macOS, Win32 + Direct3D 11 hardware on Windows, and Vulkan as the shared
+fallback/Linux default. The old Linux EGL/GLES source is retired.
+
+On macOS 27.0.1 arm64 with an Apple M1 Max:
+
+- The full iiGUI suite passed 28/28, including renderer policy, native and
+  forced-Vulkan LVUI, native and Vulkan GPU quality, shader provenance, host
+  lifecycle and Core integration. The final Vulkan source checks device
+  buffer/image limits before allocation.
+- Relocated installed consumers passed 2/2: automatic/native-first and forced
+  Vulkan. Vulkan dependency paths are forwarded from the same target kit;
+  LD/DYLD runtime overrides are removed during configure/build/execution.
+- Vulkan/MoltenVK 1.4.2 executed real graphics, native swapchain presentation,
+  capture, resize and text composition. Default macOS execution reported
+  Metal; forced execution reported Vulkan. Discovery alone is not the proof.
+- The same 1600 x 1080 LVUI scene captured with Metal and Vulkan had identical
+  RGB values across all 1,728,000 pixels. This is parity for this scene/device,
+  not a cross-platform image-quality or performance claim.
+- Automatic native-initialization/draw failure and strict hardware behavior
+  are deterministic private policy tests. No physical Metal/DirectX device
+  was disabled; forced Vulkan supplies the separate real execution evidence.
+
+The first cold Vulkan LVUI test hit a pre-initialization five-second callback
+watchdog. Initialization is now bounded by the outer CTest timeout, and the
+callback watchdog is armed after admission. The final full suite passed with
+all functional assertions retained. Initial failure logs are preserved in
+`build/Testing/Temporary/LastTestsFailed.log` when CTest retains them; only the
+final named XML/log files below describe the completed run.
+
+Evidence: `build/vulkan-full-tests.xml`, `build/vulkan-full-tests.log`,
+`build/vulkan-package-check.log`, `build/vulkan-final-consumer.log`,
+`build/vulkan-metal-comparison.json`, `build/vulkan-preview.png`, and
+`build/vulkan-verification.json`. See [renderer contracts](Renderers.md).
+
+This Vulkan change has not been compiled or executed on Windows/Linux in this
+run. Their implementation and native surface code are present; earlier SDK
+platform results do not establish this change's target execution. Global SDK
+installs, Congregation's LVRS/QML UI, and running user apps remain untouched.

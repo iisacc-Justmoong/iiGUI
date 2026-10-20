@@ -8,18 +8,18 @@ root = Path(sys.argv[1])
 violations = []
 for base in (root / 'include', root / 'src'):
     for file in base.rglob('*'):
-        if not file.is_file():
+        if not file.is_file() or file.suffix not in {'.h', '.hpp', '.cpp', '.cc', '.mm', '.m'}:
             continue
         source = file.read_text()
-        if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:Qt|Q[A-Z]|SDL)', source, re.M):
+        if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:Qt|Q[A-Z]|SDL|WebKit|WebView|webkit|cef_)', source, re.M):
             violations.append(f'{file}: GUI-framework dependency')
         if file.is_relative_to(root / 'include') and re.search(
-                r'^\s*#\s*(?:include|import)\s*[<"](?:AppKit|Foundation|CoreFoundation|Metal|QuartzCore|CoreGraphics|objc|[Ww]indows\.h|[Dd]3[dD]|[Dd][Xx][Gg][Ii]|d2d|dwrite|EGL/|GLES|X11/|wayland|sys/)', source, re.M):
+                r'^\s*#\s*(?:include|import)\s*[<"](?:AppKit|Foundation|CoreFoundation|Metal|QuartzCore|CoreGraphics|objc|[Ww]indows\.h|[Dd]3[dD]|[Dd][Xx][Gg][Ii]|d2d|dwrite|vulkan/|EGL/|GLES|X11/|wayland|sys/)', source, re.M):
             violations.append(f'{file}: native type leaked into public API')
         if re.search(r'\b(?:ofstream|fopen|freopen|creat)\s*\(', source):
             violations.append(f'{file}: file creation bypasses iiFileProvider')
 for file in (root / 'CMakeLists.txt', root / 'cmake/iiGUIConfig.cmake.in'):
-    if re.search(r'(?:find_package|find_dependency)\s*\(\s*(?:Qt|SDL)', file.read_text()):
+    if re.search(r'(?:find_package|find_dependency)\s*\(\s*(?:Qt|SDL|WebKit|WebView|CEF)', file.read_text()):
         violations.append(f'{file}: framework package dependency')
 manifest = json.loads((root / 'examples/HelloGUI/iiSDKBuilder.json').read_text())
 if {kit['platform'] for kit in manifest['kits']} != {'windows', 'macos', 'linux'}:
@@ -31,4 +31,4 @@ if re.search(r'^\s*#\s*(?:if|elif)', hello, re.M):
     violations.append('HelloGUI must use the same C++23 application code on every desktop')
 if violations:
     raise SystemExit('\n'.join(violations))
-print('iiGUI source/package boundary: C++23 public API, Core-only SDK dependency, no Qt/SDL/file creation')
+print('iiGUI source/package boundary: C++23 public API, Core/LVUI SDKs, no Qt/SDL/browser/WebView/file creation')

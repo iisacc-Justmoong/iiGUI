@@ -5,6 +5,7 @@
 #include <dxgi1_2.h>
 #include <wrl/client.h>
 #include "NativeCanvas.h"
+#include "NativeText.h"
 #include <optional>
 #include <cstring>
 
@@ -33,6 +34,15 @@ float4 fragment_main(Varying v) : SV_TARGET {
     float4 color=lerp(v.top,v.bottom,saturate(v.local.y/v.size.y));
     color.a*=coverage; return float4(color.rgb*color.a,color.a);
 }
+Texture2D<float4> glyphs : register(t1);
+float4 text_vertex(uint vertex : SV_VertexID) : SV_POSITION {
+    const float2 corners[]={float2(-1,1),float2(1,1),float2(-1,-1),float2(-1,-1),float2(1,1),float2(1,-1)};
+    return float4(corners[vertex],0,1);
+}
+float4 text_fragment(float4 position : SV_POSITION) : SV_TARGET {
+    float4 color=glyphs.Load(int3(int2(position.xy),0));
+    return float4(color.rgb*color.a,color.a);
+}
 )hlsl";
 ComPtr<ID3DBlob> compile(const char* entry, const char* profile) {
     ComPtr<ID3DBlob> code, errors;
@@ -50,7 +60,7 @@ std::string utf8(const wchar_t* text) {
     value.pop_back(); return value;
 }
 }
-struct NativeCanvas::Impl final {
+struct PlatformCanvas::Impl final {
     HWND window=nullptr;
     HINSTANCE instance=GetModuleHandleW(nullptr);
     std::wstring class_name;
@@ -60,6 +70,8 @@ struct NativeCanvas::Impl final {
     ComPtr<IDXGISwapChain> swapchain;
     ComPtr<ID3D11VertexShader> vertex;
     ComPtr<ID3D11PixelShader> fragment;
+    ComPtr<ID3D11VertexShader> text_vertex;
+    ComPtr<ID3D11PixelShader> text_fragment;
     ComPtr<ID3D11Buffer> view;
     ComPtr<ID3D11BlendState> blend;
     ComPtr<ID3D11RasterizerState> rasterizer;
@@ -79,16 +91,13 @@ struct NativeCanvas::Impl final {
         if (message==WM_PAINT) { PAINTSTRUCT p{}; BeginPaint(window,&p); EndPaint(window,&p); return 0; }
         return DefWindowProcW(window,message,w,l);
     }
-    void initialize(HWND parent,Acceleration policy) {
+    void initialize(HWND parent,Acceleration) {
         const D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0};
         D3D_FEATURE_LEVEL level{};
         auto result=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             levels,1,D3D11_SDK_VERSION,&device,&level,&context);
         statistics.hardware=SUCCEEDED(result);
-        if (FAILED(result) && policy==Acceleration::prefer_hardware)
-            result=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_WARP,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-                levels,1,D3D11_SDK_VERSION,&device,&level,&context);
-        checked(result,"No suitable Direct3D 11 hardware device (or permitted WARP fallback)");
+        checked(result,"No suitable Direct3D 11 hardware device");
         ComPtr<IDXGIDevice> dxgi;
         ComPtr<IDXGIAdapter> adapter;
         ComPtr<IDXGIFactory> factory;
@@ -102,8 +111,8 @@ struct NativeCanvas::Impl final {
             checked(adapter1->GetDesc1(&details),"Cannot query DXGI adapter flags");
             if (details.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) statistics.hardware=false;
         }
-        if (policy==Acceleration::require_hardware && !statistics.hardware)
-            throw std::runtime_error("DXGI adapter reports software rendering; hardware was required");
+        if (!statistics.hardware)
+            throw std::runtime_error("DXGI adapter reports software rendering; native hardware acceleration is unavailable");
         checked(adapter->GetParent(IID_PPV_ARGS(&factory)),"Cannot access DXGI factory");
         statistics.api=GraphicsApi::direct3d11;
         statistics.adapter=utf8(description.Description);
@@ -126,6 +135,9 @@ struct NativeCanvas::Impl final {
         auto vs=compile("vertex_main","vs_5_0"), ps=compile("fragment_main","ps_5_0");
         checked(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,&vertex),"Cannot create D3D11 vertex pipeline");
         checked(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,&fragment),"Cannot create D3D11 pixel pipeline");
+        auto tvs=compile("text_vertex","vs_5_0"), tps=compile("text_fragment","ps_5_0");
+        checked(device->CreateVertexShader(tvs->GetBufferPointer(),tvs->GetBufferSize(),nullptr,&text_vertex),"Cannot create D3D11 text vertex pipeline");
+        checked(device->CreatePixelShader(tps->GetBufferPointer(),tps->GetBufferSize(),nullptr,&text_fragment),"Cannot create D3D11 text pixel pipeline");
         D3D11_BUFFER_DESC uniform{}; uniform.ByteWidth=16; uniform.Usage=D3D11_USAGE_DEFAULT;
         uniform.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
         checked(device->CreateBuffer(&uniform,nullptr,&view),"Cannot create D3D11 viewport constant buffer");
@@ -188,6 +200,22 @@ struct NativeCanvas::Impl final {
                 context->DrawInstanced(6,static_cast<UINT>(panels.size()),0,0);
                 ID3D11ShaderResourceView* empty=nullptr; context->VSSetShaderResources(0,1,&empty);
             }
+            if (!frame.texts.empty()) {
+                const auto bitmap=rasterize_text(frame,scale);
+                D3D11_TEXTURE2D_DESC desc{}; desc.Width=width; desc.Height=height;
+                desc.MipLevels=desc.ArraySize=1; desc.SampleDesc.Count=1;
+                desc.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.Usage=D3D11_USAGE_IMMUTABLE;
+                desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+                D3D11_SUBRESOURCE_DATA data{bitmap.rgba.data(),width*4,0};
+                ComPtr<ID3D11Texture2D> glyphs;
+                checked(device->CreateTexture2D(&desc,&data,&glyphs),"Cannot allocate D3D11 text texture");
+                ComPtr<ID3D11ShaderResourceView> resource;
+                checked(device->CreateShaderResourceView(glyphs.Get(),nullptr,&resource),"Cannot create D3D11 text view");
+                auto* input=resource.Get(); context->PSSetShaderResources(1,1,&input);
+                context->VSSetShader(text_vertex.Get(),nullptr,0); context->PSSetShader(text_fragment.Get(),nullptr,0);
+                context->Draw(6,0);
+                ID3D11ShaderResourceView* empty=nullptr; context->PSSetShaderResources(1,1,&empty);
+            }
             context->OMSetRenderTargets(0,nullptr,nullptr);
             ++statistics.scene_renders;
         }
@@ -213,12 +241,12 @@ struct NativeCanvas::Impl final {
         context->Unmap(staging.Get(),0); return result;
     }
 };
-NativeCanvas::NativeCanvas(void* parent,void*,Acceleration policy) : impl_(std::make_unique<Impl>()) {
+PlatformCanvas::PlatformCanvas(void* parent,void*,Acceleration policy) : impl_(std::make_unique<Impl>()) {
     impl_->initialize(static_cast<HWND>(parent),policy);
 }
-NativeCanvas::~NativeCanvas()=default;
-void NativeCanvas::draw(const CanvasFrame& f,double s,double) { impl_->draw(f,s); }
-PixelBuffer NativeCanvas::capture() { return impl_->capture(); }
-GraphicsInfo NativeCanvas::info() const { return impl_->statistics; }
-bool NativeCanvas::native_event(const void*) { return false; }
+PlatformCanvas::~PlatformCanvas()=default;
+void PlatformCanvas::draw(const CanvasFrame& f,double s,double) { impl_->draw(f,s); }
+PixelBuffer PlatformCanvas::capture() { return impl_->capture(); }
+GraphicsInfo PlatformCanvas::info() const { return impl_->statistics; }
+bool PlatformCanvas::native_event(const void*) { return false; }
 } // namespace ii::gui::detail

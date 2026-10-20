@@ -15,9 +15,15 @@
       "cache": {"BUILD_SHARED_LIBS": "OFF"}
     },
     {
+      "name": "LVUI",
+      "source": "../../../LVUI",
+      "depends": ["iiSDKCore"],
+      "cache": {"BUILD_TESTING": "ON"}
+    },
+    {
       "name": "iiGUI",
       "source": "../..",
-      "depends": ["iiSDKCore"],
+      "depends": ["iiSDKCore", "LVUI"],
       "cache": {"BUILD_TESTING": "ON", "BUILD_SHARED_LIBS": "OFF"}
     }
   ],

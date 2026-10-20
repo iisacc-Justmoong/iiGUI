@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 
+namespace lvui { class Document; }
 namespace ii::gui {
 namespace detail { struct DispatchState; }
 
@@ -95,6 +96,8 @@ public:
     // thread; use executor() for lifetime-safe cross-thread delivery.
     [[nodiscard]] core::Result<std::reference_wrapper<runtime::EventLoop>> event_loop();
     [[nodiscard]] core::Result<void> set_canvas(CanvasFrame frame);
+    // Parse separately; rejected layouts preserve the current canvas. Re-submit on resize.
+    [[nodiscard]] core::Result<void> set_view(const lvui::Document&, Renderer renderer = Renderer::automatic);
     [[nodiscard]] core::Result<void> clear_canvas();
     [[nodiscard]] core::Result<GraphicsInfo> graphics_info() const;
     // Explicit synchronous GPU readback; normal presentation never reads back.

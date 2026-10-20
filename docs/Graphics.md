@@ -2,7 +2,8 @@
 
 The public Graphics.h is standard C++23 and uses no native/Qt types. Host
 owns one optional canvas. Existing text-only applications do not initialize
-Metal, D3D or EGL. Core remains the runtime/scheduling dependency; Builder
+Metal, D3D or Vulkan devices. [Renderer selection](Renderers.md)
+uses Metal/Direct3D first, then Vulkan; Linux uses Vulkan directly. Core remains the runtime/scheduling dependency; Builder
 orchestrates compilation and is not linked into the GUI application.
 
 ## Rendering and resource use
@@ -20,7 +21,7 @@ The canvas background is opaque, so captures are also opaque.
 |---|---|---|
 | macOS | Metal native device, compiled MSL vertex/fragment pipeline | Private BGRA8Unorm_sRGB texture; GPU blit to CAMetalLayer, display-synced, two drawables |
 | Windows | D3D11 feature level 11.0, HLSL Shader Model 5 | Typeless RGBA8 texture with sRGB view; GPU copy to two-buffer DXGI flip-sequential swapchain, sync interval 1 |
-| Linux | EGL X11 window surface, GLES3 GLSL ES 300 pipeline | GL_SRGB8_ALPHA8 framebuffer; GPU blit to verified sRGB EGL surface, swap interval 1 |
+| Vulkan (all desktop hosts; Linux default) | Native surface, Vulkan 1.1 SPIR-V pipelines | RGBA8 sRGB image; GPU blit to a native FIFO swapchain; fence and per-image semaphore synchronization |
 
 Shaders are private driver-compiled GPU programs. The application itself is a
 native C++ binary; no common application VM, interpreter, Qt plugin or WebView
@@ -33,7 +34,9 @@ render only the final value. Equal snapshots do not re-render or present.
 Pipelines/device/attachment persist. Physical size changes reallocate the
 attachment; input updates replace only the small instance data. This API does
 not promise partial panel damage tracking or a general retained scene graph.
-No CPU pixel loop is used during rendering/presentation. GPU copy/blit and
+Panel rendering/presentation has no CPU pixel loop. Canvas text uses native
+glyph rasterization and a pixel-format conversion/upload on changed scenes,
+then a GPU text-composition pass; see [LVUI](LVUI.md). GPU copy/blit and
 swapchain buffers still consume device bandwidth/storage.
 
 An exposed Linux canvas presents its cached attachment. Cocoa/DWM retain the
@@ -52,22 +55,24 @@ scheduling, not an always-running SDK frame loop.
 - At most 4096 ordered panels. Radius is finite, 0..min(width,height)/2.
   Color components must be finite 0..1, and background alpha must equal 1.
   Panels clip to the viewport. Colors are SDR sRGB, not ICC/HDR/wide gamut.
-- `prefer_hardware`: Metal GPU, D3D hardware (WARP permitted when unavailable),
-  or the driver's EGL GLES implementation. CPU software graphics is not an
-  application interpreter; its availability is reported explicitly.
-- `require_hardware`: reject an unavailable/unverified hardware device. Metal
-  identifies its MTLDevice; Windows checks the selected driver and DXGI software
-  adapter flag. Linux requires a driver-reported DRM device via EGL device
-  queries and excludes software-device/known software renderer reports. An
-  unknown EGL device is conservatively `hardware=false`, even if its renderer
-  name sounds accelerated. Driver reports cannot establish physical GPU
-  isolation or performance guarantees.
-- Text-only hosting does not require a working GPU. Failed canvas initialization
+- At most 4096 text runs, each at most 64 KiB of valid UTF-8 with no NUL,
+  at most 1 MiB total. Font size is 8..256 logical units; weight is 400/700.
+  Runs wrap, clip to their positive content rectangle, and paint after panels.
+  Text uses the same finite geometry/color limits and is included in capture.
+- `prefer_hardware`: prefer the native Metal/Direct3D accelerator, then Vulkan.
+  Vulkan prefers classified hardware and permits software/unknown devices.
+- `require_hardware`: reject software/unknown/virtual Vulkan devices; only
+  integrated/discrete device reports satisfy this policy. Metal identifies its
+  MTLDevice; Windows checks the native driver/adapter hardware flag. Driver
+  reports do not guarantee physical isolation or performance.
+- API selection is separate: automatic, native-only or explicit Vulkan. A
+  native initialization/drawing failure in automatic mode retries through
+  Vulkan and records the actual API and fallback reason. Failure of Vulkan
+  itself uses normal guarded host cleanup. See [Renderers](Renderers.md).
+- Text-only hosting does not require a GPU device. Failed canvas initialization
   returns `unsupported`; invalid input returns `invalid_argument` and physical
-  coordinate overflow `out_of_range`. Rejected replacement preserves the prior
-  canvas. Device/allocation failures during deferred drawing enter Host's
-  guarded failure/normal cleanup path. Automatic GPU device-loss recovery,
-  context migration and hot GPU switching are not provided in this release.
+  coordinate overflow `out_of_range`. Rejected admission preserves the prior
+  canvas. Vulkan device-loss recovery/hot-device migration are outside scope.
 
 Canvas methods require the open host's owning UI thread. A missing canvas has
 GraphicsApi::none, while capture returns not_found. Closing/clearing releases
@@ -82,14 +87,14 @@ does not implicitly flush deferred work.
 work. It returns top-left-origin tightly packed RGBA8 sRGB bytes in memory;
 it may stall the UI and must not be used for normal frame presentation. Metal
 uses a shared staging buffer (256-byte aligned rows), D3D a staging texture,
-and GLES a framebuffer read. Tests use captures to verify sRGB 0.5 -> about
+and Vulkan an image-to-host buffer copy with explicit visibility/fence synchronization. Tests use captures to verify sRGB 0.5 -> about
 188, alpha compositing, gradient direction and fractional corner coverage.
 They also check coalescing, stable identical-scene render count, physical
 resize, invalid update preservation, strict policy and teardown.
 
 GraphicsInfo reports the actual selected API/adapter and physical size.
 cached_texture_bytes counts the retained offscreen color attachment only
-(width*height*4); it excludes swapchain buffers, driver/pipeline/instance data
-and capture staging storage. A counter or compiled binary is not proof of
+(width*height*4); it excludes swapchain buffers, driver/pipeline/instance data,
+capture staging storage and text raster/upload storage. A counter or compiled binary is not proof of
 target execution or a Qt performance comparison. See Verification.md for
 the recorded hardware/runtime evidence and deferred platforms.

@@ -18,16 +18,30 @@ inline std::pair<std::uint32_t, std::uint32_t> canvas_pixels(const CanvasFrame& 
 // Private platform boundary. No native type or handle is exposed by the SDK.
 // Cocoa: parent is NSView*. Win32: parent is HWND. X11: parent is Window,
 // display is Display*. All operations and destruction require the host owner.
-class NativeCanvas final {
+class PlatformCanvas final {
 public:
-    NativeCanvas(void* parent, void* display, Acceleration policy);
-    ~NativeCanvas();
-    NativeCanvas(const NativeCanvas&) = delete;
-    NativeCanvas& operator=(const NativeCanvas&) = delete;
+    PlatformCanvas(void* parent, void* display, Acceleration policy);
+    ~PlatformCanvas();
+    PlatformCanvas(const PlatformCanvas&) = delete;
+    PlatformCanvas& operator=(const PlatformCanvas&) = delete;
     void draw(const CanvasFrame&, double scale, double parent_height);
     PixelBuffer capture();
     GraphicsInfo info() const;
     bool native_event(const void* event);
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+class NativeCanvas final {
+public:
+    NativeCanvas(void* parent,void* display,Acceleration policy,Renderer renderer);
+    ~NativeCanvas();
+    NativeCanvas(const NativeCanvas&)=delete;
+    NativeCanvas& operator=(const NativeCanvas&)=delete;
+    void draw(const CanvasFrame&,double scale,double parent_height);
+    PixelBuffer capture();
+    GraphicsInfo info() const;
+    bool native_event(const void*);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

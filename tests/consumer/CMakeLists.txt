@@ -13,3 +13,6 @@ set_target_properties(iiGUIInstalledConsumer PROPERTIES CXX_EXTENSIONS OFF
 add_test(NAME iiGUI.installed_consumer COMMAND iiGUIInstalledConsumer)
 set_tests_properties(iiGUI.installed_consumer PROPERTIES TIMEOUT 15
     PASS_REGULAR_EXPRESSION "INSTALLED_GUI_OK.*background=42.*resize=true.*closed=true")
+add_test(NAME iiGUI.installed_vulkan_consumer COMMAND iiGUIInstalledConsumer --vulkan)
+set_tests_properties(iiGUI.installed_vulkan_consumer PROPERTIES TIMEOUT 20 RUN_SERIAL TRUE
+    PASS_REGULAR_EXPRESSION "INSTALLED_GUI_OK.*lvui=true.*vulkan=true")

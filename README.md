@@ -1,23 +1,29 @@
 # iiGUI
 
-[Windows 빌드 및 실행](docs/WindowsBuildAndRun.md)
+[Windows build and execution](docs/WindowsBuildAndRun.md)
 
 Package release: **0.4.1** (2026-10-19). This patch packages the current
 source snapshot; build, test and installation evidence is recorded in the SDK
 patch-release report. Earlier versioned feature notes remain historical.
 
+The working tree additionally implements [LVUI 0.1](docs/LVUI.md): an independent
+HTML-shaped view language with inline styles. iiGUI parses through the LVUI
+package, lays out native boxes/text and renders them into its GPU canvas.
+The new source requires `LVUI::LVUI` and Vulkan 1.1+. [Native rendering](docs/Renderers.md)
+uses Metal/Direct3D first and Vulkan as the default fallback; Linux uses Vulkan.
+Released 0.4.1 binaries do not include these additions until rebuilt. The version above is the last package release.
 
 iiGUI 0.4.1 is a C++23 native desktop GUI host and retained GPU canvas above iiSDKCore 0.16. The same
 public API and HelloGUI source build on Windows, macOS and Linux. Each backend
-uses its platform window system directly. Qt, SDL, a WebView, JavaScript engine
-and an application interpreter are not used. Standard C/C++ runtime libraries
+uses its platform window system directly. Qt, SDL, a WebView and a JavaScript engine
+are not used. Standard C/C++ runtime libraries
 and native system libraries remain normal deployment dependencies.
 
 | Target | Private backend | Requirements |
 |---|---|---|
-| Windows | Win32, DirectWrite/Direct2D text, Direct3D 11 flip presentation, wake event/deadline timer | Windows 10 1703+; C++23 compiler/Windows SDK; D3D feature level 11.0 device or permitted WARP fallback |
-| macOS | AppKit/CoreText text, Metal/CAMetalLayer, CFRunLoop wake/deadline sources | Xcode/Command Line Tools; logged-in WindowServer; Metal GPU for canvas |
-| Linux | X11, Pango/Cairo text, EGL/OpenGL ES 3, eventfd/poll | X11/XWayland desktop, fonts, EGL sRGB surface and GLES3 driver for canvas |
+| Windows | Win32, DirectWrite/Direct2D text, Direct3D 11 flip presentation, wake event/deadline timer | Windows 10 1703+; C++23 compiler/Windows SDK; D3D feature level 11.0 device; Vulkan loader/driver for fallback |
+| macOS | AppKit/CoreText text, Metal/CAMetalLayer, CFRunLoop wake/deadline sources | Xcode/Command Line Tools; logged-in WindowServer; Metal GPU; Vulkan/MoltenVK for fallback |
+| Linux | X11, Pango/Cairo text, Vulkan, eventfd/poll | X11/XWayland desktop, fonts, Vulkan graphics/presentation driver for canvas |
 
 Linux currently uses X11. A Wayland desktop needs XWayland; there is no direct
 Wayland backend. Linux derives a logical scale from the desktop's Xft.dpi
@@ -56,6 +62,10 @@ points. A cross build or binary inspection does not prove desktop execution.
   unverified/software device. Explicit in-memory capture supports pixel tests.
 - Native Unicode shaping and font fallback: AppKit/CoreText, DirectWrite, and
   Pango/Cairo. Linux no longer wraps text by repeatedly measuring UTF-8 prefixes.
+- LVUI document parsing, inline styles, bounded row/column layout, inherited
+  typography and native text composited into the captured GPU attachment.
+  `Host::set_view` accepts a parsed document; `layout_view` exposes logical ID
+  bounds. The common HelloLVUI example embeds a real `.lvui` source at build time.
 
 Mobile/web hosts, direct Wayland, editable text/IME, general input, a widget
 framework, custom-control accessibility, arbitrary vector/image drawing,
@@ -66,9 +76,9 @@ reverse iiGUI dependency is added to iiSDKCore.
 ## Build and test
 
 All hosts require CMake 3.31+, Ninja, a C++23 compiler with std::expected,
-iiSDKCore Runtime and Python 3.9+ for build-time checks. Python is not an
+iiSDKCore Runtime, LVUI 0.1, Vulkan 1.1+ and Python 3.9+ for build-time checks. Python is not an
 application dependency. On Debian-like systems the native development packages
-are `libx11-dev`, `libpango1.0-dev`, `libcairo2-dev`, `libegl-dev`, `libgles-dev`
+are `libx11-dev`, `libpango1.0-dev`, `libcairo2-dev`, `libvulkan-dev`
 and `pkg-config`, plus fonts such as `fonts-dejavu-core` and suitable CJK,
 Arabic, Indic and emoji fonts. No GTK widget toolkit is used. Install CMake 3.31+
 separately if the distribution ships an older version.
@@ -76,6 +86,7 @@ separately if the distribution ships an older version.
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_PREFIX_PATH=/path/to/iiSDKCore \
+  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \
   -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
 cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
@@ -95,9 +106,10 @@ iisdk-builder build --manifest examples/HelloGUI/iiSDKBuilder.json --platform ho
 
 The manifest contains Windows, macOS and Linux kits. `--platform host` selects
 the native host. Without it all three are requested; foreign desktop kits need
-explicit toolchains. Core is built/installed first, then iiGUI, then the common
+explicit toolchains. Core is built/installed first, then LVUI, iiGUI and the common
 HelloGUI source. Builder uses FileProvider for its own manifests and logs;
-HelloGUI links Core, iiGUI and native system libraries only.
+HelloGUI links Core, LVUI, iiGUI, Vulkan and native system libraries.
+See [renderer selection and deployment](docs/Renderers.md) for Vulkan SDK paths.
 
 HelloGUI displays a 250 ms Core timer, a worker's computed result of 42, content
 size, resize events, multilingual text and a GPU gradient scene. The C++23
@@ -122,8 +134,9 @@ python -B tools/verify_desktop.py --builder C:/path/to/iisdk-builder.exe
 ```
 
 The verifier builds through Builder, runs the host and HelloGUI tests, installs
-Core/iiGUI, moves their prefix and builds/runs a copied consumer against only
-those packages. Logs, JUnit XML and verification.json are written to a fresh
+Core/LVUI/iiGUI, moves their prefix and builds/runs a copied consumer against
+those installed SDK packages plus the target's Vulkan/native system dependencies.
+Logs, JUnit XML and verification.json are written to a fresh
 run directory under build/. Repeated runs preserve older reports and prefixes.
 
 `--compile-only` deliberately omits target execution. A foreign target requires
@@ -149,6 +162,7 @@ For a separate package check:
 ```sh
 cmake -DSOURCE=/path/to/iiGUI -DBUILD=/path/to/iiGUI/build/package-check \
   -DCORE_BUILD=/path/to/Core/build -DGUI_BUILD=/path/to/iiGUI/build \
+  -DLVUI_BUILD=/path/to/LVUI/build \
   -P tests/package.cmake
 ```
 

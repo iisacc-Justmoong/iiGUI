@@ -222,6 +222,7 @@ void graphics_contracts() {
     invalid([](auto& f) { f.background.red = -0.1f; });
     invalid([](auto& f) { f.background.alpha = 0.5f; });
     invalid([](auto& f) { f.acceleration = static_cast<gui::Acceleration>(42); });
+    invalid([](auto& f) { f.renderer = static_cast<gui::Renderer>(42); });
     frame.panels.push_back({.bounds={8,8,64,48},.top={0,0,0,1},.bottom={1,1,1,1},.radius=12});
     check(gui::valid_canvas(frame), "rounded gradient panel valid");
     invalid([](auto& f) { f.panels[0].radius = 25; });
@@ -230,25 +231,27 @@ void graphics_contracts() {
     gui::Host host;
     check(!host.set_canvas(frame) && !host.capture_canvas() && !host.graphics_info(), "GPU operations require an open host");
 }
-void graphics() {
+void graphics(gui::Renderer renderer=gui::Renderer::automatic) {
     gui::Host host({.title="iiGUI native GPU quality test"});
     auto ui = host.executor();
     gui::CanvasFrame frame{.viewport={28,28,192,128},.background={0,0,0,1}};
+    frame.renderer=renderer;
     frame.panels = {
         {.bounds={16,16,112,96},.top={0.5f,0.5f,0.5f,1},.bottom={0.5f,0.5f,0.5f,1},.radius=20},
         {.bounds={144,16,32,96},.top={0,0,0,1},.bottom={1,1,1,1},.radius=0},
         {.bounds={48,48,32,32},.top={1,0,0,0.5f},.bottom={1,0,0,0.5f},.radius=0}
     };
-    good(ui.after(5s, [] { throw std::runtime_error("GPU watchdog"); }), "graphics watchdog");
     auto result = host.run({.opened=[&] {
         check(host.graphics_info()->api == gui::GraphicsApi::none, "no implicit GPU allocation for text hosts");
         for (int i=0; i<100; ++i) { frame.panels[0].top.red = i==99 ? 0.5f : 0.25f; good(host.set_canvas(frame), "GPU update admission"); }
         check(host.graphics_info()->scene_renders == 0, "GPU rendering waits until the Core turn finishes");
+        good(ui.after(5s, [] { throw std::runtime_error("GPU watchdog"); }), "graphics watchdog");
         good(ui.after(60ms, [&] {
             auto captured = host.capture_canvas(); good(captured, "actual GPU readback");
             const auto info = host.graphics_info(); good(info, "native adapter details");
             check(info->api != gui::GraphicsApi::none && !info->adapter.empty() && info->srgb_attachment,
                   "actual device and sRGB attachment reported");
+            if (renderer==gui::Renderer::vulkan) check(info->api==gui::GraphicsApi::vulkan && !info->fallback,"Explicit Vulkan really uses Vulkan");
             check(info->scene_renders == 1 && info->frame_requests == 100 && info->presentations >= 1,
                   "one render coalesces one hundred admitted updates");
             const double scale = host.snapshot()->backing_scale;
@@ -458,6 +461,7 @@ int main(int argc, char** argv) {
         else if (name == "wrong_thread") wrong_thread();
         else if (name == "graphics_contracts") graphics_contracts();
         else if (name == "graphics") graphics();
+        else if (name == "graphics_vulkan") graphics(gui::Renderer::vulkan);
         else if (name == "core_io") { if (argc<3) throw std::runtime_error("missing I/O fixture"); core_io(argv[2]); }
         else if (name == "core_operation") core_operation();
         else if (name == "core_frame") core_frame();

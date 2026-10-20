@@ -3,6 +3,9 @@
 ## Dependency and platform boundary
 
 `application -> iiGUI -> iiSDKCore Runtime -> C++23 / native runtime`.
+LVUI views additionally use `iiGUI -> LVUI -> iiSDKCore Contracts`. LVUI owns
+syntax and immutable document values; iiGUI owns layout/native font measurement
+and graphics. Neither LVUI nor Core imports iiGUI or Vulkan. See [LVUI](LVUI.md).
 Core does not reference iiGUI, AppKit or another feature SDK. iiSDKBuilder is
 build-time orchestration, not an application runtime dependency. No GUI or
 storage implementation is added to Core. iiGUI itself creates no files; future
@@ -14,9 +17,12 @@ native handle or platform header crosses this boundary. Platform callbacks
 remain private; they introduce no public base class or registry.
 
 CMake selects exactly one backend: Host.mm on macOS, HostWindows.cpp on
-Windows, or HostLinux.cpp on Linux. Each has a private NativeCanvas backend:
-CanvasMetal.mm, CanvasWindows.cpp, or CanvasLinux.cpp. Linux links X11,
-Pango/Cairo and EGL/GLES. Other systems are rejected explicitly.
+Windows, or HostLinux.cpp on Linux. NativeCanvas owns a private renderer selection chain:
+CanvasMetal.mm or CanvasWindows.cpp first, with VulkanCanvas.cpp as the
+shared fallback. Linux uses Vulkan directly and links X11/Pango/Cairo/Vulkan. Other systems are rejected explicitly.
+TextMac.mm, TextWindows.cpp and TextLinux.cpp implement the corresponding
+private canvas text measurement/rasterization boundary. LVUI.cpp converts the
+document to logical boxes and a CanvasFrame; it contains no OS-specific code.
 HostCommon.h shares value validation and deadline rounding; Dispatch.cpp
 remains the common Core scheduling endpoint.
 
@@ -74,7 +80,7 @@ Sizes describe content dimensions. macOS uses AppKit points; Windows uses
 the owning thread, restoring the previous context at cleanup. WM_DPICHANGED
 updates logical size and DirectWrite/Direct2D DPI. Linux reads the Xft.dpi
 RESOURCE_MANAGER value (48..384 DPI, otherwise 96), reacts to property changes,
-and uses scaled physical dimensions for Cairo text and the EGL canvas. It
+and uses scaled physical dimensions for Cairo text and the Vulkan canvas. It
 provides one X11 desktop scale; direct Wayland/per-output fractional scaling
 are not implemented. Pixel
 rounding can produce a sub-unit difference on Windows. Finite positive sizes
@@ -166,3 +172,11 @@ executor therefore cannot dangle. Host closure stops queued delivery and late
 weak submissions reject. Pending Operation::wait_for returns would_block while
 the calling thread is connected to an external host; arbitrary blocking OS/C++
 calls remain the application's responsibility.
+
+## Graphics API selection
+
+See [native rendering and Vulkan fallback](Renderers.md). Cocoa/AppKit and Win32
+remain the native window/text boundaries. The common Vulkan renderer creates
+platform surfaces through private VulkanWindow implementations and retains
+the same CanvasFrame/LVUI contracts. RendererChain owns the two concrete
+backends, records failure reasons and switches once on native failure.

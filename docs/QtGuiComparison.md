@@ -10,20 +10,20 @@ painting and graphics interfaces. Qt Quick's retained scene graph is a
 separate layer built above it; its batching/resource techniques are useful
 references but must not be attributed to Qt GUI alone.
 
-| Area | Identified iiGUI limitation | Implemented in iiGUI 0.3 | Remaining difference |
+| Area | Identified iiGUI limitation | Current source (0.3 base plus working-tree updates) | Remaining difference |
 |---|---|---|---|
 | Platform coverage | Three desktop hosts only; Linux X11 pixel scale fixed at 1 | Same C++23 GPU/host API and HelloGUI source on three desktops; live Xft.dpi logical scale on Linux | Qt supports more targets; direct Wayland, Android, iOS and WASM GUI hosts are absent |
 | Text quality | Windows GDI text; Linux manual UTF-8-prefix wrapping lacked shaping/fallback | DirectWrite/Direct2D and Pango/Cairo retained text layouts; native fallback, bidi, complex-script shaping | Editable text/IME, selection on Windows/Linux, custom-control accessibility and complete input remain absent |
 | Graphic quality | No graphics surface or GPU drawing path | Native sRGB GPU canvas, linear-light gradients and alpha, analytic rounded-edge AA, device-pixel sizing | General paths, images/codecs, rich painting, ICC content, wide gamut/HDR and 3D/compute remain absent |
-| Hardware/resource use | CPU text-only paint, repeated Linux measurement/repaint | Metal, D3D11 or GLES3 native drivers; instanced drawing; retained pipeline/attachment; equal-state suppression; Core-turn coalescing; on-demand GPU allocation | No arbitrary scene graph, partial GPU damage, texture atlas, compute scheduler, threaded renderer or guaranteed device-loss recovery |
+| Hardware/resource use | CPU text-only paint, repeated Linux measurement/repaint | Metal, D3D11 or Vulkan native drivers; instanced drawing; retained pipeline/attachment; equal-state suppression; Core-turn coalescing; on-demand GPU allocation | No arbitrary scene graph, partial GPU damage, texture atlas, compute scheduler, threaded renderer or guaranteed device-loss recovery |
 | Observability | No graphics/device information or pixel test path | Selected adapter/API, conservative hardware policy, actual storage/counters, explicit readback quality tests | No Qt-vs-iiGUI benchmark or claimed general performance superiority |
 
 The desktop GPU backends deliberately match their platforms' broadly available
 native interfaces. Metal is the maintained Apple path. D3D11 provides mature
 native Windows support with flip-model presentation; adding D3D12 command
-management is not required for this small instanced UI workload. Linux EGL/GLES3
-uses the system driver with an sRGB surface, rather than adding a Vulkan loader,
-shader-toolchain and synchronization layer before an observed need. The narrow
+management is not required for this small instanced UI workload. The current
+source uses Vulkan as the common fallback and the Linux default, with checked-in
+SPIR-V and explicit swapchain/fence/semaphore ownership. The narrow
 NativeCanvas boundary allows each implementation to be replaced without native
 types entering the public API. New hardware capabilities should be added when
 concrete drawing requirements justify them.
