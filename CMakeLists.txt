@@ -4,23 +4,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     enable_language(OBJCXX)
-    set(_host_source src/Host.mm)
-    set(_graphics_source src/CanvasMetal.mm)
-    set(_text_source src/TextMac.mm)
-    set(_vulkan_window src/VulkanWindowMac.mm)
+    set(_host_source src/iiGUI/Host.mm)
+    set(_graphics_source src/iiGUI/CanvasMetal.mm)
+    set(_text_source src/iiGUI/TextMac.mm)
+    set(_vulkan_window src/iiGUI/VulkanWindowMac.mm)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(_host_source src/HostWindows.cpp)
-    set(_graphics_source src/CanvasWindows.cpp)
-    set(_text_source src/TextWindows.cpp)
-    set(_vulkan_window src/VulkanWindowWindows.cpp)
+    set(_host_source src/iiGUI/HostWindows.cpp)
+    set(_graphics_source src/iiGUI/CanvasWindows.cpp)
+    set(_text_source src/iiGUI/TextWindows.cpp)
+    set(_vulkan_window src/iiGUI/VulkanWindowWindows.cpp)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
     find_package(X11 REQUIRED)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(NativeGraphics REQUIRED IMPORTED_TARGET pangocairo)
-    set(_host_source src/HostLinux.cpp)
+    set(_host_source src/iiGUI/HostLinux.cpp)
     set(_graphics_source)
-    set(_text_source src/TextLinux.cpp)
-    set(_vulkan_window src/VulkanWindowLinux.cpp)
+    set(_text_source src/iiGUI/TextLinux.cpp)
+    set(_vulkan_window src/iiGUI/VulkanWindowLinux.cpp)
 else()
     message(FATAL_ERROR "iiGUI supports native Windows, macOS and Linux/X11 desktop hosts")
 endif()
@@ -41,7 +41,7 @@ find_package(iiSDKCore 0.16 CONFIG REQUIRED COMPONENTS Runtime)
 find_package(LVUI 0.1 CONFIG REQUIRED)
 find_package(Vulkan 1.1 REQUIRED)
 
-add_library(iiGUI src/Dispatch.cpp src/Graphics.cpp src/LVUI.cpp src/NativeCanvas.cpp src/VulkanCanvas.cpp
+add_library(iiGUI src/iiGUI/Dispatch.cpp src/iiGUI/Graphics.cpp src/iiGUI/LVUI.cpp src/iiGUI/NativeCanvas.cpp src/iiGUI/VulkanCanvas.cpp
     ${_host_source} ${_graphics_source} ${_text_source} ${_vulkan_window})
 add_library(iiGUI::iiGUI ALIAS iiGUI)
 target_compile_features(iiGUI PUBLIC cxx_std_23)
@@ -49,7 +49,7 @@ target_link_libraries(iiGUI PUBLIC iiSDKCore::Runtime LVUI::LVUI)
 target_link_libraries(iiGUI PRIVATE Vulkan::Vulkan)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_link_libraries(iiGUI PRIVATE "-framework AppKit" "-framework CoreFoundation" "-framework Metal" "-framework QuartzCore")
-    set_source_files_properties(src/Host.mm src/CanvasMetal.mm src/TextMac.mm src/VulkanWindowMac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_source_files_properties(src/iiGUI/Host.mm src/iiGUI/CanvasMetal.mm src/iiGUI/TextMac.mm src/iiGUI/VulkanWindowMac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 elseif(WIN32)
     target_link_libraries(iiGUI PRIVATE user32 gdi32 d3d11 dxgi d3dcompiler d2d1 dwrite windowscodecs ole32)
     target_compile_definitions(iiGUI PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
@@ -57,7 +57,7 @@ else()
     target_link_libraries(iiGUI PRIVATE X11::X11 PkgConfig::NativeGraphics)
 endif()
 target_include_directories(iiGUI PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 generate_export_header(iiGUI BASE_NAME IIGUI
@@ -87,7 +87,12 @@ install(TARGETS iiGUI EXPORT iiGUITargets
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/iiGUI DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES
+    src/iiGUI/Graphics.h
+    src/iiGUI/Host.h
+    src/iiGUI/LVUI.h
+    src/iiGUI/iiGUI.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iiGUI)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/iiGUI/Export.h"
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/iiGUI)
 install(EXPORT iiGUITargets NAMESPACE iiGUI:: DESTINATION "${_package}")
@@ -102,7 +107,7 @@ install(DIRECTORY docs/ DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI/docs)
 
 if(BUILD_TESTING)
     add_executable(iiGUIRendererPolicyTests tests/renderer.cpp)
-    target_include_directories(iiGUIRendererPolicyTests PRIVATE src)
+    target_include_directories(iiGUIRendererPolicyTests PRIVATE src/iiGUI)
     target_link_libraries(iiGUIRendererPolicyTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.renderer_policy COMMAND iiGUIRendererPolicyTests)
     add_executable(iiGUILVUITests tests/lvui.cpp)

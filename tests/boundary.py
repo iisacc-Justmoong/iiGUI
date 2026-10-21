@@ -6,14 +6,19 @@ import sys
 
 root = Path(sys.argv[1])
 violations = []
-for base in (root / 'include', root / 'src'):
+public_headers = {root / 'src/iiGUI' / name for name in
+                  ('Graphics.h', 'Host.h', 'LVUI.h', 'iiGUI.h')}
+for header in public_headers:
+    if not header.is_file():
+        violations.append(f'{header}: public header missing from source directory')
+for base in (root / 'src',):
     for file in base.rglob('*'):
         if not file.is_file() or file.suffix not in {'.h', '.hpp', '.cpp', '.cc', '.mm', '.m'}:
             continue
         source = file.read_text()
         if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:Qt|Q[A-Z]|SDL|WebKit|WebView|webkit|cef_)', source, re.M):
             violations.append(f'{file}: GUI-framework dependency')
-        if file.is_relative_to(root / 'include') and re.search(
+        if file in public_headers and re.search(
                 r'^\s*#\s*(?:include|import)\s*[<"](?:AppKit|Foundation|CoreFoundation|Metal|QuartzCore|CoreGraphics|objc|[Ww]indows\.h|[Dd]3[dD]|[Dd][Xx][Gg][Ii]|d2d|dwrite|vulkan/|EGL/|GLES|X11/|wayland|sys/)', source, re.M):
             violations.append(f'{file}: native type leaked into public API')
         if re.search(r'\b(?:ofstream|fopen|freopen|creat)\s*\(', source):
