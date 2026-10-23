@@ -46,11 +46,20 @@ enum class Acceleration { prefer_hardware, require_hardware };
 enum class GraphicsApi { none, metal, direct3d11, opengl_es3, vulkan };
 // Native accelerator first, then Vulkan. Linux uses Vulkan directly.
 enum class Renderer { automatic, native, vulkan };
+struct ImageGradient final {
+    float height=0,middle_position=.5f;
+    Color top{0,0,0,0},middle{0,0,0,.5f},bottom{0,0,0,1};
+    friend bool operator==(const ImageGradient&,const ImageGradient&)=default;
+};
 struct ImageRun final {
     Rect bounds;
     std::shared_ptr<const RasterImage> image;
     std::optional<Color> tint; // Tint RGB replaces source RGB; source alpha is retained.
     float opacity=1;
+    Rect source{0,0,1,1}; // Normalized immutable source rectangle, for center crop.
+    float radius=0,border_width=0;
+    Color border{0,0,0,0};
+    std::optional<ImageGradient> gradient;
     friend bool operator==(const ImageRun&,const ImageRun&)=default;
 };
 enum class BackdropSource { content,previous_layers };
@@ -84,6 +93,7 @@ struct CanvasLayer final {
     std::optional<BackdropMaterial> backdrop;
     std::optional<BoxShadow> shadow;
     ContentTransform content_transform{};
+    bool images_before_text=false;
     friend bool operator==(const CanvasLayer&,const CanvasLayer&)=default;
 };
 struct CanvasFrame final {
@@ -100,6 +110,7 @@ struct CanvasFrame final {
     // Each overlay draws its panels, then text/images, after the preceding layer.
     // This keeps popups above underlying glyphs as well as underlying panels.
     std::vector<CanvasLayer> overlays;
+    bool images_before_text=false;
     friend bool operator==(const CanvasFrame&, const CanvasFrame&) = default;
 };
 struct GraphicsInfo final {

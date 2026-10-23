@@ -24,13 +24,13 @@ bool valid_style(const ButtonStyle& s){for(const auto* c:{&s.fill,&s.hover_fill,
 bool valid_button(const ButtonOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&unsigned(o.tone)<=4&&valid_title(o.icon_name)&&o.icon_name.size()<=65536&&valid_title(o.accessibility_name)&&o.accessibility_name.size()<=65536&&geometry(o.icon_size)&&o.icon_size>=1&&o.icon_size<=256&&(!o.style||valid_style(*o.style))&&(!o.height||(geometry(*o.height)&&*o.height>=1))&&(!o.corner_radius||geometry(*o.corner_radius))&&(!o.horizontal_padding||geometry(*o.horizontal_padding))&&(!o.left_padding||geometry(*o.left_padding))&&(!o.right_padding||geometry(*o.right_padding))&&(!o.content_spacing||(std::isfinite(*o.content_spacing)&&*o.content_spacing>=-256&&*o.content_spacing<=8192))&&(!o.indicator_size||(geometry(*o.indicator_size)&&*o.indicator_size>=1&&*o.indicator_size<=256))&&(!o.width||(geometry(*o.width)&&*o.width>=1))&&(!o.icon_mode||o.icon);}
 bool valid_label(const LabelOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&std::isfinite(o.font_size)&&o.font_size>=1&&o.font_size<=256&&geometry(o.line_height)&&o.line_height<=8192&&unsigned(o.role)<=7&&unsigned(o.alignment)<=2&&(!o.color||valid_color(*o.color))&&(!o.font_weight||*o.font_weight==400||*o.font_weight==500||*o.font_weight==600||*o.font_weight==700);}
 bool valid_action(const ActionOptions& o){
-    if(!valid_title(o.text)||o.text.size()>65536||!valid_title(o.accessibility_name)||o.accessibility_name.size()>65536||unsigned(o.role)>1||unsigned(o.text_role)>7||!std::isfinite(o.font_size)||o.font_size<1||o.font_size>256)return false;
+    if(!valid_title(o.accessibility_description)||o.accessibility_description.size()>65536||!valid_title(o.text)||o.text.size()>65536||!valid_title(o.accessibility_name)||o.accessibility_name.size()>65536||unsigned(o.role)>1||unsigned(o.text_role)>7||!std::isfinite(o.font_size)||o.font_size<1||o.font_size>256)return false;
     for(auto n:{o.line_height,o.padding.left,o.padding.top,o.padding.right,o.padding.bottom,o.minimum_width,o.minimum_height,o.corner_radius})if(!geometry(n)||n>8192)return false;
     for(auto n:{o.width,o.height})if(n&&(!geometry(*n)||*n>8192))return false;
     for(auto c:{o.text_color,o.hover_text_color,o.pressed_text_color,o.disabled_text_color})if(c&&!valid_color(*c))return false;return true;
 }
 bool valid_input(const InputOptions& o){if(!valid_title(o.text)||o.text.size()>65536||!valid_title(o.placeholder)||!valid_title(o.accessibility_name)||!geometry(o.width)||o.width<1||o.maximum_length>65536)return false;if(!o.style)return true;const auto& s=*o.style;for(auto c:{s.background,s.hover_background,s.text})if(c&&!valid_color(*c))return false;return geometry(s.height)&&s.height>=1&&s.height<=8192&&geometry(s.font_size)&&s.font_size>=1&&s.font_size<=256&&geometry(s.line_height)&&s.line_height<=8192&&geometry(s.horizontal_padding)&&s.horizontal_padding<=8192&&geometry(s.corner_radius);}
-bool valid_image_options(const ImageOptions& o){return o.image&&geometry(o.width)&&geometry(o.height)&&o.width&&o.height&&valid_title(o.accessibility_name)&&geometry(o.padding)&&o.padding*2<=std::min(o.width,o.height)&&geometry(o.corner_radius)&&geometry(o.border_width)&&(!o.background||valid_color(*o.background))&&(!o.border||valid_color(*o.border));}
+bool valid_image_options(const ImageOptions& o){return (o.image||o.allow_empty)&&(!o.fit||unsigned(*o.fit)<=2)&&geometry(o.width)&&geometry(o.height)&&o.width&&o.height&&valid_title(o.accessibility_name)&&geometry(o.padding)&&o.padding*2<=std::min(o.width,o.height)&&geometry(o.corner_radius)&&geometry(o.border_width)&&(!o.background||valid_color(*o.background))&&(!o.border||valid_color(*o.border));}
 bool valid_transition(const std::optional<PopoverTransition>& value){
     if(!value)return true;const auto& t=*value;
     return t.enter_duration>=runtime::Clock::duration::zero()&&t.exit_duration>=runtime::Clock::duration::zero()&&
@@ -57,6 +57,7 @@ std::shared_ptr<const RasterImage> slider_thumb_image(){
 }
 }
 struct WidgetState::Impl final {
+    bool painting=false;
     struct Popup final {
         double drag_offset=0,drag_start=0,snap_from=0;
         bool dragging=false,snap_active=false;
@@ -122,6 +123,7 @@ struct WidgetState::Impl final {
         std::unique_ptr<ColorButton> color_button;
         std::unique_ptr<Scroll> scroll;
         std::optional<WidgetDrawing> drawing;
+        WidgetPaintHandler paint_handler;std::size_t paint_source=absent;
         WidgetInputHandler input_handler;
         int menu_index=-1;
         std::size_t context_menu=absent;
@@ -272,6 +274,7 @@ struct WidgetState::Impl final {
         }return {0,0,float(size.width),float(size.height)};
     }
 
+    runtime::Task pointer_focus(std::size_t next){if(next!=absent&&nodes[next].action_surface&&!nodes[next].action_surface->pointer_focusable)return {};return change_focus(next);}
     runtime::Task change_focus(std::size_t next) {
         if(focused==next) return {};
         auto embedded=embedded_view(focused);
@@ -367,6 +370,7 @@ struct WidgetState::Impl final {
     std::size_t next_content(std::size_t popup,std::size_t from,int direction) const {
         const auto count=nodes.size();auto current=from;
         for(std::size_t n=0;n<count;++n){current=current==absent?(direction>0?0:count-1):(current+count+(direction>0?1:-1))%count;
+            if(nodes[current].action_surface&&!nodes[current].action_surface->tab_focusable)continue;
             if((interactive(nodes[current].kind)||nodes[current].input_handler||((nodes[current].activation_owner!=absent||nodes[current].content)&&focusable_content(current)))&&nodes[current].enabled&&logical_visible(current)&&owning_popup(current)==popup)return current;}
         return popup;
     }
@@ -720,6 +724,7 @@ core::Result<void> WidgetState::prepare_motion(PopoverOptions& options) {
     if(!tick)return std::unexpected(tick.error());impl_->motion_frames=*frames;impl_->motion_tick=*tick;return {};
 }
 core::Result<void> WidgetState::ready() const {
+    if(impl_->painting)return core::fail(core::ErrorCode::busy,"UI access is not allowed inside a paint provider");
     if (impl_->owner!=std::this_thread::get_id()) return core::fail(core::ErrorCode::wrong_executor,"Widgets require the owning UI thread");
     if (!impl_->active) return core::fail(core::ErrorCode::closed,"Widget tree is closed");
     if(!impl_->scope_prefix.empty()){auto parent=impl_->embedding_owner.lock();if(!parent||!parent->impl_->active)return core::fail(core::ErrorCode::closed,"Content owner is closed");}
@@ -985,12 +990,12 @@ core::Result<void> WidgetState::retain(std::shared_ptr<void> owner) {
 }
 core::Result<Widget> WidgetState::action_surface(Widget parent,std::string_view id,ActionOptions options,runtime::Task task){
     auto p=prepare(parent,id,WidgetKind::action_surface);if(!p)return std::unexpected(p.error());if(!valid_action(options))return core::fail(core::ErrorCode::invalid_argument,"Invalid action surface options");
-    auto widget=publish(*p,WidgetKind::action_surface,id);auto& n=impl_->nodes.back();n.text=options.text;n.enabled=options.enabled&&options.interaction_enabled;n.button.tone=ButtonTone::normal;n.button.accessibility_name=options.accessibility_name;n.action_surface=std::make_unique<ActionOptions>(std::move(options));n.action=std::move(task);return widget;
+    auto widget=publish(*p,WidgetKind::action_surface,id);auto& n=impl_->nodes.back();n.text=options.text;n.enabled=options.enabled&&options.interaction_enabled;n.button.tone=ButtonTone::normal;n.button.accessibility_name=options.accessibility_name;n.checked=options.checked;n.action_surface=std::make_unique<ActionOptions>(std::move(options));n.action=std::move(task);return widget;
 }
-core::Result<ActionOptions> WidgetState::action_options(std::size_t i)const{if(auto r=ready();!r)return std::unexpected(r.error());if(i>=impl_->nodes.size()||!impl_->nodes[i].action_surface)return core::fail(core::ErrorCode::invalid_argument,"Widget is not an action surface");return *impl_->nodes[i].action_surface;}
+core::Result<ActionOptions> WidgetState::action_options(std::size_t i)const{if(auto r=ready();!r)return std::unexpected(r.error());if(i>=impl_->nodes.size()||!impl_->nodes[i].action_surface)return core::fail(core::ErrorCode::invalid_argument,"Widget is not an action surface");auto result=*impl_->nodes[i].action_surface;result.checked=impl_->nodes[i].checked;return result;}
 core::Result<void> WidgetState::action_options(std::size_t i,ActionOptions options){
     if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||!impl_->nodes[i].action_surface||!valid_action(options))return core::fail(core::ErrorCode::invalid_argument,"Invalid action surface options");
-    auto& n=impl_->nodes[i];const bool active=options.enabled;n.text=options.text;n.button.accessibility_name=options.accessibility_name;*n.action_surface=std::move(options);impl_->invalidate(true,i);impl_->accessibility_changed();return enabled(i,active);
+    auto& n=impl_->nodes[i];const bool active=options.enabled;n.checked=options.checked;n.text=options.text;n.button.accessibility_name=options.accessibility_name;*n.action_surface=std::move(options);impl_->invalidate(true,i);impl_->accessibility_changed();return enabled(i,active);
 }
 core::Result<Widget> WidgetState::content_host(Widget parent,std::string_view id,Size size){
     auto p=prepare(parent,id);if(!p)return std::unexpected(p.error());
@@ -1111,7 +1116,7 @@ core::Result<WidgetSnapshot> WidgetState::snapshot(std::size_t i) {
         .visual_bounds=impl_->visual_bounds(i)};
     if(n.scroll){result.horizontal_scroll_offset=n.scroll->horizontal_offset;result.content_width=n.scroll->content_width;}
     if(n.content){result.has_content=bool(n.content->view);result.content_generation=n.content->epoch;}
-    if(n.action_surface){result.action_role=n.action_surface->role;result.custom_content=impl_->custom_action_content(n);result.text_underline=n.action_surface->underline;result.foreground_color=impl_->action_ink(n);result.hovered=impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i);}
+    if(n.action_surface){result.accessibility_description=n.action_surface->accessibility_description;result.action_role=n.action_surface->role;result.custom_content=impl_->custom_action_content(n);result.text_underline=n.action_surface->underline;result.foreground_color=impl_->action_ink(n);result.hovered=impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i);}
     if(n.kind==WidgetKind::input_field){
         result.password=n.field.password;
         const auto first=std::min(n.anchor,n.cursor),last=std::max(n.anchor,n.cursor);
@@ -1269,10 +1274,16 @@ core::Result<void> WidgetState::drawing(std::size_t i,WidgetDrawing value){
     if(i>=impl_->nodes.size()||!stack_kind(impl_->nodes[i].kind))return core::fail(core::ErrorCode::invalid_argument,"Retained drawing requires a stack");
     CanvasFrame validation{.viewport={0,0,8192,8192},.panels=std::move(value.panels),.texts=std::move(value.texts),.images=std::move(value.images)};
     if(!valid_canvas(validation))return core::fail(core::ErrorCode::invalid_argument,"Invalid retained widget drawing");
-    value={std::move(validation.panels),std::move(validation.texts),std::move(validation.images)};
+    value={std::move(validation.panels),std::move(validation.texts),std::move(validation.images),value.images_before_text};
     auto& current=impl_->nodes[i].drawing;if(current&&*current==value)return {};
-    current=std::move(value);impl_->invalidate();return {};
+    current=std::move(value);impl_->nodes[i].paint_handler={};impl_->invalidate();return {};
 }
+core::Result<void> WidgetState::paint_handler(std::size_t i,WidgetPaintHandler callback,Widget source){
+    if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].action_surface))return core::fail(core::ErrorCode::invalid_argument,"Paint provider requires a container");
+    auto owner=i;if(auto state=source.state_.lock()){if(state.get()!=this||source.index_>=impl_->nodes.size()||!impl_->descendant(i,source.index_))return core::fail(core::ErrorCode::invalid_argument,"Paint interaction owner must be an ancestor in the same generation");owner=source.index_;}else if(source.owner_!=std::thread::id{})return core::fail(core::ErrorCode::closed,"Paint interaction owner retired");
+    auto& n=impl_->nodes[i];n.paint_handler=std::move(callback);n.paint_source=owner;n.drawing.reset();impl_->invalidate();return {};
+}
+core::Result<void> WidgetState::repaint(std::size_t i){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Paint owner not found");impl_->invalidate();return {};}
 core::Result<void> WidgetState::input_handler(std::size_t i,WidgetInputHandler handler){
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content))return core::fail(core::ErrorCode::invalid_argument,"Input interception requires a stack or content host");
@@ -1324,7 +1335,7 @@ core::Result<void> WidgetState::clip_content(std::size_t i,bool value){if(auto r
 core::Result<void> WidgetState::accessibility_name(std::size_t i,std::string_view value){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||!valid_title(value)||value.size()>65536||(impl_->nodes[i].kind!=WidgetKind::button&&!impl_->nodes[i].action_surface&&impl_->nodes[i].kind!=WidgetKind::input_field))return core::fail(core::ErrorCode::invalid_argument,"Accessible name requires an action or editor");auto& n=impl_->nodes[i];if(n.kind==WidgetKind::input_field)n.field.accessibility_name=value;else n.button.accessibility_name=value;if(n.action_surface)n.action_surface->accessibility_name=value;impl_->accessibility_changed();return {};}
 core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
     if (auto r=ready();!r) return r;
-    if (i>=impl_->nodes.size() || (!interactive(impl_->nodes[i].kind)&&!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no enabled property");
+    if (i>=impl_->nodes.size() || (!interactive(impl_->nodes[i].kind)&&!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content&&impl_->nodes[i].kind!=WidgetKind::image)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no enabled property");
     auto& n=impl_->nodes[i];
     if(n.menu_item) { n.menu_item->enabled=value;value=value && n.menu_item->state!=MenuItemState::inactive; }
     const bool requested=value;if(n.action_surface)value=value&&n.action_surface->interaction_enabled;
@@ -1338,7 +1349,7 @@ core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
 }
 core::Result<void> WidgetState::checked(std::size_t i,bool value) {
     if (auto r=ready();!r) return r;
-    if (i>=impl_->nodes.size() || !check_kind(impl_->nodes[i].kind)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no checked property");
+    if (i>=impl_->nodes.size() || (!check_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].action_surface)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no checked property");
     auto& n=impl_->nodes[i]; n.checked=value;
     if (value && n.kind==WidgetKind::radio_button && !n.group.empty()) for(auto& sibling:impl_->nodes) if(&sibling!=&n && sibling.kind==WidgetKind::radio_button && sibling.group==n.group) sibling.checked=false;
     impl_->invalidate(); return {};
@@ -1399,6 +1410,7 @@ core::Result<void> WidgetState::activate(std::size_t i) {
             }
         });return {};
     }
+    if(n.action_surface&&n.action_surface->checkable){n.checked=!n.checked;n.action_surface->checked=n.checked;impl_->invalidate();impl_->accessibility_changed();}
     runtime::Task action=n.action;
     if(n.kind==WidgetKind::tab && n.parent!=absent && impl_->nodes[n.parent].kind==WidgetKind::tab_bar) {
         auto& bar=impl_->nodes[n.parent];
@@ -1810,13 +1822,13 @@ core::Result<void> WidgetState::input(const WidgetInput& incoming) {
         if(hit!=absent && impl_->nodes[hit].color){
             auto canceled=impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
             auto& n=impl_->nodes[hit];const auto point=impl_->logical_point(hit,event.x,event.y);const bool accepted=n.color->begin(n.bounds,point.width,point.height);
-            impl_->pressed=accepted?hit:absent;auto blur=accepted?impl_->change_focus(hit):runtime::Task{};if(accepted)impl_->hovered=hit;impl_->invalidate();
+            impl_->pressed=accepted?hit:absent;auto blur=accepted?impl_->pointer_focus(hit):runtime::Task{};if(accepted)impl_->hovered=hit;impl_->invalidate();
             auto invoke=impl_->invoke;if(canceled)invoke(std::move(canceled));if(blur)invoke(std::move(blur));
             if(!impl_->active || !accepted || impl_->pressed!=hit || impl_->focused!=hit)return {};
             const auto edited_point=impl_->logical_point(hit,event.x,event.y);return impl_->nodes[hit].color->edit(impl_->nodes[hit].bounds,edited_point.width,edited_point.height);
         }
         auto canceled=impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
-        impl_->pressed=hit;auto blur=impl_->change_focus(hit);impl_->hovered=hit;impl_->invalidate();auto invoke=impl_->invoke;
+        impl_->pressed=hit;auto blur=impl_->pointer_focus(hit);impl_->hovered=hit;impl_->invalidate();auto invoke=impl_->invoke;
         if(canceled)invoke(std::move(canceled));if(blur)invoke(std::move(blur));
         if(!impl_->active || impl_->pressed!=hit || impl_->focused!=hit)return {};
         if(hit!=absent && impl_->nodes[hit].kind==WidgetKind::slider) return move_slider(hit,impl_->slider_value(hit,event.x));
@@ -1988,7 +2000,15 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
             for(auto item:n.drawing->images){item.bounds.x+=r.x;item.bounds.y+=r.y;target.images.push_back(std::move(item));}
             return;
         }
-        if(n.kind==WidgetKind::image){const auto& o=n.image;const auto border=float(std::min(o.border_width,double(std::min(r.width,r.height)/2)));const auto radius=std::min(float(o.corner_radius),std::min(r.width,r.height)/2);if(o.background)panel(r,*o.background,radius);if(o.border&&border>0){auto c=color(*o.border);target.panels.push_back({r,c,c,radius,border});}const auto pad=float(o.padding);Rect image{r.x+pad,r.y+pad,std::max(0.f,r.width-2*pad),std::max(0.f,r.height-2*pad)};if(o.preserve_aspect){const auto scale=std::min(image.width/o.image->width(),image.height/o.image->height());const auto width=o.image->width()*scale,height=o.image->height()*scale;image.x+=(image.width-width)/2;image.y+=(image.height-height)/2;image.width=width;image.height=height;}if(image.width>0&&image.height>0)target.images.push_back({image,o.image,{},1});return;}
+        if(n.kind==WidgetKind::image){
+            const auto& o=n.image;auto bounds=r;if(o.circular){const auto side=std::min(r.width,r.height);bounds={r.x+(r.width-side)/2,r.y+(r.height-side)/2,side,side};}
+            const auto border=float(std::min(o.border_width,double(std::min(bounds.width,bounds.height)/2))),radius=o.circular?std::min(bounds.width,bounds.height)/2:std::min(float(o.corner_radius),std::min(bounds.width,bounds.height)/2);
+            if(o.background)panel(bounds,*o.background,radius);if(o.border&&border>0){auto c=color(*o.border);target.panels.push_back({bounds,c,c,radius,border});}
+            if(!o.image)return;const auto pad=float(o.padding);Rect image{bounds.x+pad,bounds.y+pad,std::max(0.f,bounds.width-2*pad),std::max(0.f,bounds.height-2*pad)},uv{0,0,1,1};const auto fit=o.fit.value_or(o.preserve_aspect?ImageFit::contain:ImageFit::stretch);
+            if(fit==ImageFit::contain){const auto scale=std::min(image.width/o.image->width(),image.height/o.image->height());const auto width=o.image->width()*scale,height=o.image->height()*scale;image.x+=(image.width-width)/2;image.y+=(image.height-height)/2;image.width=width;image.height=height;}
+            if(fit==ImageFit::cover&&image.width>0&&image.height>0){const auto source=double(o.image->width())/o.image->height(),destination=double(image.width)/image.height;if(source>destination){uv.width=float(destination/source);uv.x=(1-uv.width)/2;}else{uv.height=float(source/destination);uv.y=(1-uv.height)/2;}}
+            if(image.width>0&&image.height>0){ImageRun run{.bounds=image,.image=o.image,.source=uv};if(fit!=ImageFit::contain){run.radius=std::min(std::max(0.f,radius-pad),std::min(image.width,image.height)/2);if(pad==0&&o.border){run.border=color(*o.border);run.border_width=border;}}target.images.push_back(std::move(run));}return;
+        }
         if(n.color){n.color->options.enabled=enabled;n.color->paint(target,r,impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1);return;}
         if(n.color_button){target.images.push_back({r,n.color_button->paint({r.width,r.height},enabled&&impl_->hovered==i,enabled&&impl_->pressed==i,enabled&&impl_->focused==i,impl_->appearance.primary),{},enabled?1.f:.32f});return;}
         if(n.menu_item) {draw_menu_item(target,i);return;}
@@ -2132,7 +2152,7 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
             if(layer.shadow){layer.shadow->bounds.x+=body.x;layer.shadow->bounds.y+=body.y;}
             layer.content_transform.origin_x+=body.x;layer.content_transform.origin_y+=body.y;
         };
-        CanvasLayer base{.panels=std::move(scene.panels),.texts=std::move(scene.texts),.images=std::move(scene.images)};translate(base);base.clip=clip;base.content_transform=compose(inherited,base.content_transform);
+        CanvasLayer base{.panels=std::move(scene.panels),.texts=std::move(scene.texts),.images=std::move(scene.images),.images_before_text=scene.images_before_text};translate(base);base.clip=clip;base.content_transform=compose(inherited,base.content_transform);
         if(!base.panels.empty()||!base.texts.empty()||!base.images.empty())f.overlays.push_back(std::move(base));
         for(std::size_t j=0;j<scene.overlays.size();++j){auto layer=std::move(scene.overlays[j]);translate(layer);
             if(j>=popup_start)portals.push_back(std::move(layer));
@@ -2145,8 +2165,19 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
     auto draw_tree=[&](auto&& self,std::size_t i,std::optional<std::size_t>& batch,ContentTransform transform)->void {
         const auto& n=impl_->nodes[i];if(n.popup||!impl_->visible(i))return;
         auto use_clip=[&](std::optional<Rect> clip){if(batch&&*batch==f.overlays.size()){f.overlays.push_back({.clip=clip,.content_transform=transform});return;}const auto current=batch?f.overlays[*batch].clip:std::optional<Rect>{};if(current!=clip){batch=f.overlays.size();f.overlays.push_back({.clip=clip,.content_transform=transform});}};
-        use_clip(impl_->clip_rect(i));
-        if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);
+        const bool provided=bool(n.paint_handler)||(n.drawing&&n.drawing->images_before_text);
+        if(!provided)use_clip(impl_->clip_rect(i));
+        if(provided){
+            const auto source=n.paint_source==absent?i:n.paint_source;const auto& owner=impl_->nodes[source];
+            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),impl_->hovered!=absent&&impl_->descendant(impl_->hovered,source),impl_->pressed==source,impl_->focused==source,owner.checked};
+            struct Guard{bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}}guard{impl_->painting};
+            core::Result<std::shared_ptr<const WidgetDrawing>> drawing=n.paint_handler?n.paint_handler(state):core::Result<std::shared_ptr<const WidgetDrawing>>{std::make_shared<const WidgetDrawing>(*n.drawing)};if(!drawing){if(drawing.error().cause)std::rethrow_exception(drawing.error().cause);throw std::runtime_error(drawing.error().message);}
+            if(*drawing){const auto& d=**drawing;CanvasFrame check{.viewport={0,0,8192,8192},.panels=d.panels,.texts=d.texts,.images=d.images};if(!valid_canvas(check))throw std::runtime_error("Paint provider returned invalid native drawing");
+                CanvasLayer layer{.panels=d.panels,.texts=d.texts,.images=d.images,.clip=impl_->clip_rect(i),.content_transform=transform,.images_before_text=d.images_before_text};
+                for(auto& p:layer.panels){p.bounds.x+=n.bounds.x;p.bounds.y+=n.bounds.y;}for(auto& t:layer.texts){t.bounds.x+=n.bounds.x;t.bounds.y+=n.bounds.y;if(t.clip){t.clip->x+=n.bounds.x;t.clip->y+=n.bounds.y;}}for(auto& image:layer.images){image.bounds.x+=n.bounds.x;image.bounds.y+=n.bounds.y;}
+                f.overlays.push_back(std::move(layer));batch=f.overlays.size();
+            }
+        }else if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);
         if(n.content&&n.content->view){auto clip=impl_->clip_rect(i);clip=clip?intersect(*clip,n.bounds):n.bounds;append_embedded(n.content->view,n.bounds,transform,clip);batch=f.overlays.size();}
         for(auto child:n.children)self(self,child,batch,transform);
         if(n.scroll&&n.scroll->options.enabled&&n.scroll->options.show_indicator&&n.bounds.width>0&&n.bounds.height>0&&(n.scroll->content_height>n.bounds.height||n.scroll->content_width>n.bounds.width)){
@@ -2194,6 +2225,9 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
         if(p.content_view)append_embedded(p.content_view,impl_->activation_rect(index),animated?impl_->transform(index):ContentTransform{},(!p.popover||p.popover->clip_content)?std::optional{p.content}:std::nullopt);
         flush_portals();
     }
+    const auto empty=[](const CanvasLayer& layer){return layer.panels.empty()&&layer.texts.empty()&&layer.images.empty()&&!layer.backdrop&&!layer.shadow;};
+    if(popup_start){std::size_t removed=0;for(std::size_t i=0;i<*popup_start;++i)if(empty(f.overlays[i]))++removed;*popup_start-=removed;}
+    std::erase_if(f.overlays,empty);
     return f;
 }
 core::Result<GraphicsInfo> WidgetState::graphics_info() {

@@ -54,8 +54,16 @@ struct WidgetDrawing final {
     std::vector<Panel> panels;
     std::vector<TextRun> texts;
     std::vector<ImageRun> images;
+    bool images_before_text=false;
     friend bool operator==(const WidgetDrawing&,const WidgetDrawing&)=default;
 };
+struct WidgetPaintState final {
+    Size size;
+    bool enabled=true,hovered=false,pressed=false,focused=false,checked=false;
+    friend bool operator==(const WidgetPaintState&,const WidgetPaintState&)=default;
+};
+// Pure, owner-thread paint provider. UI queries/mutations during it are rejected.
+using WidgetPaintHandler=std::function<core::Result<std::shared_ptr<const WidgetDrawing>>(const WidgetPaintState&)>;
 struct LabelOptions final { std::string text; double font_size = 14; bool selectable = true; TextRole role=TextRole::description;std::optional<WidgetColor> color;TextAlignment alignment=TextAlignment::left;double line_height=0;std::optional<unsigned> font_weight;bool elide_right=false;friend bool operator==(const LabelOptions&,const LabelOptions&)=default; };
 struct ButtonStyle final {
     std::optional<WidgetColor> fill,hover_fill,pressed_fill,disabled_fill,text,disabled_text,border;
@@ -92,6 +100,8 @@ struct ActionOptions final {
     std::optional<double> width,height;
     std::optional<WidgetColor> text_color,hover_text_color,pressed_text_color,disabled_text_color;
     bool interaction_enabled=true;
+    bool checkable=false,checked=false,tab_focusable=true,pointer_focusable=true;
+    std::string accessibility_description;
 };
 enum class TabStyle { underline,surface };
 struct TabOptions final {
@@ -244,6 +254,8 @@ struct ImageOptions final {
     double padding=0,corner_radius=0,border_width=0;
     std::optional<WidgetColor> background,border;
     bool preserve_aspect=false;
+    std::optional<ImageFit> fit;
+    bool circular=false,allow_empty=false;
 };
 struct ProgressOptions final { double minimum=0, maximum=100, start=0, value=0, width=100, height=6; };
 struct ColorSurfaceOptions final {
@@ -337,6 +349,7 @@ struct WidgetSnapshot final {
     ActionRole action_role=ActionRole::button;
     bool custom_content=false,text_underline=false;
     std::optional<WidgetColor> foreground_color;
+    std::string accessibility_description;
 };
 // Opaque generation identity plus actual parent/sibling placement. The weak
 // identity never owns a native tree and cannot expose its implementation.
@@ -407,6 +420,8 @@ public:
     [[nodiscard]] core::Result<Widget> content_item(std::string_view id={}) const;
     [[nodiscard]] core::Result<void> set_layout_handler(std::function<void(Rect)>) const;
     [[nodiscard]] core::Result<void> set_drawing(WidgetDrawing) const;
+    [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler,Widget interaction_owner={}) const;
+    [[nodiscard]] core::Result<void> request_repaint() const;
     [[nodiscard]] core::Result<void> set_input_handler(WidgetInputHandler) const;
     [[nodiscard]] core::Result<void> set_stack_options(StackOptions) const;
     [[nodiscard]] core::Result<void> set_button_style(ButtonStyle) const;

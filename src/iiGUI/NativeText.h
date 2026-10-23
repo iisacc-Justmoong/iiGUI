@@ -17,11 +17,12 @@ struct CanvasLayerView final {
     std::optional<BackdropMaterial> backdrop=std::nullopt;
     std::optional<BoxShadow> shadow=std::nullopt;
     ContentTransform content_transform{};
+    bool images_before_text=false;
     [[nodiscard]] bool foreground() const noexcept { return !texts.empty() || !images.empty(); }
 };
 inline std::vector<CanvasLayerView> canvas_layers(const CanvasFrame& f) {
-    std::vector<CanvasLayerView> out{{f.panels,f.texts,f.images}};
-    for(const auto& l:f.overlays) out.push_back({l.panels,l.texts,l.images,l.clip,l.backdrop,l.shadow,l.content_transform});
+    std::vector<CanvasLayerView> out{{f.panels,f.texts,f.images,std::nullopt,std::nullopt,std::nullopt,{},f.images_before_text}};
+    for(const auto& l:f.overlays) out.push_back({l.panels,l.texts,l.images,l.clip,l.backdrop,l.shadow,l.content_transform,l.images_before_text});
     return out;
 }
 struct PixelClip final { std::uint32_t x,y,width,height; };
@@ -41,11 +42,14 @@ struct ForegroundKey final {
     std::vector<TextRun> texts;
     std::vector<ImageRun> images;
     ContentTransform transform{};
+    bool images_before_text=false;
     bool matches(Rect r,double s,CanvasLayerView l,bool transformed=false) const {
-        return valid && viewport==r && scale==s && transform==(transformed?l.content_transform:ContentTransform{}) && std::ranges::equal(texts,l.texts) && std::ranges::equal(images,l.images);
+        return valid && viewport==r && scale==s && images_before_text==l.images_before_text && transform==(transformed?l.content_transform:ContentTransform{}) && std::ranges::equal(texts,l.texts) && std::ranges::equal(images,l.images);
     }
-    void assign(Rect r,double s,CanvasLayerView l,bool transformed=false) { transform=transformed?l.content_transform:ContentTransform{};valid=true;viewport=r;scale=s;texts.assign(l.texts.begin(),l.texts.end());images.assign(l.images.begin(),l.images.end()); }
+    void assign(Rect r,double s,CanvasLayerView l,bool transformed=false) { images_before_text=l.images_before_text;transform=transformed?l.content_transform:ContentTransform{};valid=true;viewport=r;scale=s;texts.assign(l.texts.begin(),l.texts.end());images.assign(l.images.begin(),l.images.end()); }
 };
+struct ForegroundRaster final {PixelBuffer pixels;PixelClip region;};
+ForegroundRaster rasterize_foreground_region(Rect,CanvasLayerView,double,bool transformed=false);
 PixelBuffer rasterize_foreground(Rect viewport,CanvasLayerView,double scale);
 PixelBuffer rasterize_transformed_foreground(Rect viewport,CanvasLayerView,double scale);
 inline float encoded_srgb(float linear) {

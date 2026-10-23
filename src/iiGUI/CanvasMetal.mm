@@ -44,8 +44,8 @@ float4 premultiplied_read(texture2d<float> image,int2 p) {
 struct ForegroundTransform {float4 local,offset;};
 fragment float4 text_fragment(float4 position [[position]], texture2d<float> glyphs [[texture(0)]],constant ForegroundTransform& values [[buffer(0)]]) {
     const float4 transform=values.local;const float2 destination=position.xy-values.offset.xy;
-    if(transform.z==1&&all(fract(values.offset.xy)==float2(0)))return premultiplied_read(glyphs,int2(destination))*transform.w;
-    float2 source=(destination-transform.xy)/transform.z+transform.xy-.5;
+    if(transform.z==1&&all(fract(values.offset.xy)==float2(0)))return premultiplied_read(glyphs,int2(destination-values.offset.zw))*transform.w;
+    float2 source=(destination-transform.xy)/transform.z+transform.xy-values.offset.zw-.5;
     int2 p=int2(floor(source));float2 f=source-float2(p);
     float4 a=mix(premultiplied_read(glyphs,p),premultiplied_read(glyphs,p+int2(1,0)),f.x);
     float4 b=mix(premultiplied_read(glyphs,p+int2(0,1)),premultiplied_read(glyphs,p+int2(1,1)),f.x);
@@ -109,7 +109,7 @@ struct PlatformCanvas::Impl final {
         std::array<float,4> shape{};double scale=0;float padding=0;
         bool valid=false,dirty=false;
     };
-    struct Layer final { id<MTLTexture> foreground=nil; ForegroundKey key;MaterialCache material;ShadowCache shadow; };
+    struct Layer final { id<MTLTexture> foreground=nil; ForegroundKey key;PixelClip region{};MaterialCache material;ShadowCache shadow; };
     std::vector<Layer> layers;
     std::optional<CanvasFrame> previous;
     double previous_scale=0;
@@ -192,7 +192,7 @@ struct PlatformCanvas::Impl final {
         return {std::uint32_t(width),std::uint32_t(height)};
     }
     void prepare_materials(const CanvasFrame& frame,double scale,std::uint32_t width,std::uint32_t height,const std::vector<CanvasLayerView>& views) {
-        const bool base_changed=!previous||previous_scale!=scale||previous->viewport!=frame.viewport||previous->background!=frame.background||previous->panels!=frame.panels||previous->texts!=frame.texts||previous->images!=frame.images;
+        const bool base_changed=!previous||previous_scale!=scale||previous->viewport!=frame.viewport||previous->background!=frame.background||previous->panels!=frame.panels||previous->texts!=frame.texts||previous->images!=frame.images||previous->images_before_text!=frame.images_before_text;
         std::uint64_t bytes=0;std::vector<Rect> regions(views.size());
         for(std::size_t i=0;i<views.size();++i)if(views[i].backdrop){const auto& m=*views[i].backdrop;auto region=views[i];region.content_transform={};const auto p=m.blur_radius;region.clip=Rect{m.bounds.x-p,m.bounds.y-p,m.bounds.width+2*p,m.bounds.height+2*p};auto r=clip_pixels(region,scale,width,height);regions[i]={float(r.x),float(r.y),float(r.width),float(r.height)};bytes+=std::uint64_t(r.width)*r.height*(m.blur_radius>0?12:4);}
         std::uint64_t shadow_bytes=0;
@@ -313,16 +313,16 @@ struct PlatformCanvas::Impl final {
                 }
                 if(content.foreground()) {
                     if(!cached.foreground || !cached.key.matches(frame.viewport,scale,content)) {
-                        auto bitmap=rasterize_foreground(frame.viewport,content,scale);
-                        auto descriptor=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB width:width height:pixels_high mipmapped:NO];
+                        auto raster=rasterize_foreground_region(frame.viewport,content,scale);auto& bitmap=raster.pixels;cached.region=raster.region;
+                        auto descriptor=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB width:bitmap.width height:bitmap.height mipmapped:NO];
                         descriptor.usage=MTLTextureUsageShaderRead; descriptor.storageMode=MTLStorageModeShared;
                         cached.foreground=[device newTextureWithDescriptor:descriptor]; require(cached.foreground!=nil,"Cannot allocate Metal foreground texture");
-                        [cached.foreground replaceRegion:MTLRegionMake2D(0,0,width,pixels_high) mipmapLevel:0 withBytes:bitmap.rgba.data() bytesPerRow:std::size_t(width)*4];
+                        [cached.foreground replaceRegion:MTLRegionMake2D(0,0,bitmap.width,bitmap.height) mipmapLevel:0 withBytes:bitmap.rgba.data() bytesPerRow:std::size_t(bitmap.width)*4];
                         cached.key.assign(frame.viewport,scale,content); ++statistics.foreground_rasterizations;
                     }
-                    statistics.foreground_texture_bytes+=std::uint64_t(width)*pixels_high*4;
+                    statistics.foreground_texture_bytes+=std::uint64_t(cached.region.width)*cached.region.height*4;
                     [encoder setRenderPipelineState:text_pipeline]; [encoder setFragmentTexture:cached.foreground atIndex:0];
-                    const auto& t=content.content_transform;const float transform[]{float(t.origin_x*scale),float(t.origin_y*scale),t.scale,t.opacity,float(t.offset_x*scale),float(t.offset_y*scale),0,0};
+                    const auto& t=content.content_transform;const float transform[]{float(t.origin_x*scale),float(t.origin_y*scale),t.scale,t.opacity,float(t.offset_x*scale),float(t.offset_y*scale),float(cached.region.x),float(cached.region.y)};
                     [encoder setFragmentBytes:transform length:sizeof(transform) atIndex:0];
                     [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
                 } else { cached.foreground=nil; cached.key={}; }

@@ -42,7 +42,8 @@ float4 text_vertex(uint vertex : SV_VertexID) : SV_POSITION {
     return float4(corners[vertex],0,1);
 }
 float4 text_fragment(float4 position : SV_POSITION) : SV_TARGET {
-    float4 color=glyphs.Load(int3(int2(position.xy),0));
+    uint width,height;glyphs.GetDimensions(width,height);int2 pixel=int2(position.xy-effect_bounds.xy);if(any(pixel<0)||any(pixel>=int2(width,height)))return 0;
+    float4 color=glyphs.Load(int3(pixel,0));
     return float4(color.rgb*color.a,color.a);
 }
 
@@ -109,7 +110,7 @@ struct PlatformCanvas::Impl final {
     ComPtr<ID3D11RasterizerState> rasterizer;
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11RenderTargetView> target;
-    struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key; };
+    struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key;PixelClip region{}; };
     std::vector<Layer> layers;
     std::optional<CanvasFrame> previous;
     double previous_scale=0;
@@ -267,12 +268,12 @@ struct PlatformCanvas::Impl final {
             }
             if (layer.foreground()) {
                 if(!cached.foreground || !cached.key.matches(frame.viewport,scale,layer,true)) {
-                const auto bitmap=rasterize_transformed_foreground(frame.viewport,layer,scale);
-                D3D11_TEXTURE2D_DESC desc{}; desc.Width=width; desc.Height=height;
+                auto raster=rasterize_foreground_region(frame.viewport,layer,scale,true);const auto& bitmap=raster.pixels;cached.region=raster.region;
+                D3D11_TEXTURE2D_DESC desc{}; desc.Width=bitmap.width; desc.Height=bitmap.height;
                 desc.MipLevels=desc.ArraySize=1; desc.SampleDesc.Count=1;
                 desc.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.Usage=D3D11_USAGE_IMMUTABLE;
                 desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
-                D3D11_SUBRESOURCE_DATA data{bitmap.rgba.data(),width*4,0};
+                D3D11_SUBRESOURCE_DATA data{bitmap.rgba.data(),bitmap.width*4,0};
                 ComPtr<ID3D11Texture2D> glyphs;
                 checked(device->CreateTexture2D(&desc,&data,&glyphs),"Cannot allocate D3D11 text texture");
                 ComPtr<ID3D11ShaderResourceView> resource;
@@ -280,7 +281,8 @@ struct PlatformCanvas::Impl final {
                 cached.foreground=std::move(resource);cached.key.assign(frame.viewport,scale,layer,true);
                 ++statistics.foreground_rasterizations;
                 }
-                statistics.foreground_texture_bytes+=std::uint64_t(width)*height*4;
+                statistics.foreground_texture_bytes+=std::uint64_t(cached.region.width)*cached.region.height*4;
+                auto foreground=size;foreground.bounds[0]=float(cached.region.x);foreground.bounds[1]=float(cached.region.y);context->UpdateSubresource(view.Get(),0,nullptr,&foreground,0,0);
                 auto* input=cached.foreground.Get(); context->PSSetShaderResources(1,1,&input);
                 context->VSSetShader(text_vertex.Get(),nullptr,0); context->PSSetShader(text_fragment.Get(),nullptr,0);
                 context->Draw(6,0);

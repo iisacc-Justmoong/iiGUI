@@ -88,6 +88,8 @@ public:
     [[nodiscard]] core::Result<void> scroll_handler(std::size_t,std::function<void(const ScrollViewport&)>);
     [[nodiscard]] core::Result<void> layout_handler(std::size_t,std::function<void(Rect)>);
     [[nodiscard]] core::Result<void> drawing(std::size_t,WidgetDrawing);
+    [[nodiscard]] core::Result<void> paint_handler(std::size_t,WidgetPaintHandler,Widget);
+    [[nodiscard]] core::Result<void> repaint(std::size_t);
     [[nodiscard]] core::Result<void> input_handler(std::size_t,WidgetInputHandler);
     [[nodiscard]] core::Result<void> stack_options(std::size_t,StackOptions);
     [[nodiscard]] core::Result<void> button_style(std::size_t,ButtonStyle);

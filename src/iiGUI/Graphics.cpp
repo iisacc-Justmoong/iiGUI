@@ -37,8 +37,11 @@ bool valid_canvas(const CanvasFrame& frame) noexcept {
                 text.text.size()>65536 || bytes>1024*1024 || text.text.find('\0')!=text.text.npos || !core::valid_utf8(text.text) ||
                 text.font_family.size()>256 || text.font_family.find('\0')!=text.font_family.npos || !core::valid_utf8(text.font_family)) return false;
         }
-        for(const auto& image:is)
-            if(!rect(image.bounds) || !image.image || !std::isfinite(image.opacity) || image.opacity<0 || image.opacity>1 || (image.tint && !color(*image.tint))) return false;
+        for(const auto& image:is){
+            const auto uv=image.source;
+            if(!rect(image.bounds)||!image.image||!std::isfinite(image.opacity)||image.opacity<0||image.opacity>1||(image.tint&&!color(*image.tint))||!rect(uv)||uv.x<0||uv.y<0||uv.x+uv.width>1.000001f||uv.y+uv.height>1.000001f||!std::isfinite(image.radius)||image.radius<0||image.radius>std::min(image.bounds.width,image.bounds.height)/2||!std::isfinite(image.border_width)||image.border_width<0||image.border_width>std::min(image.bounds.width,image.bounds.height)/2||!color(image.border))return false;
+            if(image.gradient){const auto& g=*image.gradient;if(!std::isfinite(g.height)||g.height<0||g.height>8192||!std::isfinite(g.middle_position)||g.middle_position<=0||g.middle_position>=1||!color(g.top)||!color(g.middle)||!color(g.bottom))return false;}
+        }
         return true;
     };
     if(!layer(frame.panels,frame.texts,frame.images)) return false;

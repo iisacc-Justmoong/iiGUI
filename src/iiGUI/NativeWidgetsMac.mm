@@ -85,6 +85,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     if(n.kind==WidgetKind::menu) return native(n.id);
     return native(n.kind==WidgetKind::input_field?(n.placeholder.empty()?n.id:n.placeholder):n.text.empty()?n.icon_name:n.text);
 }
+- (NSString*)accessibilityHelp { auto n=read?read():WidgetSnapshot{};return n.accessibility_description.empty()?nil:native(n.accessibility_description); }
 - (BOOL)isAccessibilitySelected { return read && read().selected; }
 - (id)accessibilityValue {
     if(read && read().password)return @"";

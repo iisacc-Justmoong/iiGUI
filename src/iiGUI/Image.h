@@ -8,6 +8,7 @@
 #include <vector>
 
 namespace ii::gui {
+enum class ImageFit {stretch,contain,cover};
 // Immutable encoded-sRGB, straight-alpha RGBA8. Pointer identity is a stable
 // render-cache key. Creation transfers the byte buffer; clients cannot mutate it.
 class IIGUI_EXPORT RasterImage final {

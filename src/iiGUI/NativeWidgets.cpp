@@ -79,6 +79,8 @@ core::Result<void> Widget::set_content(WidgetFactory factory,std::function<core:
 core::Result<void> Widget::clear_content() const {return set_content({});}
 core::Result<Widget> Widget::content_item(std::string_view id) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->content_item(index_,id);}
 core::Result<void> Widget::set_layout_handler(std::function<void(Rect)> v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->layout_handler(index_,std::move(v));}
+core::Result<void> Widget::set_paint_handler(WidgetPaintHandler callback,Widget owner)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->paint_handler(index_,std::move(callback),owner);}
+core::Result<void> Widget::request_repaint()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->repaint(index_);}
 core::Result<void> Widget::set_drawing(WidgetDrawing v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->drawing(index_,std::move(v));}
 core::Result<void> Widget::set_input_handler(WidgetInputHandler v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->input_handler(index_,std::move(v));}
 core::Result<void> Widget::set_stack_options(StackOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->stack_options(index_,std::move(v));}

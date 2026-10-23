@@ -81,6 +81,7 @@ struct VulkanCanvas::Impl final {
         std::unique_ptr<Image> glyphs;
         std::unique_ptr<Buffer> panels,glyph_upload;
         ForegroundKey key;
+        PixelClip region{};
         std::size_t panel_count=0;
         bool glyph_initialized=false,upload=false,foreground=false;
     };
@@ -457,8 +458,8 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
             layer.upload=false;layer.foreground=view.foreground();
             if(layer.foreground) {
                 if(!layer.glyphs || !layer.key.matches(frame.viewport,scale,view,true)) {
-                    const auto bitmap=rasterize_transformed_foreground(frame.viewport,view,scale);
-                    if (!layer.glyphs) layer.glyphs=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+                    auto raster=rasterize_foreground_region(frame.viewport,view,scale,true);const auto& bitmap=raster.pixels;
+                    if (!layer.glyphs||layer.region.width!=bitmap.width||layer.region.height!=bitmap.height){layer.glyphs=image(bitmap.width,bitmap.height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);layer.glyph_initialized=false;}layer.region=raster.region;
                     if (!layer.glyph_upload || layer.glyph_upload->capacity<bitmap.rgba.size())
                         layer.glyph_upload=buffer(bitmap.rgba.size(),VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
                     std::memcpy(layer.glyph_upload->mapped,bitmap.rgba.data(),bitmap.rgba.size());
@@ -469,7 +470,7 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
                 write.dstBinding=1; write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 write.pBufferInfo=nullptr; write.pImageInfo=&text;
                 vkUpdateDescriptorSets(device,1,&write,0,nullptr);
-                statistics.foreground_texture_bytes+=std::uint64_t(width)*height*4;
+                statistics.foreground_texture_bytes+=std::uint64_t(layer.region.width)*layer.region.height*4;
             } else { layer.glyphs.reset();layer.glyph_upload.reset();layer.key={};layer.glyph_initialized=false; }
         }
     }
@@ -479,7 +480,7 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
             barrier(layer.glyphs->handle,layer.glyph_initialized?VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,layer.glyph_initialized?VK_ACCESS_SHADER_READ_BIT:0,VK_ACCESS_TRANSFER_WRITE_BIT,
                 layer.glyph_initialized?VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT:VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT);
-            VkBufferImageCopy copy{}; copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1}; copy.imageExtent={width,height,1};
+            VkBufferImageCopy copy{}; copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1}; copy.imageExtent={layer.region.width,layer.region.height,1};
             vkCmdCopyBufferToImage(command,layer.glyph_upload->handle,layer.glyphs->handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
             barrier(layer.glyphs->handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -504,7 +505,7 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
                 if(views[i].shadow)effect(true);if(views[i].backdrop)effect(false);
                 const float size[]{frame.viewport.width,frame.viewport.height};vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT,0,sizeof(size),size);
                 vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&descriptor[i],0,nullptr);
-                const auto& layer=layers[i];if(layer.panel_count){vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,panels_pipeline);vkCmdDraw(command,6,std::uint32_t(layer.panel_count),0,0);}if(layer.foreground){vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,text_pipeline);vkCmdDraw(command,6,1,0,0);}
+                const auto& layer=layers[i];if(layer.panel_count){vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,panels_pipeline);vkCmdDraw(command,6,std::uint32_t(layer.panel_count),0,0);}if(layer.foreground){GpuEffect foreground{{frame.viewport.width,frame.viewport.height,float(scale),1},{float(layer.region.x),float(layer.region.y),float(layer.region.width),float(layer.region.height)},{},{},{}};vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(foreground),&foreground);vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,text_pipeline);vkCmdDraw(command,6,1,0,0);}
             }
             vkCmdEndRenderPass(command);if(i==0&&has_effects)snapshot(*effect_content,content_initialized);
         }
