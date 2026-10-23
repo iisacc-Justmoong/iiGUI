@@ -1,12 +1,53 @@
 #pragma once
 #include "NativeCanvas.h"
 #include <algorithm>
+#include <span>
 
 namespace ii::gui::detail {
 // Native shaping/wrapping uses logical units. Rasterization uses device pixels.
 float measure_text(const TextRun&);
+float measure_text_width(const TextRun&);
 // Top-left, straight-alpha RGBA8 encoded sRGB, uploaded to an sRGB GPU texture.
 PixelBuffer rasterize_text(const CanvasFrame&, double scale);
+struct CanvasLayerView final {
+    std::span<const Panel> panels;
+    std::span<const TextRun> texts;
+    std::span<const ImageRun> images;
+    std::optional<Rect> clip=std::nullopt;
+    std::optional<BackdropMaterial> backdrop=std::nullopt;
+    std::optional<BoxShadow> shadow=std::nullopt;
+    ContentTransform content_transform{};
+    [[nodiscard]] bool foreground() const noexcept { return !texts.empty() || !images.empty(); }
+};
+inline std::vector<CanvasLayerView> canvas_layers(const CanvasFrame& f) {
+    std::vector<CanvasLayerView> out{{f.panels,f.texts,f.images}};
+    for(const auto& l:f.overlays) out.push_back({l.panels,l.texts,l.images,l.clip,l.backdrop,l.shadow,l.content_transform});
+    return out;
+}
+struct PixelClip final { std::uint32_t x,y,width,height; };
+inline PixelClip clip_pixels(CanvasLayerView l,double scale,std::uint32_t width,std::uint32_t height) {
+    if(!l.clip) return {0,0,width,height};
+    const auto r=transform_rect(*l.clip,l.content_transform);
+    const auto left=std::uint32_t(std::clamp(std::floor(r.x*scale),0.0,double(width)));
+    const auto top=std::uint32_t(std::clamp(std::floor(r.y*scale),0.0,double(height)));
+    const auto right=std::uint32_t(std::clamp(std::ceil((double(r.x)+r.width)*scale),double(left),double(width)));
+    const auto bottom=std::uint32_t(std::clamp(std::ceil((double(r.y)+r.height)*scale),double(top),double(height)));
+    return {left,top,right-left,bottom-top};
+}
+struct ForegroundKey final {
+    bool valid=false;
+    Rect viewport;
+    double scale=0;
+    std::vector<TextRun> texts;
+    std::vector<ImageRun> images;
+    ContentTransform transform{};
+    bool matches(Rect r,double s,CanvasLayerView l,bool transformed=false) const {
+        return valid && viewport==r && scale==s && transform==(transformed?l.content_transform:ContentTransform{}) && std::ranges::equal(texts,l.texts) && std::ranges::equal(images,l.images);
+    }
+    void assign(Rect r,double s,CanvasLayerView l,bool transformed=false) { transform=transformed?l.content_transform:ContentTransform{};valid=true;viewport=r;scale=s;texts.assign(l.texts.begin(),l.texts.end());images.assign(l.images.begin(),l.images.end()); }
+};
+PixelBuffer rasterize_foreground(Rect viewport,CanvasLayerView,double scale);
+PixelBuffer rasterize_transformed_foreground(Rect viewport,CanvasLayerView,double scale);
 inline float encoded_srgb(float linear) {
     return linear<=0.0031308f ? linear*12.92f : 1.055f*std::pow(linear,1.f/2.4f)-0.055f;
 }

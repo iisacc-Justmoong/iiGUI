@@ -1,0 +1,17 @@
+import vm HelloBackend
+let greeting: String = "Hello World"
+
+ApplicationWindow(title: "Hello World · LVRS · iiSDKCore", width: 720, height: 420,
+                  minimumWidth: 480, minimumHeight: 320) {
+    VStack(id: "root", spacing: 18, padding: 32) {
+        Label(id: "greeting", text: greeting, style: .title, fontSize: 32)
+        Label(text: "LVUI → Native C++ Widgets → iiSDKCore", style: .body, fontSize: 16)
+        Label(text: "하나의 코드로 만드는 네이티브 앱", style: .description, fontSize: 14)
+        Label(id: "worker", text: "Background: waiting…", style: .body, fontSize: 15)
+        Label(id: "timer", text: "Timer: 0", style: .caption)
+        HStack(spacing: 12) {
+            PushButton(vm.greet, id: "greet", text: "Say Hello")
+            PushButton(vm.close, id: "close", text: "Close")
+        }
+    }
+}

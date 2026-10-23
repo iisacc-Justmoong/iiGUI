@@ -2,6 +2,10 @@
 #include "DispatchState.h"
 #include "HostCommon.h"
 #include "CanvasState.h"
+#include "WidgetState.h"
+#include "WidgetSurface.h"
+#include "DesktopCommon.h"
+#include "NativeDesktop_p.hpp"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -56,13 +60,22 @@ struct WakeGate final {
 struct Host::Impl {
     enum class Phase { created, running, closing, closed };
     explicit Impl(HostOptions value) : options(detail::validate_options(std::move(value))),
-        dispatch(std::make_shared<detail::DispatchState>(options.task_capacity)),
+        dispatch(std::make_shared<detail::DispatchState>(options.task_capacity, options.event_loop)),
         gate(std::make_shared<WakeGate>()) {
 
         state.size = options.size;
         state.title = options.title;
         state.text = "HelloGUI\n\nNative C++23 desktop host\niiSDKCore + iiSDKBuilder";
     }
+    std::shared_ptr<detail::WidgetState> widgets;
+    bool mounting=false;
+    Impl* parent=nullptr;
+    std::vector<Impl*> children;
+    std::shared_ptr<detail::NativeDialog> dialog;
+    std::shared_ptr<MotionPreferences> motion_preferences=std::make_shared<MotionPreferences>();
+    std::unique_ptr<runtime::FrameLoop> motion_frames;
+    runtime::TaskToken cadence;
+    std::optional<detail::NativeMenu> app_menu;
     HostOptions options;
     std::shared_ptr<detail::DispatchState> dispatch;
     std::shared_ptr<WakeGate> gate;
@@ -102,8 +115,10 @@ struct Host::Impl {
     void did_close() noexcept {
         if (phase != Phase::running) return;
         phase = Phase::closing;
-        dispatch->accepting.store(false, std::memory_order_release);
-        dispatch->loop.request_stop();
+        dispatch->retire();
+        if(!parent)dispatch->loop.request_stop();
+        if(widgets){widgets->close();widgets.reset();}
+        dialog.reset();auto closing=children;for(auto* child:closing){child->force_close();child->cleanup();}
         canvas.clear();
         state.visible = false;
         state.closed = true;
@@ -131,8 +146,17 @@ struct Host::Impl {
         catch (...) { remember_failure("iiGUI close callback failed", std::current_exception()); }
         return accepted;
     }
+    runtime::FrameLoop* frames(){return options.frame_loop?options.frame_loop:motion_frames.get();}
+    void ensure_cadence(){
+        if(parent){parent->ensure_cadence();return;}if(cadence.pending())return;
+        auto weak=std::weak_ptr<detail::DispatchState>(dispatch);
+        auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{if(frames())(void)frames()->step();if(widgets)widgets->present();auto active=children;for(auto* child:active)if(child->phase==Phase::running)child->drain();});});}));
+        if(!scheduled)throw std::runtime_error("Cannot admit native frame cadence");cadence=scheduled.token;
+    }
+    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer};}
     void drain() noexcept {
         if (phase != Phase::running || draining) return;
+        if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;if(callbacks.opened)callbacks.opened();}for(int i=0;i<64&&phase==Phase::running&&display&&XPending(display);++i){XEvent event{};XNextEvent(display,&event);native_event(event);}if(widgets)widgets->present();});return;}
         guard([&] {
             struct Reset final { bool& value; ~Reset() { value = false; } } reset{draining};
             draining = true;
@@ -182,6 +206,7 @@ struct Host::Impl {
         XSetWMNormalHints(display,window,&limits);
     }
     void paint() {
+        if(widgets){widgets->present();return;}
         if (!drawing || !window || phase!=Phase::running) return;
         const double scale=state.backing_scale;
         const int width=std::max(1,pixels(state.size.width)), height=std::max(1,pixels(state.size.height));
@@ -208,7 +233,7 @@ struct Host::Impl {
             throw std::runtime_error("Cannot render Pango/Cairo text");
         cairo_surface_flush(drawing); XFlush(display); text_dirty=false;
     }
-    void native_event(const XEvent& event) {
+    void native_event(XEvent event) {
         if (canvas.native && canvas.native->native_event(&event)) return;
         if (event.type==PropertyNotify && event.xproperty.window==RootWindow(display,screen) && event.xproperty.atom==resources) {
             const auto previous=state.backing_scale; read_scale();
@@ -218,6 +243,9 @@ struct Host::Impl {
             }
             return;
         }
+        if(detail::desktop_event(&event))return;
+        if(app_menu&&app_menu->key&&app_menu->key(&event))return;
+        if(widgets&&widgets->native_event(&event))return;
         if (event.xany.window != window || phase != Phase::running) return;
         switch (event.type) {
         case MapNotify:
@@ -276,8 +304,10 @@ struct Host::Impl {
         drawing=cairo_xlib_surface_create(display,window,DefaultVisual(display,screen),pixels(options.size.width),pixels(options.size.height));
         if (cairo_surface_status(drawing)!=CAIRO_STATUS_SUCCESS) throw std::runtime_error("Cannot create Cairo X11 text surface");
         gate->attach();
-        dispatch->connect([wake=gate]() noexcept { wake->signal(); });
+        if(!parent)dispatch->connect([wake=gate]() noexcept { wake->signal(); });
         phase = Phase::running;
+        if(!parent)detail::bind_desktop(display,window);
+        if(options.frame_loop)ensure_cadence();
         XMapWindow(display, window);
         XFlush(display);
     }
@@ -313,8 +343,10 @@ struct Host::Impl {
         }
     }
     void cleanup() {
-        dispatch->accepting.store(false, std::memory_order_release);
-        dispatch->loop.request_stop();
+        dispatch->retire();
+        if(!parent)dispatch->loop.request_stop();
+        if(widgets){widgets->close();widgets.reset();}dialog.reset();(void)cadence.cancel();
+        if(parent){std::erase(parent->children,this);parent=nullptr;}
         if (auto detached=dispatch->disconnect(); !detached)
             remember_failure(detached.error().message,detached.error().cause);
         gate->detach();
@@ -322,9 +354,11 @@ struct Host::Impl {
         if (display) {
             if (drawing) { cairo_surface_destroy(drawing); drawing=nullptr; }
             if (window) { XDestroyWindow(display, window); window = 0; }
+            detail::unbind_desktop(display);
             XCloseDisplay(display);
             display = nullptr;
         }
+        app_menu.reset();
         callbacks = {};
         state.visible = false;
         state.closed = true;
@@ -336,8 +370,8 @@ Host::Host(HostOptions options) : impl_(std::make_unique<Impl>(std::move(options
 Host::~Host() {
     if (!is_ui_thread() || impl_->phase == Impl::Phase::running || impl_->phase == Impl::Phase::closing)
         std::terminate();
-    impl_->dispatch->accepting.store(false, std::memory_order_release);
-    impl_->dispatch->loop.request_stop();
+    impl_->dispatch->retire();
+    if (impl_->dispatch->owned_loop) impl_->dispatch->loop.request_stop();
     impl_->gate->detach();
 }
 UiExecutor Host::executor() const noexcept { return UiExecutor(impl_->dispatch); }
@@ -412,10 +446,12 @@ core::Result<void> Host::clear_canvas() {
 }
 core::Result<GraphicsInfo> Host::graphics_info() const {
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
+    if(impl_->widgets)return impl_->widgets->graphics_info();
     return impl_->canvas.info();
 }
 core::Result<PixelBuffer> Host::capture_canvas() {
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
+    if(impl_->widgets)return impl_->widgets->capture();
     return impl_->canvas.capture(impl_->state.backing_scale,impl_->state.size.height);
 }
 core::Result<std::reference_wrapper<runtime::EventLoop>> Host::event_loop() {
@@ -437,3 +473,35 @@ core::Result<HostStats> Host::stats() const {
     return result;
 }
 } // namespace ii::gui
+
+namespace ii::gui {
+
+core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
+    if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Native windows require the UI owner thread");
+    if(auto ready=parent.impl_->ready();!ready)return ready;
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Window was already opened");
+    try{impl_->parent=parent.impl_.get();impl_->options.event_loop=&parent.impl_->dispatch->loop;impl_->dispatch=std::make_shared<detail::DispatchState>(impl_->options.task_capacity,impl_->options.event_loop);impl_->callbacks=std::move(callbacks);parent.impl_->children.push_back(impl_.get());impl_->open_native();parent.impl_->ensure_cadence();return {};}catch(...){impl_->cleanup();return core::fail(core::ErrorCode::failed,"Cannot open a native secondary window",std::current_exception());}
+}
+core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory){return mount_widgets(std::move(factory),WidgetAppearance{});}
+core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const WidgetAppearance& appearance){
+    if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());if(!factory)return core::fail(core::ErrorCode::invalid_argument,"Native widget factory is empty");if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
+    struct Reset final{bool& value;~Reset(){value=false;}}reset{impl_->mounting};impl_->mounting=true;
+    try{auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,impl_->frame_hooks());WidgetBuilder builder(replacement);if(auto built=factory(builder);!built)return std::unexpected(built.error());
+        if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());
+        detail::X11WidgetParent native{impl_->display,impl_->window,[host=impl_.get()]{return host->state.backing_scale;}};if(auto attached=replacement->attach(&native);!attached)return std::unexpected(attached.error());
+        impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);return WidgetMount(impl_->widgets);
+    }catch(...){return core::fail(core::ErrorCode::failed,"Native widget factory failed",std::current_exception());}
+}
+core::Result<void> Host::unmount_widgets(){if(auto ready=impl_->ready();!ready)return ready;if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}return {};}
+core::Result<void> Host::unmount_widgets(const WidgetMount& expected){auto owner=expected.state_.lock();if(!owner)return core::fail(core::ErrorCode::closed,"Widget generation is closed");if(owner!=impl_->widgets)return core::fail(core::ErrorCode::invalid_argument,"Widget generation belongs to another host");return unmount_widgets();}
+core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogCompletion completion){
+    if(auto ready=impl_->ready();!ready)return ready;if(impl_->dialog)return core::fail(core::ErrorCode::busy,"A native file dialog is already open");
+    auto weak=std::weak_ptr<detail::DispatchState>(impl_->dispatch);auto opened=detail::native_file_dialog(reinterpret_cast<void*>(impl_->window),std::move(options),executor(),[host=impl_.get(),weak,completion=std::move(completion)](auto result)mutable{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;host->dialog.reset();if(completion)completion(std::move(result));});if(!opened)return std::unexpected(opened.error());impl_->dialog=std::move(*opened);return {};
+}
+
+}
+
+namespace ii::gui {
+core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::raise))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto* display=impl_->display;const auto window=impl_->window;const auto state=[&](long mode,const char* first,const char* second=nullptr){XEvent event{};event.xclient.type=ClientMessage;event.xclient.window=window;event.xclient.message_type=XInternAtom(display,"_NET_WM_STATE",False);event.xclient.format=32;event.xclient.data.l[0]=mode;event.xclient.data.l[1]=XInternAtom(display,first,False);event.xclient.data.l[2]=second?XInternAtom(display,second,False):0;event.xclient.data.l[3]=1;XSendEvent(display,RootWindow(display,impl_->screen),False,SubstructureRedirectMask|SubstructureNotifyMask,&event);};switch(action){case WindowAction::restore:XMapRaised(display,window);state(0,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");state(0,"_NET_WM_STATE_FULLSCREEN");break;case WindowAction::minimize:XIconifyWindow(display,window,impl_->screen);break;case WindowAction::maximize:state(1,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");break;case WindowAction::toggle_fullscreen:state(2,"_NET_WM_STATE_FULLSCREEN");break;case WindowAction::raise:XMapRaised(display,window);XRaiseWindow(display,window);break;}XFlush(display);return {};}
+core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){if(auto ready=impl_->ready();!ready)return ready;auto created=detail::native_app_menu(impl_->display,impl_->window,std::move(items),executor());if(!created)return std::unexpected(created.error());impl_->app_menu=std::move(*created);return {};}
+}

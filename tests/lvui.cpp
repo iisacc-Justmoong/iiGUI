@@ -68,7 +68,9 @@ void invalid() {
     const auto invalid=[&](auto change) { auto copy=frame; change(copy.texts[0]); check(!ii::gui::valid_canvas(copy),"Text validation"); };
     invalid([](auto& t) { t.text="\xc0\x80"; }); invalid([](auto& t) { t.text.assign(65537,'x'); });
     invalid([](auto& t) { t.text=std::string("a\0b",3); }); invalid([](auto& t) { t.bounds.width=0; });
-    invalid([](auto& t) { t.font_size=0; }); invalid([](auto& t) { t.font_weight=500; });
+    for(unsigned weight:{400,500,600,700}) { auto copy=frame; copy.texts[0].font_weight=weight; check(ii::gui::valid_canvas(copy),"LVRS font weight rejected"); }
+    invalid([](auto& t) { t.font_size=0; }); invalid([](auto& t) { t.font_weight=550; });
+    invalid([](auto& t) { t.font_family=std::string("bad\0font",8); });
     invalid([](auto& t) { t.alignment=static_cast<ii::gui::TextAlignment>(42); });
     invalid([](auto& t) { t.color.alpha=2; });
     frame.texts.resize(4097,frame.texts.front()); check(!ii::gui::valid_canvas(frame),"Bounded run count");

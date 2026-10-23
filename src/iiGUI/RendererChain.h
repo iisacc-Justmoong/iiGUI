@@ -1,5 +1,6 @@
 #pragma once
 #include "NativeCanvas.h"
+#include <algorithm>
 
 namespace ii::gui::detail {
 // Private, concrete two-backend ownership. The template allows deterministic
@@ -39,6 +40,9 @@ private:
     void fallback(std::string reason,const CanvasFrame* frame,double scale,double height) {
         try {
             auto replacement=std::make_unique<Vulkan>(parent_,display_,acceleration_);
+            if(frame&&std::ranges::any_of(frame->overlays,[](const auto& l){return bool(l.backdrop);})&&!replacement->info().backdrop_supported)throw std::runtime_error("Vulkan backdrop materials are not implemented");
+            if(frame&&std::ranges::any_of(frame->overlays,[](const auto& l){return bool(l.shadow);})&&!replacement->info().shadow_supported)throw std::runtime_error("Vulkan box shadows are not implemented");
+            if(frame&&std::ranges::any_of(frame->overlays,[](const auto& l){return !l.content_transform.identity();})&&!replacement->info().content_transform_supported)throw std::runtime_error("Vulkan content transforms are not implemented");
             if (frame) replacement->draw(*frame,scale,height);
             primary_.reset(); vulkan_=std::move(replacement); reason_=std::move(reason);
         } catch (const std::exception& error) {

@@ -1,0 +1,60 @@
+{
+  "lvrs_revision": "13b657b21a8ca9babe40ac790bb547c3f7758eea",
+  "license_source": "https://raw.githubusercontent.com/orioncactus/pretendard/main/LICENSE",
+  "fonts": [
+    {
+      "file": "Pretendard-Regular.ttf",
+      "source": "LVRS/resources/font/Pretendard-Regular.ttf",
+      "sha256": "6d0af5258997aec7354a6e340fc2325ba321c410ca48b3af858c8c3d6e92a324"
+    },
+    {
+      "file": "Pretendard-Medium.ttf",
+      "source": "LVRS/resources/font/Pretendard-Medium.ttf",
+      "sha256": "3bae579377eb8e9ac412cb4809ebc3de1d956ed75995c1e346f0c1311053f4e2"
+    },
+    {
+      "file": "Pretendard-SemiBold.ttf",
+      "source": "LVRS/resources/font/Pretendard-SemiBold.ttf",
+      "sha256": "5e1c548732af70873103066c16e1369b9a8a871f0b38c321a1d5bc73e43cea2d"
+    },
+    {
+      "file": "Pretendard-Bold.ttf",
+      "source": "LVRS/resources/font/Pretendard-Bold.ttf",
+      "sha256": "c16b88c670d23e83fa1170c954cbc4822d3b8dad3c3cde15d798a94b43d97985"
+    }
+  ],
+  "visual_sources": [
+    {
+      "file": "src/qml/Theme.qml",
+      "sha256": "52a4bdb3ad2f345b6bac0baec041884d2a22ce130811089ee3ba61d44c9597ac"
+    },
+    {
+      "file": "src/qml/components/control/buttons/PushButton.qml",
+      "sha256": "783026b48922ec9d3470d8578bc1ac8f1d265b94130b7d4b2887e42fd6e4e66b"
+    },
+    {
+      "file": "src/qml/components/control/buttons/AbstractButton.qml",
+      "sha256": "e34599e6234316d190a96e0d729a6433822a992fea6afd63a36984817ddf7509"
+    },
+    {
+      "file": "src/backend/fonts/fontpolicy.cpp",
+      "sha256": "1864d96c5ccba044fcf45c08212938ec26457c06188e91a90a31ecf665a53ab3"
+    },
+    {
+      "file": "src/backend/fonts/fontpolicy.h",
+      "sha256": "da9af5f0d3f4fc068442f6b745931b193f91ead4df9e143bd5bf76017f534620"
+    },
+    {
+      "file": "src/qml/components/control/display/Label.qml",
+      "sha256": "a0b5d0ee4f91d1b2cf15aace8a6f6af8d4d1e7058acbd6651d76e041950cc5a9"
+    },
+    {
+      "file": "src/qml/components/layout/VStack.qml",
+      "sha256": "dddadcc005f58cfc0de2d2a86b30ac8147be5a7ab5bf0137cc4fed54a62abc04"
+    },
+    {
+      "file": "src/qml/components/layout/HStack.qml",
+      "sha256": "976b7ff0d0cb1b62ebb0f5d2083875544d1371cee67aebc7104f66b926fea705"
+    }
+  ]
+}

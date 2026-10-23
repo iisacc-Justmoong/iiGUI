@@ -13,6 +13,7 @@ struct VulkanWindow::Impl final {
     static LRESULT CALLBACK procedure(HWND h,UINT message,WPARAM w,LPARAM l) noexcept {
         if (message==WM_ERASEBKGND) return 1;
         if (message==WM_PAINT) { PAINTSTRUCT paint{}; BeginPaint(h,&paint); EndPaint(h,&paint); return 0; }
+        if(message==WM_NCHITTEST)return HTTRANSPARENT;
         return DefWindowProcW(h,message,w,l);
     }
     ~Impl() {

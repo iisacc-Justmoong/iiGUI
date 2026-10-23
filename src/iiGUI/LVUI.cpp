@@ -48,7 +48,7 @@ struct Layout final {
         if (node.kind==lvui::Kind::text) {
             if (inner_width<=0) overflow(node,"text needs positive content width");
             TextRun run{{x+p.left,y+p.top,inner_width,8192},node.text,
-                inherited.color,inherited.size,inherited.weight,inherited.alignment};
+                inherited.color,inherited.size,inherited.weight,inherited.alignment,{}};
             used=detail::measure_text(run);
             if (fixed_height) run.bounds.height=inner_height; else run.bounds.height=used;
             if (run.bounds.height>0 && !run.text.empty()) result.frame.texts.push_back(std::move(run));

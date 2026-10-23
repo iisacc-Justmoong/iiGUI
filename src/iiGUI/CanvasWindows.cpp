@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 #include "NativeCanvas.h"
 #include "NativeText.h"
+#include "GpuEffects.h"
 #include <optional>
 #include <cstring>
 
@@ -16,21 +17,22 @@ void checked(HRESULT value, const char* operation) {
     if (FAILED(value)) throw std::runtime_error(std::string(operation)+" (HRESULT "+std::to_string(value)+")");
 }
 const char shader[] = R"hlsl(
-struct Panel { float4 bounds, top, bottom; float radius; float3 padding; };
+struct Panel { float4 bounds, top, bottom; float radius,stroke; float2 padding; };
 StructuredBuffer<Panel> panels : register(t0);
-cbuffer View : register(b0) { float2 size; float2 padding; };
+cbuffer View : register(b0) { float2 size; float2 padding; float4 effect_bounds, effect_tint, effect_border, effect_style; };
 struct Varying { float4 position : SV_POSITION; float2 local : TEXCOORD0;
-    float2 size : TEXCOORD1; float4 top : COLOR0; float4 bottom : COLOR1; float radius : TEXCOORD2; };
+    float2 size : TEXCOORD1; float4 top : COLOR0; float4 bottom : COLOR1; float radius : TEXCOORD2; float stroke : TEXCOORD3; };
 Varying vertex_main(uint vertex : SV_VertexID, uint instance : SV_InstanceID) {
     const float2 corners[] = {float2(0,0),float2(1,0),float2(0,1),float2(0,1),float2(1,0),float2(1,1)};
     Panel p=panels[instance]; float2 uv=corners[vertex]; float2 xy=p.bounds.xy+uv*p.bounds.zw;
     Varying v; v.position=float4(xy.x/size.x*2-1,1-xy.y/size.y*2,0,1);
-    v.local=uv*p.bounds.zw; v.size=p.bounds.zw; v.top=p.top; v.bottom=p.bottom; v.radius=p.radius; return v;
+    v.local=uv*p.bounds.zw; v.size=p.bounds.zw; v.top=p.top; v.bottom=p.bottom; v.radius=p.radius;v.stroke=p.stroke; return v;
 }
 float4 fragment_main(Varying v) : SV_TARGET {
     float2 q=abs(v.local-v.size*0.5)-(v.size*0.5-v.radius);
     float distance=length(max(q,0))+min(max(q.x,q.y),0)-v.radius;
     float coverage=saturate(0.5-distance/max(abs(ddx(distance))+abs(ddy(distance)),0.0001));
+    if(v.stroke>0){float radius=max(0,v.radius-v.stroke);float2 q=abs(v.local-v.size*.5)-(v.size*.5-v.stroke-radius);float d=length(max(q,0))+min(max(q.x,q.y),0)-radius;coverage=max(0,coverage-saturate(.5-d/max(abs(ddx(d))+abs(ddy(d)),.0001)));}
     float4 color=lerp(v.top,v.bottom,saturate(v.local.y/v.size.y));
     color.a*=coverage; return float4(color.rgb*color.a,color.a);
 }
@@ -42,6 +44,33 @@ float4 text_vertex(uint vertex : SV_VertexID) : SV_POSITION {
 float4 text_fragment(float4 position : SV_POSITION) : SV_TARGET {
     float4 color=glyphs.Load(int3(int2(position.xy),0));
     return float4(color.rgb*color.a,color.a);
+}
+
+SamplerState linear_clamp : register(s0);
+float shape_distance(float2 point,float4 bounds,float radius) {
+    float2 q=abs(point-bounds.xy-bounds.zw*.5)-(bounds.zw*.5-radius);
+    return length(max(q,0))+min(max(q.x,q.y),0)-radius;
+}
+float shape_mask(float2 point) { return saturate(.5-shape_distance(point,effect_bounds,effect_style.x)*padding.x); }
+float4 effect_fragment(float4 position : SV_POSITION) : SV_TARGET {
+    float scale=padding.x,opacity=padding.y,blur=effect_style.y;
+    float2 point=position.xy/scale;
+    bool shadow=effect_style.w>.5;
+    if(opacity<=0||shape_distance(point,effect_bounds,effect_style.x)>(shadow?blur+1:1))return 0;
+    float coverage=shape_mask(point);float3 paint;
+    if(shadow){
+        if(blur>.01){coverage=0;float total=0,sigma=blur/3,step_size=blur/6;
+            [loop] for(int y=-6;y<=6;++y)[loop] for(int x=-6;x<=6;++x){float2 offset=float2(x,y)*step_size;float weight=exp(-dot(offset,offset)/(2*sigma*sigma));coverage+=shape_mask(point+offset)*weight;total+=weight;}coverage/=total;}
+        float alpha=coverage*effect_tint.a*opacity;return float4(effect_tint.rgb*alpha,alpha);
+    }
+    float2 extent=size*scale;
+    if(blur>.01){paint=0;float total=0,sigma=blur/3,step_size=blur/6;
+        [loop] for(int y=-6;y<=6;++y)[loop] for(int x=-6;x<=6;++x){float2 offset=float2(x,y)*step_size;float weight=exp(-dot(offset,offset)/(2*sigma*sigma));paint+=glyphs.SampleLevel(linear_clamp,(position.xy+offset*scale)/extent,0).rgb*weight;total+=weight;}paint/=total;
+    }else paint=glyphs.SampleLevel(linear_clamp,position.xy/extent,0).rgb;
+    paint=lerp(paint,effect_tint.rgb,effect_tint.a);
+    float border_width=effect_style.z;
+    if(border_width>0&&effect_border.a>0){float4 inner=effect_bounds+float4(border_width,border_width,-2*border_width,-2*border_width);float inside=saturate(.5-shape_distance(point,inner,max(0,effect_style.x-border_width))*scale);paint=lerp(paint,effect_border.rgb,saturate((coverage-inside)/max(coverage,.0001))*effect_border.a);}
+    float alpha=coverage*opacity;return float4(paint*alpha,alpha);
 }
 )hlsl";
 ComPtr<ID3DBlob> compile(const char* entry, const char* profile) {
@@ -71,13 +100,19 @@ struct PlatformCanvas::Impl final {
     ComPtr<ID3D11VertexShader> vertex;
     ComPtr<ID3D11PixelShader> fragment;
     ComPtr<ID3D11VertexShader> text_vertex;
-    ComPtr<ID3D11PixelShader> text_fragment;
+    ComPtr<ID3D11PixelShader> text_fragment, effect_fragment;
+    ComPtr<ID3D11SamplerState> effect_sampler;
+    ComPtr<ID3D11Texture2D> content_snapshot, current_snapshot;
+    ComPtr<ID3D11ShaderResourceView> content_view, current_view;
     ComPtr<ID3D11Buffer> view;
     ComPtr<ID3D11BlendState> blend;
     ComPtr<ID3D11RasterizerState> rasterizer;
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11RenderTargetView> target;
+    struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key; };
+    std::vector<Layer> layers;
     std::optional<CanvasFrame> previous;
+    double previous_scale=0;
     GraphicsInfo statistics;
 
     ~Impl() {
@@ -87,6 +122,7 @@ struct PlatformCanvas::Impl final {
         if (registered) UnregisterClassW(class_name.c_str(),instance);
     }
     static LRESULT CALLBACK procedure(HWND window,UINT message,WPARAM w,LPARAM l) noexcept {
+        if(message==WM_NCHITTEST)return HTTRANSPARENT;
         if (message==WM_ERASEBKGND) return 1;
         if (message==WM_PAINT) { PAINTSTRUCT p{}; BeginPaint(window,&p); EndPaint(window,&p); return 0; }
         return DefWindowProcW(window,message,w,l);
@@ -117,6 +153,7 @@ struct PlatformCanvas::Impl final {
         statistics.api=GraphicsApi::direct3d11;
         statistics.adapter=utf8(description.Description);
         statistics.srgb_attachment=true;
+        statistics.backdrop_supported=statistics.shadow_supported=statistics.content_transform_supported=true;
         class_name=L"iiGUI.Canvas."+std::to_wstring(reinterpret_cast<std::uintptr_t>(this));
         WNDCLASSEXW type{}; type.cbSize=sizeof(type); type.lpfnWndProc=procedure;
         type.hInstance=instance; type.lpszClassName=class_name.c_str();
@@ -138,7 +175,12 @@ struct PlatformCanvas::Impl final {
         auto tvs=compile("text_vertex","vs_5_0"), tps=compile("text_fragment","ps_5_0");
         checked(device->CreateVertexShader(tvs->GetBufferPointer(),tvs->GetBufferSize(),nullptr,&text_vertex),"Cannot create D3D11 text vertex pipeline");
         checked(device->CreatePixelShader(tps->GetBufferPointer(),tps->GetBufferSize(),nullptr,&text_fragment),"Cannot create D3D11 text pixel pipeline");
-        D3D11_BUFFER_DESC uniform{}; uniform.ByteWidth=16; uniform.Usage=D3D11_USAGE_DEFAULT;
+        auto effect=compile("effect_fragment","ps_5_0");
+        checked(device->CreatePixelShader(effect->GetBufferPointer(),effect->GetBufferSize(),nullptr,&effect_fragment),"Cannot create D3D11 material pipeline");
+        D3D11_SAMPLER_DESC sampler{};sampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        sampler.AddressU=sampler.AddressV=sampler.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP;sampler.MaxLOD=D3D11_FLOAT32_MAX;
+        checked(device->CreateSamplerState(&sampler,&effect_sampler),"Cannot create D3D11 material sampler");
+        D3D11_BUFFER_DESC uniform{}; uniform.ByteWidth=sizeof(GpuEffect); uniform.Usage=D3D11_USAGE_DEFAULT;
         uniform.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
         checked(device->CreateBuffer(&uniform,nullptr,&view),"Cannot create D3D11 viewport constant buffer");
         D3D11_BLEND_DESC blending{};
@@ -148,7 +190,7 @@ struct PlatformCanvas::Impl final {
         b.BlendOp=b.BlendOpAlpha=D3D11_BLEND_OP_ADD; b.RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
         checked(device->CreateBlendState(&blending,&blend),"Cannot create D3D11 linear blend state");
         D3D11_RASTERIZER_DESC raster{}; raster.FillMode=D3D11_FILL_SOLID; raster.CullMode=D3D11_CULL_NONE;
-        raster.DepthClipEnable=TRUE;
+        raster.DepthClipEnable=TRUE;raster.ScissorEnable=TRUE;
         checked(device->CreateRasterizerState(&raster,&rasterizer),"Cannot create D3D11 rasterizer state");
     }
     void draw(const CanvasFrame& frame,double scale) {
@@ -156,10 +198,10 @@ struct PlatformCanvas::Impl final {
         if (!SetWindowPos(window,nullptr,static_cast<int>(std::lround(frame.viewport.x*scale)),
             static_cast<int>(std::lround(frame.viewport.y*scale)),width,height,SWP_NOZORDER|SWP_NOACTIVATE|SWP_SHOWWINDOW))
             throw std::runtime_error("Cannot position D3D11 canvas child surface");
-        bool changed=!previous || *previous!=frame;
+        bool changed=!previous || *previous!=frame || previous_scale!=scale;
         if (!texture || statistics.pixel_width!=width || statistics.pixel_height!=height) {
             context->OMSetRenderTargets(0,nullptr,nullptr);
-            target.Reset(); texture.Reset();
+            target.Reset(); texture.Reset();content_snapshot.Reset();current_snapshot.Reset();content_view.Reset();current_view.Reset();
             checked(swapchain->ResizeBuffers(0,width,height,DXGI_FORMAT_UNKNOWN,0),"Cannot resize D3D11 swapchain");
             D3D11_TEXTURE2D_DESC desc{}; desc.Width=width; desc.Height=height;
             desc.MipLevels=desc.ArraySize=1; desc.SampleDesc.Count=1;
@@ -169,8 +211,14 @@ struct PlatformCanvas::Impl final {
             D3D11_RENDER_TARGET_VIEW_DESC rtv{}; rtv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
             rtv.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
             checked(device->CreateRenderTargetView(texture.Get(),&rtv,&target),"Cannot create D3D11 sRGB view");
+            D3D11_TEXTURE2D_DESC snapshot=desc;snapshot.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+            checked(device->CreateTexture2D(&snapshot,nullptr,&content_snapshot),"Cannot allocate D3D11 content snapshot");
+            checked(device->CreateTexture2D(&snapshot,nullptr,&current_snapshot),"Cannot allocate D3D11 layer snapshot");
+            D3D11_SHADER_RESOURCE_VIEW_DESC srv{};srv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;srv.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
+            checked(device->CreateShaderResourceView(content_snapshot.Get(),&srv,&content_view),"Cannot create D3D11 content sampler");
+            checked(device->CreateShaderResourceView(current_snapshot.Get(),&srv,&current_view),"Cannot create D3D11 layer sampler");
             statistics.pixel_width=width; statistics.pixel_height=height;
-            statistics.cached_texture_bytes=std::uint64_t(width)*height*4; changed=true;
+            statistics.cached_texture_bytes=std::uint64_t(width)*height*12; changed=true;
         }
         if (changed) {
             auto* render=target.Get(); context->OMSetRenderTargets(1,&render,nullptr);
@@ -180,11 +228,28 @@ struct PlatformCanvas::Impl final {
             context->RSSetViewports(1,&viewport); context->RSSetState(rasterizer.Get());
             context->OMSetBlendState(blend.Get(),nullptr,0xffffffff);
             context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            const GpuEffect size{{frame.viewport.width,frame.viewport.height,float(scale),1},{},{},{},{}};
+            context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
+            auto* uniform=view.Get(); context->VSSetConstantBuffers(0,1,&uniform);context->PSSetConstantBuffers(0,1,&uniform);
+            const auto views=canvas_layers(frame);layers.resize(views.size());statistics.foreground_texture_bytes=0;
+            for(std::size_t i=0;i<views.size();++i) {
+            const auto layer=views[i];auto& cached=layers[i];
+            const auto snapshot=[&](ID3D11Texture2D* destination){context->OMSetRenderTargets(0,nullptr,nullptr);context->CopyResource(destination,texture.Get());context->OMSetRenderTargets(1,&render,nullptr);};
+            if(i==1)snapshot(content_snapshot.Get());
+            if(layer.backdrop&&layer.backdrop->source==BackdropSource::previous_layers)snapshot(current_snapshot.Get());
+            const auto clip=clip_pixels(layer,scale,width,height);
+            if(!clip.width || !clip.height) { cached.foreground.Reset();cached.key={};continue; }
+            const D3D11_RECT scissor{LONG(clip.x),LONG(clip.y),LONG(clip.x+clip.width),LONG(clip.y+clip.height)};
+            context->RSSetScissorRects(1,&scissor);
+            const auto effect_draw=[&](bool shadow){const auto params=effect_parameters(layer,frame.viewport,scale,shadow);context->UpdateSubresource(view.Get(),0,nullptr,&params,0,0);
+                auto* source=(!shadow&&layer.backdrop->source==BackdropSource::previous_layers)?current_view.Get():content_view.Get();
+                context->PSSetShaderResources(1,1,&source);auto* sampler=effect_sampler.Get();context->PSSetSamplers(0,1,&sampler);
+                context->VSSetShader(text_vertex.Get(),nullptr,0);context->PSSetShader(effect_fragment.Get(),nullptr,0);context->Draw(6,0);
+                ID3D11ShaderResourceView* empty=nullptr;context->PSSetShaderResources(1,1,&empty);};
+            if(layer.shadow)effect_draw(true);if(layer.backdrop)effect_draw(false);
+            context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
             context->VSSetShader(vertex.Get(),nullptr,0); context->PSSetShader(fragment.Get(),nullptr,0);
-            const float size[]{frame.viewport.width,frame.viewport.height,0,0};
-            context->UpdateSubresource(view.Get(),0,nullptr,size,0,0);
-            auto* uniform=view.Get(); context->VSSetConstantBuffers(0,1,&uniform);
-            const auto panels=pack_panels(frame);
+            const auto panels=pack_panels(layer.panels,layer.content_transform);
             if (!panels.empty()) {
                 D3D11_BUFFER_DESC desc{}; desc.ByteWidth=static_cast<UINT>(panels.size()*sizeof(GpuPanel));
                 desc.Usage=D3D11_USAGE_IMMUTABLE; desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
@@ -200,8 +265,9 @@ struct PlatformCanvas::Impl final {
                 context->DrawInstanced(6,static_cast<UINT>(panels.size()),0,0);
                 ID3D11ShaderResourceView* empty=nullptr; context->VSSetShaderResources(0,1,&empty);
             }
-            if (!frame.texts.empty()) {
-                const auto bitmap=rasterize_text(frame,scale);
+            if (layer.foreground()) {
+                if(!cached.foreground || !cached.key.matches(frame.viewport,scale,layer,true)) {
+                const auto bitmap=rasterize_transformed_foreground(frame.viewport,layer,scale);
                 D3D11_TEXTURE2D_DESC desc{}; desc.Width=width; desc.Height=height;
                 desc.MipLevels=desc.ArraySize=1; desc.SampleDesc.Count=1;
                 desc.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.Usage=D3D11_USAGE_IMMUTABLE;
@@ -210,11 +276,16 @@ struct PlatformCanvas::Impl final {
                 ComPtr<ID3D11Texture2D> glyphs;
                 checked(device->CreateTexture2D(&desc,&data,&glyphs),"Cannot allocate D3D11 text texture");
                 ComPtr<ID3D11ShaderResourceView> resource;
-                checked(device->CreateShaderResourceView(glyphs.Get(),nullptr,&resource),"Cannot create D3D11 text view");
-                auto* input=resource.Get(); context->PSSetShaderResources(1,1,&input);
+                checked(device->CreateShaderResourceView(glyphs.Get(),nullptr,&resource),"Cannot create D3D11 foreground view");
+                cached.foreground=std::move(resource);cached.key.assign(frame.viewport,scale,layer,true);
+                ++statistics.foreground_rasterizations;
+                }
+                statistics.foreground_texture_bytes+=std::uint64_t(width)*height*4;
+                auto* input=cached.foreground.Get(); context->PSSetShaderResources(1,1,&input);
                 context->VSSetShader(text_vertex.Get(),nullptr,0); context->PSSetShader(text_fragment.Get(),nullptr,0);
                 context->Draw(6,0);
                 ID3D11ShaderResourceView* empty=nullptr; context->PSSetShaderResources(1,1,&empty);
+            } else { cached.foreground.Reset();cached.key={}; }
             }
             context->OMSetRenderTargets(0,nullptr,nullptr);
             ++statistics.scene_renders;
@@ -223,7 +294,7 @@ struct PlatformCanvas::Impl final {
         checked(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)),"Cannot access D3D11 presentation buffer");
         context->CopyResource(back.Get(),texture.Get());
         checked(swapchain->Present(1,0),"Cannot present D3D11 canvas (device may have been removed)");
-        ++statistics.presentations; previous=frame;
+        ++statistics.presentations; previous=frame;previous_scale=scale;
     }
     PixelBuffer capture() {
         if (!texture) throw std::runtime_error("D3D11 canvas has not rendered");

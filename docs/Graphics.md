@@ -56,7 +56,7 @@ scheduling, not an always-running SDK frame loop.
   Color components must be finite 0..1, and background alpha must equal 1.
   Panels clip to the viewport. Colors are SDR sRGB, not ICC/HDR/wide gamut.
 - At most 4096 text runs, each at most 64 KiB of valid UTF-8 with no NUL,
-  at most 1 MiB total. Font size is 8..256 logical units; weight is 400/700.
+  at most 1 MiB total. Font size is 8..256 logical units; weight is 400/500/600/700.
   Runs wrap, clip to their positive content rectangle, and paint after panels.
   Text uses the same finite geometry/color limits and is included in capture.
 - `prefer_hardware`: prefer the native Metal/Direct3D accelerator, then Vulkan.
@@ -98,3 +98,18 @@ cached_texture_bytes counts the retained offscreen color attachment only
 capture staging storage and text raster/upload storage. A counter or compiled binary is not proof of
 target execution or a Qt performance comparison. See Verification.md for
 the recorded hardware/runtime evidence and deferred platforms.
+
+Optional [backdrop materials, inner strokes and fixed line metrics](BackdropMaterials.md)
+extend these contracts. Backdrop working textures have a separate 64 MiB bound
+and explicit capability/counters; they are not included in `cached_texture_bytes`.
+
+`TextRun::clip` adds an optional paint clip in the coordinate space of `bounds`.
+Native shaping, wrapping and ellipsis still use the original bounds. Core Text,
+DirectWrite and Pango/Cairo apply both rectangles during rasterization; allocation
+remains bounded by the actual canvas. Retained drawing and embedded popup
+translation move both rectangles. `render_text` rebases the clip with its bounds.
+Clips participate in validation, equality and foreground cache keys. Runtime crop
+checks are deferred to the final verification batch.
+
+The Vulkan effect test uses the public `CanvasLayer` type in `CanvasFrame::overlays`.
+Compilation of that test is separate from executing its GPU pixel checks.

@@ -1,5 +1,65 @@
 # iiGUI
 
+Native [container layout](docs/ContainerLayout.md) now supports minimum implicit
+metrics, independent implicit/content insets and construction-time default slots.
+Ordinary container disabling cancels descendant input, and native button option
+replacement preserves callbacks and identity. Runtime verification is deferred.
+
+[Action surfaces](docs/ActionSurfaces.md) add a transparent native child container
+with text fallback, state foreground colors, keyboard actions and link semantics.
+Text underline is shaped by the platform font service. New runtime validation is
+deferred to the final batch; compilation and static package checks are separate.
+
+Native [motion](docs/NativeMotion.md) shares Core display frames across app and game
+updates, with on-demand idle behavior and live reduced-motion preferences. Metal
+[shadows](docs/Shadows.md) and cached foreground scale/opacity composition support
+the authored LVRS Alert transitions without OS control wrappers.
+
+
+Native widgets now use iiGUI's own C++ layout, hit testing, focus, input state and
+GPU drawing. Cocoa supplies one input/presentation surface and virtual
+accessibility peers; OS control wrappers are no longer the widget implementation.
+See [Self-rendered C++ widgets](docs/SelfRenderedWidgets.md) for the current
+architecture and the LVRS framework migration boundary.
+
+[Popovers](docs/Popovers.md) retain ordinary C++ widget content in the same GPU
+overlay, with child-first Escape, modal/nonmodal outside presses, anchor placement
+and generation-safe close/reopen behavior.
+
+[Activation-owned content](docs/PopupContent.md) can build a fresh C++ view on
+each open and retire it on close while keeping the original native GPU surface.
+Generation-specific handles, native focus/IME and bounded accessibility caches
+keep repeated activations independent from the outer application's lifetime.
+
+[Generic content hosts](docs/ContentHosts.md) construct and atomically replace
+independent page generations in that same surface, with scoped ownership,
+viewport layout, input routing and a shared node budget. Runtime verification
+of this new path is deferred to the final validation batch.
+
+[Dialog layout](docs/DialogLayout.md) adds centered popup constraints, width-aware
+stack alignment and flex sizing, authored button/image geometry, and distinct
+close/cancel events for native dialog compositions such as LVRS Modal.
+
+[GPU backdrop materials](docs/BackdropMaterials.md) add real Metal Gaussian
+glass from underlying content, retained ROI textures, transparent tint and
+rounded inner borders. Authored fixed line heights, asymmetric stack insets and
+button state styles support LVRS Alert composition. Metal/Vulkan strokes are
+pixel-tested; D3D11 stroke execution and non-Metal backdrop implementations remain
+unverified or unfinished as documented.
+
+[Core-owned widget applications](docs/CoreApplication.md) connect native C++ widgets
+to iiSDKCore's app runtime, entrypoint and attachment lifecycle. LVUI emits concrete
+C++ widget classes; LVRS provides appearance data/fonts; iiGUI supplies the OS driver
+and its own C++ widgets using the same Core-owned event loop. Hello World now uses this
+path and Core's final-executable/resource helper.
+
+The working tree now also implements [compiled self-rendered widgets and LVUI AOT](docs/SelfRenderedWidgets.md):
+`examples/HelloWorld/HelloWorld.lvui` generates C++23 during the build and mounts
+iiGUI C++ stacks, labels and buttons on a single Cocoa/Metal surface. The macOS Hello World
+uses Core timers/workers, follows resize and closes normally. This AOT route does
+not embed or parse LVUI source at runtime. The initial native widget backend is
+macOS; the existing Windows/Linux hosts and GPU canvases remain separate.
+
 [Windows build and execution](docs/WindowsBuildAndRun.md)
 
 Package release: **0.4.1** (2026-10-19). This patch packages the current
@@ -191,3 +251,7 @@ headers in the package include directory. Generated export headers belong to
 Validate this layout from the SDK workspace with
 `python3 -B tests/test_source_header_layout.py`. Reconfigure, build, run CTest,
 and verify a staged installed consumer after changing source/header paths.
+
+Composed native buttons support asymmetric content insets, explicit indicator size,
+content spacing and optional width. See [container layout](docs/ContainerLayout.md);
+new layout test executables are compiled with runtime execution deferred.

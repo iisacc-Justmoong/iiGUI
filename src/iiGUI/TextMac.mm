@@ -8,20 +8,38 @@ NSAttributedString* attributed(const TextRun& run) {
     auto paragraph=[NSMutableParagraphStyle new];
     paragraph.alignment=run.alignment==TextAlignment::center?NSTextAlignmentCenter:
         run.alignment==TextAlignment::right?NSTextAlignmentRight:NSTextAlignmentLeft;
-    paragraph.lineBreakMode=NSLineBreakByWordWrapping;
-    auto font=[NSFont systemFontOfSize:run.font_size weight:run.font_weight==700?NSFontWeightBold:NSFontWeightRegular];
+    paragraph.lineBreakMode=run.elide_right?NSLineBreakByTruncatingTail:NSLineBreakByWordWrapping;
+    if(run.line_height>0){paragraph.minimumLineHeight=run.line_height;paragraph.maximumLineHeight=run.line_height;}
+    auto weight=run.font_weight>=700 ? NSFontWeightBold : run.font_weight>=600 ? NSFontWeightSemibold : run.font_weight>=500 ? NSFontWeightMedium : NSFontWeightRegular;
+    NSFont* font=nil;
+    if (!run.font_family.empty()) {
+        auto family=[[NSString alloc] initWithBytes:run.font_family.data() length:run.font_family.size() encoding:NSUTF8StringEncoding];
+        auto face=run.font_weight>=700 ? @"Bold" : run.font_weight>=600 ? @"SemiBold" : run.font_weight>=500 ? @"Medium" : @"Regular";
+        font=[NSFont fontWithName:[NSString stringWithFormat:@"%@-%@",family,face] size:run.font_size];
+        if (!font) font=[NSFont fontWithName:family size:run.font_size];
+    }
+    if (!font) font=[NSFont systemFontOfSize:run.font_size weight:weight];
     auto c=run.color;
     auto color=[NSColor colorWithSRGBRed:encoded_srgb(c.red) green:encoded_srgb(c.green)
         blue:encoded_srgb(c.blue) alpha:c.alpha];
     return [[NSAttributedString alloc] initWithString:text attributes:@{
-        NSFontAttributeName:font, NSForegroundColorAttributeName:color, NSParagraphStyleAttributeName:paragraph}];
+        NSFontAttributeName:font, NSForegroundColorAttributeName:color, NSParagraphStyleAttributeName:paragraph,
+        NSUnderlineStyleAttributeName:@(run.underline?NSUnderlineStyleSingle:NSUnderlineStyleNone)}];
 }
 constexpr auto options=NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesFontLeading;
 }
 float measure_text(const TextRun& run) {
     @autoreleasepool {
+        if(run.elide_right)return run.line_height>0?run.line_height:std::max(run.font_size,float(std::ceil([attributed(run) size].height)));
+        if(run.line_height>0){auto storage=[[NSTextStorage alloc] initWithAttributedString:attributed(run)];auto manager=[NSLayoutManager new];manager.usesFontLeading=NO;auto container=[[NSTextContainer alloc] initWithSize:NSMakeSize(std::max(1.f,run.bounds.width),CGFLOAT_MAX)];container.lineFragmentPadding=0;[manager addTextContainer:container];[storage addLayoutManager:manager];auto range=[manager glyphRangeForTextContainer:container];__block NSUInteger lines=0;[manager enumerateLineFragmentsForGlyphRange:range usingBlock:^(NSRect,NSRect,NSTextContainer*,NSRange,BOOL*){++lines;}];if(manager.extraLineFragmentTextContainer==container&&run.text.ends_with('\n'))++lines;return std::min(8192.f,float(std::max<NSUInteger>(1,lines))*run.line_height);}
         auto bounds=[attributed(run) boundingRectWithSize:NSMakeSize(run.bounds.width,8192) options:options];
         return std::max(run.font_size,float(std::ceil(bounds.size.height)));
+    }
+}
+float measure_text_width(const TextRun& run) {
+    @autoreleasepool {
+        auto bounds=[attributed(run) boundingRectWithSize:NSMakeSize(8192,8192) options:options];
+        return float(std::ceil(bounds.size.width));
     }
 }
 PixelBuffer rasterize_text(const CanvasFrame& frame, double scale) {
@@ -41,7 +59,8 @@ PixelBuffer rasterize_text(const CanvasFrame& frame, double scale) {
             CGContextSaveGState(context);
             const auto r=run.bounds;
             CGContextClipToRect(context,CGRectMake(r.x,r.y,r.width,r.height));
-            [attributed(run) drawWithRect:NSMakeRect(r.x,r.y,r.width,r.height) options:options];
+            if(run.clip){const auto c=*run.clip;CGContextClipToRect(context,CGRectMake(c.x,c.y,c.width,c.height));}
+            [attributed(run) drawWithRect:NSMakeRect(r.x,r.y,r.width,r.height) options:run.line_height>0?NSStringDrawingUsesLineFragmentOrigin:options];
             CGContextRestoreGState(context);
         }
         [NSGraphicsContext restoreGraphicsState];

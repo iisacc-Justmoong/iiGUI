@@ -21,6 +21,12 @@ inline bool valid_title(std::string_view title) {
     return core::valid_utf8(title) && title.find('\0') == std::string_view::npos;
 }
 inline HostOptions validate_options(HostOptions options) {
+    if(unsigned(options.renderer)>unsigned(Renderer::vulkan))throw std::invalid_argument("Invalid widget renderer selection");
+    if(options.frame_loop && options.event_loop!=&options.frame_loop->events())
+        throw std::invalid_argument("Display frame loop must borrow the Host's event loop");
+#if !defined(__APPLE__)
+
+#endif
     if (!valid_size(options.size) || !valid_size(options.minimum_size) ||
         options.size.width < options.minimum_size.width ||
         options.size.height < options.minimum_size.height)

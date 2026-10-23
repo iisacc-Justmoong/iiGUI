@@ -1,5 +1,10 @@
 # LVUI views rendered by iiGUI
 
+The compiled component-language route is documented separately in
+[NativeWidgets.md](NativeWidgets.md). `examples/HelloWorld` AOT-compiles `.lvui`
+into native C++23 and mounts actual Cocoa widgets. The document below describes
+the earlier HTML-shaped runtime-parsed GPU canvas API, which remains available.
+
 LVUI is a separate declarative UI language: familiar tags and inline styles
 describe a view. iiGUI consumes the validated document directly. No browser,
 WebView, HTML importer, JavaScript runtime or Qt dependency is involved.

@@ -6,11 +6,16 @@
 #include "DispatchState.h"
 #include "HostCommon.h"
 #include "CanvasState.h"
+#include "WidgetState.h"
+#include "WidgetSurface.h"
+#include "DesktopCommon.h"
+#include "NativeDesktop_p.hpp"
 #include <algorithm>
 #include <atomic>
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <map>
 
 namespace ii::gui {
 namespace {
@@ -80,7 +85,7 @@ struct WakeGate final {
 struct Host::Impl {
     enum class Phase { created, running, closing, closed };
     explicit Impl(HostOptions value) : options(detail::validate_options(std::move(value))),
-        dispatch(std::make_shared<detail::DispatchState>(options.task_capacity)),
+        dispatch(std::make_shared<detail::DispatchState>(options.task_capacity, options.event_loop)),
         gate(std::make_shared<WakeGate>()) {
 
         state.size = options.size;
@@ -88,6 +93,15 @@ struct Host::Impl {
         state.text = "HelloGUI\n\nNative C++23 desktop host\niiSDKCore + iiSDKBuilder";
         text = native_text(state.text);
     }
+    std::shared_ptr<detail::WidgetState> widgets;
+    bool mounting=false;
+    Impl* parent=nullptr;
+    std::vector<Impl*> children;
+    std::shared_ptr<detail::NativeDialog> dialog;
+    std::shared_ptr<MotionPreferences> motion_preferences=std::make_shared<MotionPreferences>();
+    std::unique_ptr<runtime::FrameLoop> motion_frames;
+    runtime::TaskToken cadence;
+    HMENU app_menu=nullptr;HACCEL shortcuts=nullptr;std::map<UINT,runtime::Task> menu_actions;bool fullscreen=false;LONG_PTR saved_style=0;RECT saved_bounds{};
     HostOptions options;
     std::shared_ptr<detail::DispatchState> dispatch;
     std::shared_ptr<WakeGate> gate;
@@ -142,8 +156,10 @@ struct Host::Impl {
     void did_close() noexcept {
         if (phase != Phase::running) return;
         phase = Phase::closing;
-        dispatch->accepting.store(false, std::memory_order_release);
-        dispatch->loop.request_stop();
+        dispatch->retire();
+        if(!parent)dispatch->loop.request_stop();
+        if(widgets){widgets->close();widgets.reset();}
+        dialog.reset();auto closing=children;for(auto* child:closing){child->force_close();child->cleanup();}
         canvas.clear();
         state.visible = false;
         state.closed = true;
@@ -179,8 +195,17 @@ struct Host::Impl {
         if (!SetTimer(window, deadline_timer, static_cast<UINT>(delay), nullptr))
             throw native_error("Cannot arm GUI deadline timer");
     }
+    runtime::FrameLoop* frames(){return options.frame_loop?options.frame_loop:motion_frames.get();}
+    void ensure_cadence(){
+        if(parent){parent->ensure_cadence();return;}if(cadence.pending())return;
+        auto weak=std::weak_ptr<detail::DispatchState>(dispatch);
+        auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{if(frames())(void)frames()->step();if(widgets)widgets->present();auto active=children;for(auto* child:active)if(child->phase==Phase::running)child->drain();});});}));
+        if(!scheduled)throw std::runtime_error("Cannot admit native frame cadence");cadence=scheduled.token;
+    }
+    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer};}
     void drain() noexcept {
         if (phase != Phase::running || draining) return;
+        if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;if(callbacks.opened)callbacks.opened();}if(widgets)widgets->present();});return;}
         guard([&] {
             struct Reset final { bool& value; ~Reset() { value = false; } } reset{draining};
             draining = true;
@@ -191,6 +216,7 @@ struct Host::Impl {
             }
             if (phase == Phase::running) dispatch->loop.poll(options.budget);
             if (phase == Phase::running && dispatch->loop.state()==runtime::LoopState::stopped) force_close();
+            if(phase==Phase::running&&widgets)widgets->present();
             if (phase == Phase::running) canvas.flush(state.backing_scale, state.size.height);
             arm_timer();
         });
@@ -204,6 +230,7 @@ struct Host::Impl {
         text_layout.Reset();
     }
     void paint() {
+        if(widgets){PAINTSTRUCT paint{};BeginPaint(window,&paint);widgets->present();EndPaint(window,&paint);return;}
         PAINTSTRUCT paint_state{};
         if (!BeginPaint(window, &paint_state)) return;
         struct End final { HWND window; PAINTSTRUCT& state; ~End() { EndPaint(window,&state); } } end{window,paint_state};
@@ -239,6 +266,8 @@ struct Host::Impl {
             self->window = handle;
         }
         if (!self) return DefWindowProcW(handle, message, wparam, lparam);
+        if(self->widgets){MSG event{handle,message,wparam,lparam,GetMessageTime(),{}};if(self->widgets->native_event(&event))return 0;}
+        if(message==WM_COMMAND){auto found=self->menu_actions.find(LOWORD(wparam));if(found!=self->menu_actions.end()){self->guard([&]{if(found->second){auto task=found->second;(void)self->dispatch->track(self->dispatch->loop.post([weak=std::weak_ptr<detail::DispatchState>(self->dispatch),task=std::move(task)]{if(auto endpoint=weak.lock();endpoint&&endpoint->accepting.load())(void)endpoint->tasks.run(task);}));}});return 0;}}
         bool handled = true;
         LRESULT result = 0;
         self->guard([&] {
@@ -320,11 +349,12 @@ struct Host::Impl {
             actual_frame.bottom-actual_frame.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
             throw native_error("Cannot size native GUI window");
         gate->attach(window);
-        dispatch->connect([wake=gate]() noexcept { wake->signal(); });
+        if(!parent)dispatch->connect([wake=gate]() noexcept { wake->signal(); });
         phase = Phase::running;
         ShowWindow(window, SW_SHOWNORMAL);
         UpdateWindow(window);
         update_snapshot();
+        if(options.frame_loop)ensure_cadence();
         gate->signal();
     }
     void execute() {
@@ -341,6 +371,7 @@ struct Host::Impl {
                     force_close();
                     break;
                 }
+                if(shortcuts&&TranslateAcceleratorW(window,shortcuts,&message))continue;
                 TranslateMessage(&message);
                 DispatchMessageW(&message);
             }
@@ -348,8 +379,10 @@ struct Host::Impl {
         }
     }
     void cleanup() {
-        dispatch->accepting.store(false, std::memory_order_release);
-        dispatch->loop.request_stop();
+        dispatch->retire();
+        if(!parent)dispatch->loop.request_stop();
+        if(widgets){widgets->close();widgets.reset();}dialog.reset();(void)cadence.cancel();
+        if(parent){std::erase(parent->children,this);parent=nullptr;}
         if (auto detached=dispatch->disconnect(); !detached)
             remember_failure(detached.error().message,detached.error().cause);
         gate->detach();
@@ -364,6 +397,7 @@ struct Host::Impl {
         }
         if (registered) { UnregisterClassW(class_name.c_str(), instance); registered = false; }
         if (previous_dpi) { SetThreadDpiAwarenessContext(previous_dpi); previous_dpi = nullptr; }
+        if(shortcuts){DestroyAcceleratorTable(shortcuts);shortcuts=nullptr;}if(app_menu){DestroyMenu(app_menu);app_menu=nullptr;}menu_actions.clear();
         callbacks = {};
         state.visible = false;
         state.closed = true;
@@ -375,8 +409,8 @@ Host::Host(HostOptions options) : impl_(std::make_unique<Impl>(std::move(options
 Host::~Host() {
     if (!is_ui_thread() || impl_->phase == Impl::Phase::running || impl_->phase == Impl::Phase::closing)
         std::terminate();
-    impl_->dispatch->accepting.store(false, std::memory_order_release);
-    impl_->dispatch->loop.request_stop();
+    impl_->dispatch->retire();
+    if (impl_->dispatch->owned_loop) impl_->dispatch->loop.request_stop();
     impl_->gate->detach();
 }
 UiExecutor Host::executor() const noexcept { return UiExecutor(impl_->dispatch); }
@@ -439,6 +473,9 @@ core::Result<void> Host::request_close() {
 }
 core::Result<void> Host::set_canvas(CanvasFrame frame) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    if(frame.renderer==Renderer::automatic)frame.renderer=impl_->options.renderer;
+    if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
+    if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}
     auto result = impl_->canvas.set(std::move(frame), impl_->window, nullptr, impl_->state.backing_scale);
     if (result) impl_->gate->signal();
     return result;
@@ -451,10 +488,12 @@ core::Result<void> Host::clear_canvas() {
 }
 core::Result<GraphicsInfo> Host::graphics_info() const {
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
+    if(impl_->widgets)return impl_->widgets->graphics_info();
     return impl_->canvas.info();
 }
 core::Result<PixelBuffer> Host::capture_canvas() {
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
+    if(impl_->widgets)return impl_->widgets->capture();
     return impl_->canvas.capture(impl_->state.backing_scale, impl_->state.size.height);
 }
 core::Result<std::reference_wrapper<runtime::EventLoop>> Host::event_loop() {
@@ -475,3 +514,35 @@ core::Result<HostStats> Host::stats() const {
     return result;
 }
 } // namespace ii::gui
+
+namespace ii::gui {
+
+core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
+    if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Native windows require the UI owner thread");
+    if(auto ready=parent.impl_->ready();!ready)return ready;
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Window was already opened");
+    try{impl_->parent=parent.impl_.get();impl_->options.event_loop=&parent.impl_->dispatch->loop;impl_->dispatch=std::make_shared<detail::DispatchState>(impl_->options.task_capacity,impl_->options.event_loop);impl_->callbacks=std::move(callbacks);parent.impl_->children.push_back(impl_.get());impl_->open_native();parent.impl_->ensure_cadence();return {};}catch(...){impl_->cleanup();return core::fail(core::ErrorCode::failed,"Cannot open a native secondary window",std::current_exception());}
+}
+core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory){return mount_widgets(std::move(factory),WidgetAppearance{});}
+core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const WidgetAppearance& appearance){
+    if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());if(!factory)return core::fail(core::ErrorCode::invalid_argument,"Native widget factory is empty");if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
+    struct Reset final{bool& value;~Reset(){value=false;}}reset{impl_->mounting};impl_->mounting=true;
+    try{auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,impl_->frame_hooks());WidgetBuilder builder(replacement);if(auto built=factory(builder);!built)return std::unexpected(built.error());
+        if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());
+        if(auto attached=replacement->attach(impl_->window);!attached)return std::unexpected(attached.error());
+        impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);return WidgetMount(impl_->widgets);
+    }catch(...){return core::fail(core::ErrorCode::failed,"Native widget factory failed",std::current_exception());}
+}
+core::Result<void> Host::unmount_widgets(){if(auto ready=impl_->ready();!ready)return ready;if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}return {};}
+core::Result<void> Host::unmount_widgets(const WidgetMount& expected){auto owner=expected.state_.lock();if(!owner)return core::fail(core::ErrorCode::closed,"Widget generation is closed");if(owner!=impl_->widgets)return core::fail(core::ErrorCode::invalid_argument,"Widget generation belongs to another host");return unmount_widgets();}
+core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogCompletion completion){
+    if(auto ready=impl_->ready();!ready)return ready;if(impl_->dialog)return core::fail(core::ErrorCode::busy,"A native file dialog is already open");
+    auto weak=std::weak_ptr<detail::DispatchState>(impl_->dispatch);auto opened=detail::native_file_dialog(impl_->window,std::move(options),executor(),[host=impl_.get(),weak,completion=std::move(completion)](auto result)mutable{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;host->dialog.reset();if(completion)completion(std::move(result));});if(!opened)return std::unexpected(opened.error());impl_->dialog=std::move(*opened);return {};
+}
+
+}
+
+namespace ii::gui {
+core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::raise))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto window=impl_->window;switch(action){case WindowAction::restore:ShowWindow(window,SW_RESTORE);break;case WindowAction::minimize:ShowWindow(window,SW_MINIMIZE);break;case WindowAction::maximize:ShowWindow(window,SW_MAXIMIZE);break;case WindowAction::raise:ShowWindow(window,SW_SHOWNORMAL);SetForegroundWindow(window);break;case WindowAction::toggle_fullscreen:if(!impl_->fullscreen){impl_->saved_style=GetWindowLongPtrW(window,GWL_STYLE);GetWindowRect(window,&impl_->saved_bounds);MONITORINFO monitor{sizeof(monitor)};if(!GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))return core::fail(core::ErrorCode::failed,"Cannot read fullscreen monitor");SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style&~WS_OVERLAPPEDWINDOW);SetWindowPos(window,HWND_TOP,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_FRAMECHANGED);}else{SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style);auto r=impl_->saved_bounds;SetWindowPos(window,nullptr,r.left,r.top,r.right-r.left,r.bottom-r.top,SWP_FRAMECHANGED|SWP_NOZORDER);}impl_->fullscreen=!impl_->fullscreen;break;}impl_->update_snapshot();return {};}
+core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){if(auto ready=impl_->ready();!ready)return ready;if(!detail::valid_menu(items))return core::fail(core::ErrorCode::invalid_argument,"Invalid native application menu");HMENU replacement=CreateMenu();if(!replacement)return core::fail(core::ErrorCode::failed,"Cannot allocate native menu");try{std::map<UINT,runtime::Task> actions;std::vector<ACCEL> keys;UINT next=0x4000;const auto build=[&](auto&& self,HMENU menu,const std::vector<AppMenuItem>& source)->void{for(const auto& item:source){if(item.separator){AppendMenuW(menu,MF_SEPARATOR,0,nullptr);continue;}const auto title=native_text(item.title);if(!item.children.empty()){auto popup=CreatePopupMenu();if(!popup)throw native_error("Cannot create native submenu");self(self,popup,item.children);if(!AppendMenuW(menu,MF_POPUP|MF_STRING,reinterpret_cast<UINT_PTR>(popup),title.c_str())){DestroyMenu(popup);throw native_error("Cannot append native submenu");}}else{const auto id=next++;UINT flags=MF_STRING|(item.enabled?MF_ENABLED:MF_GRAYED)|(item.checked?MF_CHECKED:MF_UNCHECKED);if(!AppendMenuW(menu,flags,id,title.c_str()))throw native_error("Cannot append native menu action");actions.emplace(id,item.triggered);if(item.shortcut&&item.enabled){auto key=native_text(item.shortcut->key);if(key.size()!=1)throw std::invalid_argument("Native shortcut must name one character");const auto virtual_key=VkKeyScanW(key[0]);if(virtual_key==-1)throw std::invalid_argument("Shortcut is unavailable in the current keyboard layout");BYTE modifiers=FVIRTKEY;if(item.shortcut->control||item.shortcut->meta)modifiers|=FCONTROL;if(item.shortcut->alt)modifiers|=FALT;if(item.shortcut->shift||(HIBYTE(virtual_key)&1))modifiers|=FSHIFT;keys.push_back({modifiers,WORD(LOBYTE(virtual_key)),WORD(id)});}}}};build(build,replacement,items);HACCEL accelerator=keys.empty()?nullptr:CreateAcceleratorTableW(keys.data(),int(keys.size()));if(!keys.empty()&&!accelerator)throw native_error("Cannot create native keyboard shortcuts");if(!SetMenu(impl_->window,replacement)){if(accelerator)DestroyAcceleratorTable(accelerator);throw native_error("Cannot attach native menu");}if(impl_->app_menu)DestroyMenu(impl_->app_menu);if(impl_->shortcuts)DestroyAcceleratorTable(impl_->shortcuts);impl_->app_menu=replacement;impl_->shortcuts=accelerator;impl_->menu_actions=std::move(actions);DrawMenuBar(impl_->window);return {};}catch(...){DestroyMenu(replacement);return core::fail(core::ErrorCode::failed,"Cannot build the native application menu",std::current_exception());}}
+}

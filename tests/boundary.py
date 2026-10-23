@@ -7,7 +7,7 @@ import sys
 root = Path(sys.argv[1])
 violations = []
 public_headers = {root / 'src/iiGUI' / name for name in
-                  ('Graphics.h', 'Host.h', 'LVUI.h', 'iiGUI.h')}
+                  ('Graphics.h', 'Image.h', 'Host.h', 'LVUI.h', 'NativeWidgets.h', 'Appearance.h', 'Application.h', 'iiGUI.h')}
 for header in public_headers:
     if not header.is_file():
         violations.append(f'{header}: public header missing from source directory')
@@ -27,6 +27,10 @@ for file in (root / 'CMakeLists.txt', root / 'cmake/iiGUIConfig.cmake.in'):
     if re.search(r'(?:find_package|find_dependency)\s*\(\s*(?:Qt|SDL|WebKit|WebView|CEF)', file.read_text()):
         violations.append(f'{file}: framework package dependency')
 manifest = json.loads((root / 'examples/HelloGUI/iiSDKBuilder.json').read_text())
+for name in ('NativeWidgetsMac.mm', 'Host.mm'):
+    source=(root/'src/iiGUI'/name).read_text()
+    if re.search(r'\b(?:NSButton|NSTextField|NSStackView|NSControl|NSLayoutConstraint)\b',source):
+        violations.append(f'{name}: OS control/layout used instead of iiGUI widget rendering')
 if {kit['platform'] for kit in manifest['kits']} != {'windows', 'macos', 'linux'}:
     violations.append('HelloGUI manifest must include the three native desktop kits')
 if 'Python3_EXECUTABLE' in json.dumps(manifest):
