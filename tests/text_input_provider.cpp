@@ -22,8 +22,11 @@ void run(const std::string& name){
             auto root=take(b.vstack({},"root",{.padding=20}));
             editor=take(b.absolute_stack(root,"editor",{300,160}));other=take(b.button(root,"other"));
             good(editor.set_input_handler([](const auto& e)->core::Result<bool>{return e.kind==gui::WidgetInputKind::pointer_down;}));
-            return editor.set_text_input_provider(provider);
+            check(!editor.set_accessibility_name("Before provider"),"Ordinary stack accepted an editor name");
+            good(editor.set_text_input_provider(provider));
+            return editor.set_accessibility_name("Native virtual editor");
         }));
+        if(name=="bounded")check(take(editor.snapshot()).accessibility_name=="Native virtual editor","Custom editor accessibility name was lost");
         if(name=="bounded"){auto s=take(editor.snapshot());check(s.text.empty()&&s.text_input&&s.multiline&&s.text_length==1000000000&&reads==0,"Snapshot materialized the virtual document");auto content=take(editor.text_content({500000,1000000}));check(content.range==gui::TextRange{500000,65536}&&content.text.size()==65536&&reads==1,"Native text service range was not bounded");}
         else if(name=="geometry"){auto s=take(editor.snapshot());check(s.caret_bounds.x==s.bounds.x+12&&s.caret_bounds.y==s.bounds.y+24&&take(editor.text_position(s.bounds.x+42,s.bounds.y+50))==42,"Text caret/hit lost native surface coordinates");}
         else if(name=="focus"){good(editor.focus());good(other.focus());check(focus==1&&blur==1,"Provider focus lifetime notifications changed");}

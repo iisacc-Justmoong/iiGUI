@@ -4,8 +4,8 @@
 using namespace ii;
 namespace {
 void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
-template<class T>T take(core::Result<T> value){if(!value)throw std::runtime_error(value.error().message);return std::move(*value);}
-void good(core::Result<void> value){if(!value)throw std::runtime_error(value.error().message);}
+template<class T>T take(core::Result<T> value){if(!value){if(value.error().cause)std::rethrow_exception(value.error().cause);throw std::runtime_error(value.error().message);}return std::move(*value);}
+void good(core::Result<void> value){if(!value){if(value.error().cause)std::rethrow_exception(value.error().cause);throw std::runtime_error(value.error().message);}}
 void run(std::string name){
     gui::Host host({.size={540,400}});gui::WidgetMount mount;gui::Widget slot,old,button,after;
     int created=0,destroyed=0,clicked=0,committed=0;
@@ -26,12 +26,12 @@ void run(std::string name){
             failed=slot.set_content([](gui::WidgetBuilder&)->core::Result<void>{throw std::runtime_error("factory exception");});check(!failed&&failed.error().cause&&old.snapshot(),"Factory exception escaped or retired the old page");
         }else if(name=="input"){
             const auto r=take(button.snapshot()).bounds;good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_down,.x=r.x+10,.y=r.y+10}));good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_up,.x=r.x+10,.y=r.y+10}));check(clicked==1,"Host did not route native pointer input");
-            good(button.focus());good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::enter}));check(clicked==2,"Host did not route keyboard input");
+            good(button.focus());good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::enter}));check(clicked==1,"Keyboard press activated before release");good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_up,.key=gui::WidgetKey::enter}));check(clicked==2,"Host did not route keyboard input");
             auto before=take(host.capture_canvas());good(slot.set_enabled(false));auto disabled=take(host.capture_canvas());check(before.rgba!=disabled.rgba,"Disabled host did not update inherited control visuals");check(!take(button.snapshot()).enabled,"Disabled host exposed enabled descendants");good(button.activate());check(clicked==2,"Disabled host admitted activation");
         }else if(name=="nested"){
             good(slot.set_content([&](gui::WidgetBuilder& b)->core::Result<void>{auto root=take(b.vstack({},"page"));auto inner=take(b.content_host(root,"inner",{280,160}));return inner.set_content([&](gui::WidgetBuilder& nested)->core::Result<void>{auto root=take(nested.vstack({},"page"));button=take(nested.button(root,"action",{.text="Nested"},[&]{++clicked;}));return {};});}));
             check(take(mount.snapshot()).size()==7&&take(button.snapshot()).popup_id.empty(),"Nested activation was lost or became a popup");
-            good(button.focus());good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::enter}));check(clicked==1,"Nested host lost keyboard focus routing");
+            good(button.focus());good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::enter}));check(clicked==0,"Nested keyboard press activated before release");good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_up,.key=gui::WidgetKey::enter}));check(clicked==1,"Nested host lost keyboard focus routing");
             good(slot.clear_content());check(!button.snapshot()&&take(mount.snapshot()).size()==3,"Nested generation leaked after clear");
         }else if(name=="capture"){
             int moves=0,ups=0;

@@ -1,6 +1,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
 #include "DesktopCommon.h"
 #include <cstring>
 

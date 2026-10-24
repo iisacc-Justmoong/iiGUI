@@ -957,7 +957,7 @@ core::Result<Widget> WidgetState::slider(Widget p,std::string_view id,SliderOpti
 }
 core::Result<Widget> WidgetState::absolute_stack(Widget p,std::string_view id,Size size) {
     auto parent=prepare(p,id);if(!parent)return std::unexpected(parent.error());
-    if(!geometry(size.width) || !geometry(size.height) || !size.width || !size.height)return core::fail(core::ErrorCode::invalid_argument,"Invalid absolute stack extent");
+    if(!geometry(size.width) || !geometry(size.height))return core::fail(core::ErrorCode::invalid_argument,"Invalid absolute stack extent");
     auto w=publish(*parent,WidgetKind::absolute_stack,id);impl_->nodes.back().extent=size;return w;
 }
 core::Result<Widget> WidgetState::image(Widget p,std::string_view id,ImageOptions options) {
@@ -1238,7 +1238,7 @@ core::Result<WidgetInteraction> WidgetState::interaction(std::size_t i){
 core::Result<Size> WidgetState::measure(std::size_t i,double width){
     if(auto r=ready();!r)return std::unexpected(r.error());
     if(i>=impl_->nodes.size()||!std::isfinite(width)||width<=0||width>8192)return core::fail(core::ErrorCode::invalid_argument,"Invalid native width constraint");
-    try{return impl_->measure_width(i,width);}catch(const std::bad_alloc&){return core::fail(core::ErrorCode::full,"Native measurement allocation failed");}catch(...){return core::fail(core::ErrorCode::failed,"Native measurement failed",std::current_exception());}
+    try{auto measured=impl_->measure_width(i,width);measured.width=std::min(measured.width,width);return measured;}catch(const std::bad_alloc&){return core::fail(core::ErrorCode::full,"Native measurement allocation failed");}catch(...){return core::fail(core::ErrorCode::failed,"Native measurement failed",std::current_exception());}
 }
 core::Result<void> WidgetState::observe_interaction(std::size_t i,std::shared_ptr<const WidgetInteractionPort> port){
     if(auto r=ready();!r)return r;
@@ -1383,7 +1383,7 @@ core::Result<void> WidgetState::fixed_frame(std::size_t i,Rect r) {
 }
 core::Result<void> WidgetState::extent(std::size_t i,Size size) {
     if(auto r=ready();!r)return r;
-    if(i>=impl_->nodes.size() || (!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content) || !geometry(size.width) || !geometry(size.height) || (impl_->nodes[i].kind==WidgetKind::absolute_stack&&(!size.width||!size.height)))return core::fail(core::ErrorCode::invalid_argument,"Extent requires a stack with finite dimensions; absolute stacks require positive dimensions");
+    if(i>=impl_->nodes.size() || (!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content) || !geometry(size.width) || !geometry(size.height))return core::fail(core::ErrorCode::invalid_argument,"Extent requires a stack with finite nonnegative dimensions");
     auto& n=impl_->nodes[i];if(n.extent==size)return {};n.extent=size;
     if(n.fixed_frame){n.fixed_frame->width=float(size.width);n.fixed_frame->height=float(size.height);}
     impl_->invalidate(true,i);return {};
@@ -1556,7 +1556,7 @@ core::Result<void> WidgetState::text(std::size_t i,std::string_view value) {
 core::Result<void> WidgetState::label_options(std::size_t i,LabelOptions o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||impl_->nodes[i].kind!=WidgetKind::label||!valid_label(o))return core::fail(core::ErrorCode::invalid_argument,"Invalid label options");auto& n=impl_->nodes[i];if(n.label==o&&n.text==o.text)return {};n.text=o.text;n.label=std::move(o);impl_->invalidate(true,i);return {};}
 core::Result<void> WidgetState::input_options(std::size_t i,InputOptions o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||impl_->nodes[i].kind!=WidgetKind::input_field||!valid_input(o))return core::fail(core::ErrorCode::invalid_argument,"Invalid input options");if(o.maximum_length)o.text.resize(scalar_prefix(o.text,o.maximum_length));auto& n=impl_->nodes[i];if(n.text!=o.text){n.text=o.text;n.cursor=n.anchor=n.text.size();n.marked.clear();}const bool active=o.enabled;n.field=std::move(o);impl_->invalidate(true,i);return enabled(i,active);}
 core::Result<void> WidgetState::clip_content(std::size_t i,bool value){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].action_surface)||impl_->nodes[i].scroll)return core::fail(core::ErrorCode::invalid_argument,"Clip requires an ordinary container");impl_->nodes[i].clip=value;impl_->hovered=absent;impl_->invalidate();impl_->accessibility_changed();return {};}
-core::Result<void> WidgetState::accessibility_name(std::size_t i,std::string_view value){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||!valid_title(value)||value.size()>65536||(impl_->nodes[i].kind!=WidgetKind::button&&!impl_->nodes[i].action_surface&&impl_->nodes[i].kind!=WidgetKind::input_field))return core::fail(core::ErrorCode::invalid_argument,"Accessible name requires an action or editor");auto& n=impl_->nodes[i];if(n.kind==WidgetKind::input_field)n.field.accessibility_name=value;else n.button.accessibility_name=value;if(n.action_surface)n.action_surface->accessibility_name=value;impl_->accessibility_changed();return {};}
+core::Result<void> WidgetState::accessibility_name(std::size_t i,std::string_view value){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||!valid_title(value)||value.size()>65536||(impl_->nodes[i].kind!=WidgetKind::button&&!impl_->nodes[i].action_surface&&impl_->nodes[i].kind!=WidgetKind::input_field&&!impl_->nodes[i].text_input))return core::fail(core::ErrorCode::invalid_argument,"Accessible name requires an action or editor");auto& n=impl_->nodes[i];if(n.kind==WidgetKind::input_field)n.field.accessibility_name=value;else n.button.accessibility_name=value;if(n.action_surface)n.action_surface->accessibility_name=value;impl_->accessibility_changed();return {};}
 core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
     if (auto r=ready();!r) return r;
     if (i>=impl_->nodes.size() || (!interactive(impl_->nodes[i].kind)&&!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content&&impl_->nodes[i].kind!=WidgetKind::image)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no enabled property");

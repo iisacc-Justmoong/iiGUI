@@ -1,5 +1,5 @@
 {
-  "lvrs_revision": "13b657b21a8ca9babe40ac790bb547c3f7758eea",
+  "lvrs_revision": "2aeb162a6b1a2ea3bf2bc796a2174cc310f186fa",
   "license_source": "https://raw.githubusercontent.com/orioncactus/pretendard/main/LICENSE",
   "fonts": [
     {
@@ -26,7 +26,7 @@
   "visual_sources": [
     {
       "file": "src/qml/Theme.qml",
-      "sha256": "52a4bdb3ad2f345b6bac0baec041884d2a22ce130811089ee3ba61d44c9597ac"
+      "sha256": "6f69e02da269421e6fac8608a3b944fe5d79a78c0a61423f0152690851b17484"
     },
     {
       "file": "src/qml/components/control/buttons/PushButton.qml",

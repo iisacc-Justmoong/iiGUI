@@ -127,13 +127,21 @@ void native(ii::gui::Renderer renderer=ii::gui::Renderer::automatic) {
             std::uint8_t maximum=0;
             for (std::size_t i=0;i<alpha->rgba.size();i+=4) maximum=std::max(maximum,alpha->rgba[i]);
             check(maximum>=135 && maximum<=140,"Text alpha composes in linear light: 0.5 * 0.5 to sRGB 137");
-            quality.texts[0].bounds.height=20;
+            std::size_t first_ink=alpha->height;
+            for(std::size_t y=0;y<alpha->height&&first_ink==alpha->height;++y)
+                for(std::size_t x=0;x<alpha->width;++x)
+                    if(alpha->rgba[(y*alpha->width+x)*4]>=10){first_ink=y;break;}
+            check(first_ink<alpha->height,"Unclipped native glyph ink must exist");
+            const auto clip_bottom=std::min(69.,std::ceil((first_ink+8)/scale));
+            check(clip_bottom>first_ink/scale&&clip_bottom<70,"Native font fixture must retain and crop glyph ink");
+            quality.texts[0].bounds.height=float(clip_bottom-10);
             good(host.set_canvas(quality),"Clip oversized glyphs");
             auto clipped=host.capture_canvas(); good(clipped,"Read clipped glyphs");
             std::size_t inside=0;
             for (std::size_t y=0;y<clipped->height;++y) for (std::size_t x=0;x<clipped->width;++x) {
                 if (clipped->rgba[(y*clipped->width+x)*4]<10) continue;
-                check(x>=20*scale && x<200*scale && y>=10*scale && y<30*scale,"Glyph pixels respect explicit clipping rectangle");
+                check(x>=20*scale && x<200*scale && y>=10*scale && y<clip_bottom*scale,"Glyph pixels respect explicit clipping rectangle");
+                check(clipped->rgba[(y*clipped->width+x)*4]==alpha->rgba[(y*alpha->width+x)*4],"Clipping must retain native glyph shaping and origin");
                 ++inside;
             }
             check(inside>10,"Clipping retains visible glyph coverage");

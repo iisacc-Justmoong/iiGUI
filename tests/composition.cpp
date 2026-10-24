@@ -19,7 +19,9 @@ void layout(){
         good(a.focus());good(group.set_visible(false));check(!take(a.snapshot()).visible && !take(a.snapshot()).focused,"Hidden descendants still visible/focused");
         auto activated=a.activate();check(!activated && clicks==0,"Hidden control activated");
         good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::tab}));check(take(b.snapshot()).focused,"Tab did not skip hidden subtree");
-        good(group.set_visible(true));good(group.set_extent({120,80}));check(take(group.snapshot()).size==gui::Size{120,80},"Extent did not invalidate ancestor layout");
+        good(group.set_visible(true));good(group.set_extent({0,0}));check(take(group.snapshot()).size==gui::Size{},"Empty absolute extent must remain zero");
+        check(!group.set_extent({-1,0}),"Negative empty extent accepted");
+        good(group.set_extent({120,80}));check(take(group.snapshot()).size==gui::Size{120,80},"Extent did not invalidate ancestor layout");
         good(a.activate());check(clicks==1,"Restored subtree lost its action");good(host.request_close());
     }});good(result);check(!a.set_visible(true),"Closed widget mutated");
 }

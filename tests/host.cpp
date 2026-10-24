@@ -256,7 +256,7 @@ void graphics(gui::Renderer renderer=gui::Renderer::automatic) {
                   "one render coalesces one hundred admitted updates");
             const double scale = host.snapshot()->backing_scale;
             check(captured->width == std::ceil(192*scale) && captured->height == std::ceil(128*scale), "capture uses device pixels");
-            check(info->cached_texture_bytes == std::uint64_t(captured->width)*captured->height*4, "reported attachment storage matches physical size");
+            check(info->cached_texture_bytes == std::uint64_t(captured->width)*captured->height*4, "plain scenes allocate only their physical color attachment without effect snapshots");
             auto pixel = [&](double x,double y,int channel=0) {
                 return captured->rgba[(std::size_t(y*scale)*captured->width+std::size_t(x*scale))*4+channel];
             };
