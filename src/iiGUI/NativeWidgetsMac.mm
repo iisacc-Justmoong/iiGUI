@@ -26,6 +26,7 @@ WidgetKey key(unsigned short code) {
         case 53:return WidgetKey::escape; case 123:return WidgetKey::left; case 124:return WidgetKey::right;
         case 125:return WidgetKey::down; case 126:return WidgetKey::up; case 115:return WidgetKey::home;
         case 119:return WidgetKey::end; case 51:return WidgetKey::backspace; case 117:return WidgetKey::delete_forward;
+        case 116:return WidgetKey::page_up; case 121:return WidgetKey::page_down; case 114:return WidgetKey::insert;
         default:return WidgetKey::none;
     }
 }
@@ -51,6 +52,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     __weak NSView* surface;
     std::function<WidgetSnapshot()> read;
     std::function<void(WidgetInput)> send;
+    std::function<ii::core::Result<TextContent>(std::string_view,ii::gui::TextRange)> text_content;
     NSMutableArray* entries;
 }
 @end
@@ -60,6 +62,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
 - (NSString*)accessibilityIdentifier { return native(identity); }
 - (NSString*)accessibilityRole {
     auto n=read?read():WidgetSnapshot{};
+    if(n.text_input)return n.multiline?NSAccessibilityTextAreaRole:NSAccessibilityTextFieldRole;
     switch(n.kind) {
         case WidgetKind::menu:return NSAccessibilityMenuRole;
         case WidgetKind::popover:return NSAccessibilityGroupRole;
@@ -94,8 +97,12 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     if(n.kind==WidgetKind::check_box || n.kind==WidgetKind::radio_button || n.kind==WidgetKind::toggle_switch) return @(n.checked);
     if(n.kind==WidgetKind::slider || n.kind==WidgetKind::progress) return @(n.value);
     if(n.color_state)return native("#"+n.color_state->hex);
+    if(n.text_input&&n.kind!=WidgetKind::input_field){if(n.text_length>65536||!text_content)return nil;auto content=text_content(identity,{0,n.text_length});return content?native(content->text):nil;}
     return native(n.text);
 }
+- (NSInteger)accessibilityNumberOfCharacters { auto n=read?read():WidgetSnapshot{};return NSInteger(std::min(n.text_length,std::size_t(NSIntegerMax))); }
+- (NSRange)accessibilitySelectedTextRange { auto n=read?read():WidgetSnapshot{};return n.text_input?NSMakeRange(n.text_selection.location,n.text_selection.length):NSMakeRange(NSNotFound,0); }
+- (NSString*)accessibilityStringForRange:(NSRange)range { if(!text_content||range.location==NSNotFound||range.length>65536)return nil;auto content=text_content(identity,{range.location,range.length});return content&&content->range.length==range.length?native(content->text):nil; }
 - (BOOL)isAccessibilityEnabled { auto n=read?read():WidgetSnapshot{};return n.attached && n.enabled && n.visible && !n.input_blocked; }
 - (BOOL)isAccessibilityFocused { return read && read().focused; }
 - (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {
@@ -103,11 +110,11 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     if(!n.attached || !n.visible || n.input_blocked) return NO;
     if(selector==@selector(accessibilityPerformShowMenu)) return n.enabled && n.has_context_menu;
     if(selector==@selector(accessibilityPerformCancel)) return (n.kind==WidgetKind::menu||n.kind==WidgetKind::popover)&&n.opened;
-    if(selector==@selector(setAccessibilityValue:)) return n.kind==WidgetKind::input_field && n.enabled && !n.read_only;
+    if(selector==@selector(setAccessibilityValue:)) return n.text_input && n.enabled && !n.read_only;
     if(selector==@selector(accessibilityPerformIncrement)) return n.enabled && ((n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::down) || (n.color_state && n.color_field>=ColorField::hue_rail));
     if(selector==@selector(accessibilityPerformDecrement)) return n.enabled && ((n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::up) || (n.color_state && n.color_field>=ColorField::hue_rail));
     if(selector==@selector(accessibilityPerformPress) || selector==@selector(setAccessibilityFocused:))
-        return n.enabled && (n.kind==WidgetKind::button || n.kind==WidgetKind::action_surface || n.kind==WidgetKind::check_box || n.kind==WidgetKind::radio_button || n.kind==WidgetKind::toggle_switch || n.kind==WidgetKind::input_field || n.kind==WidgetKind::slider || n.kind==WidgetKind::tab || n.kind==WidgetKind::stepper || n.kind==WidgetKind::combo_box || n.kind==WidgetKind::menu_item || n.kind==WidgetKind::color_surface);
+        return n.enabled && (n.text_input || n.kind==WidgetKind::button || n.kind==WidgetKind::action_surface || n.kind==WidgetKind::check_box || n.kind==WidgetKind::radio_button || n.kind==WidgetKind::toggle_switch || n.kind==WidgetKind::slider || n.kind==WidgetKind::tab || n.kind==WidgetKind::stepper || n.kind==WidgetKind::combo_box || n.kind==WidgetKind::menu_item || n.kind==WidgetKind::color_surface);
     return [super isAccessibilitySelectorAllowed:selector];
 }
 - (void)setAccessibilityFocused:(BOOL)value {
@@ -125,7 +132,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     auto action=send; auto id=identity;
     auto n=read?read():WidgetSnapshot{};
     if(!action || !n.enabled || !n.attached || !n.visible || n.input_blocked) return NO;
-    if(n.kind==WidgetKind::input_field || n.kind==WidgetKind::slider || n.kind==WidgetKind::color_surface) {
+    if(n.text_input || n.kind==WidgetKind::slider || n.kind==WidgetKind::color_surface) {
         action({.kind=WidgetInputKind::focus,.target=std::move(id)});
         if(surface) NSAccessibilityPostNotification(surface,NSAccessibilityFocusedUIElementChangedNotification);
         return YES;
@@ -154,7 +161,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
 }
 - (void)setAccessibilityValue:(id)value {
     auto n=read?read():WidgetSnapshot{}; auto action=send;
-    if(!action || !n.attached || !n.visible || n.input_blocked || !n.enabled || n.read_only || n.kind!=WidgetKind::input_field || ![value isKindOfClass:NSString.class]) return;
+    if(!action || !n.attached || !n.visible || n.input_blocked || !n.enabled || n.read_only || !n.text_input || ![value isKindOfClass:NSString.class]) return;
     auto id=identity;
     action({.kind=WidgetInputKind::focus,.target=id});
     action({.kind=WidgetInputKind::key_down,.key=WidgetKey::select_all});
@@ -172,6 +179,8 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     std::function<std::vector<WidgetSnapshot>()> snapshots;
     std::function<WidgetSnapshot(std::string_view)> lookup;
     std::function<void(std::exception_ptr)> failure;
+    std::function<ii::core::Result<TextContent>(std::string_view,ii::gui::TextRange)> text_content;
+    std::function<ii::core::Result<std::size_t>(std::string_view,double,double)> text_position;
     NSMutableDictionary<NSString*,IIGUIWidgetElement*>* peers;
     NSString* marked;
     NSRange selection;
@@ -227,18 +236,18 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
 }
 - (BOOL)resignFirstResponder {
     marked=@""; auto action=send;
-    if(action) { action({.kind=WidgetInputKind::composition}); action({.kind=WidgetInputKind::focus_lost}); }
+    if(action) { action({.kind=WidgetInputKind::focus_lost}); action({.kind=WidgetInputKind::composition}); }
     return [super resignFirstResponder];
 }
 - (void)keyDown:(NSEvent*)event {
     auto code=key(event.keyCode);
     bool editing=false;
-    for(const auto& n:snapshots?snapshots():std::vector<WidgetSnapshot>{}) if(n.focused && !n.input_blocked && n.kind==WidgetKind::input_field) {editing=true;break;}
+    for(const auto& n:snapshots?snapshots():std::vector<WidgetSnapshot>{}) if(n.focused && !n.input_blocked && n.text_input) {editing=true;break;}
     if(event.modifierFlags&NSEventModifierFlagCommand){
         if(event.keyCode==0){[self selectAll:nil];return;}if(event.keyCode==9){[self paste:nil];return;}
         if(event.keyCode==8){[self copy:nil];return;}if(event.keyCode==7){[self cut:nil];return;}
     }
-    if((code!=WidgetKey::none||!editing||(event.modifierFlags&(NSEventModifierFlagCommand|NSEventModifierFlagControl))) && (!self.hasMarkedText || !editing)) {
+    if(((code!=WidgetKey::none&&code!=WidgetKey::space)||!editing||(event.modifierFlags&(NSEventModifierFlagCommand|NSEventModifierFlagControl))) && (!self.hasMarkedText || !editing)) {
         auto value=native_input(event,WidgetInputKind::key_down);value.key=code==WidgetKey::none?WidgetKey::character:code;
         value.text=event.charactersIgnoringModifiers.lowercaseString.UTF8String?:"";auto action=send;if(action)action(std::move(value));
     } else [self interpretKeyEvents:@[event]];
@@ -280,18 +289,19 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     if(range.location!=NSNotFound&&(current.location==NSNotFound||!NSEqualRanges(current,range)))event.replacement_range=ii::gui::TextRange{range.location,range.length};
     auto action=send;if(action)action(std::move(event));
 }
-- (void)unmarkText { marked=@""; auto action=send; if(action) action({.kind=WidgetInputKind::composition}); }
+- (void)unmarkText { marked=@""; auto action=send; if(action) action({.kind=WidgetInputKind::commit_composition}); }
 - (BOOL)hasMarkedText { return marked.length>0; }
 - (NSRange)markedRange { for(const auto& n:snapshots?snapshots():std::vector<WidgetSnapshot>{})if(n.focused&&n.marked_range)return NSMakeRange(n.marked_range->location,n.marked_range->length);return NSMakeRange(NSNotFound,0); }
-- (NSRange)selectedRange { for(const auto& n:snapshots?snapshots():std::vector<WidgetSnapshot>{})if(n.focused&&n.kind==WidgetKind::input_field)return NSMakeRange(n.text_selection.location,n.text_selection.length);return NSMakeRange(NSNotFound,0); }
+- (NSRange)selectedRange { for(const auto& n:snapshots?snapshots():std::vector<WidgetSnapshot>{})if(n.focused&&n.text_input)return NSMakeRange(n.text_selection.location,n.text_selection.length);return NSMakeRange(NSNotFound,0); }
 - (NSArray<NSAttributedStringKey>*)validAttributesForMarkedText { return @[]; }
 - (NSAttributedString*)attributedSubstringForProposedRange:(NSRange)range actualRange:(NSRangePointer)actual {
-    (void)range; if(actual) *actual=NSMakeRange(NSNotFound,0); return nil;
+    if(actual)*actual=NSMakeRange(NSNotFound,0);if(!text_content||range.location==NSNotFound)return nil;
+    for(const auto& item:snapshots?snapshots():std::vector<WidgetSnapshot>{})if(item.focused&&item.text_input&&!item.password){auto content=text_content(item.id,{range.location,range.length});if(!content)return nil;if(actual)*actual=NSMakeRange(content->range.location,content->range.length);return [[NSAttributedString alloc] initWithString:native(content->text)];}return nil;
 }
-- (NSUInteger)characterIndexForPoint:(NSPoint)point { (void)point; return 0; }
+- (NSUInteger)characterIndexForPoint:(NSPoint)point { if(!text_position)return NSNotFound;auto local=[self convertPoint:[self.window convertPointFromScreen:point] fromView:nil];for(const auto& item:snapshots?snapshots():std::vector<WidgetSnapshot>{})if(item.focused&&item.text_input){auto position=text_position(item.id,local.x,local.y);return position?*position:NSNotFound;}return NSNotFound; }
 - (NSRect)firstRectForCharacterRange:(NSRange)range actualRange:(NSRangePointer)actual {
     if(actual) *actual=range; auto list=snapshots?snapshots():std::vector<WidgetSnapshot>{};
-    for(auto& item:list) if(item.focused) { auto r=item.visual_bounds; return [self.window convertRectToScreen:[self convertRect:NSMakeRect(r.x,r.y+r.height,1,16) toView:nil]]; }
+    for(auto& item:list) if(item.focused) { auto r=item.text_input?item.caret_bounds:item.visual_bounds; return [self.window convertRectToScreen:[self convertRect:NSMakeRect(r.x,r.y,r.width,r.height) toView:nil]]; }
     return [self.window convertRectToScreen:self.frame];
 }
 - (void)doCommandBySelector:(SEL)selector {
@@ -315,7 +325,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     for(IIGUIWidgetElement* peer in peers.allValues) {[peer->entries removeAllObjects];peer.accessibilityParent=nil;}
     for(auto& item:current) {
         if(!item.visible || item.input_blocked) continue;
-        if(item.kind==WidgetKind::vertical_stack || item.kind==WidgetKind::horizontal_stack || item.kind==WidgetKind::overlay_stack || item.kind==WidgetKind::absolute_stack || item.kind==WidgetKind::spacer || item.kind==WidgetKind::tab_bar || item.kind==WidgetKind::segmented_control || item.kind==WidgetKind::menu_divider) continue;
+        if(!item.text_input&&(item.kind==WidgetKind::vertical_stack || item.kind==WidgetKind::horizontal_stack || item.kind==WidgetKind::overlay_stack || item.kind==WidgetKind::absolute_stack || item.kind==WidgetKind::spacer || item.kind==WidgetKind::tab_bar || item.kind==WidgetKind::segmented_control || item.kind==WidgetKind::menu_divider)) continue;
         auto id=native(item.id); auto peer=peers[id];
         if(!peer) {
             peer=[IIGUIWidgetElement new];peer->entries=[NSMutableArray new]; peer->identity=item.id; peer->surface=self;
@@ -324,7 +334,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
                 IIGUIWidgetSurface* view=weak; if(view && view->lookup) return view->lookup(identity);
                 return WidgetSnapshot{};
             };
-            peer->send=send;peers[id]=peer;
+            peer->send=send;peer->text_content=text_content;peers[id]=peer;
         }
         peer.accessibilityParent=self;
     }
@@ -363,7 +373,7 @@ struct WidgetSurface::Impl final {
     }
     ~Impl() {
         if(view) {
-            view->paint={}; view->send={}; view->snapshots={}; view->lookup={}; view->failure={};
+            view->paint={}; view->send={}; view->snapshots={}; view->lookup={}; view->failure={};view->text_content={};view->text_position={};
             for(IIGUIWidgetElement* peer in view->peers.allValues) { peer->read={}; peer->send={};[peer->entries removeAllObjects]; peer.accessibilityParent=nil; }
             [view->peers removeAllObjects]; view->textContext=nil;
             canvas.reset(); [view removeFromSuperview]; view=nil;
@@ -380,6 +390,7 @@ WidgetSurface::WidgetSurface(void* value,WidgetSurfaceCallbacks callbacks):impl_
     view.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable; view.wantsLayer=YES;
     view->marked=@""; view->selection=NSMakeRange(0,0); view->send=impl_->callbacks.input;
     view->snapshots=impl_->callbacks.accessibility; view->lookup=impl_->callbacks.lookup; view->failure=impl_->callbacks.failure;
+    view->text_content=impl_->callbacks.text_content;view->text_position=impl_->callbacks.text_position;
     [parent addSubview:view];
     impl_->canvas=std::make_unique<NativeCanvas>((__bridge void*)view,nullptr,Acceleration::prefer_hardware,impl_->callbacks.renderer);
     auto state=impl_.get(); view->paint=[state] { state->dirty=true;if(!state->paced) state->draw(); };

@@ -25,6 +25,8 @@ inline std::vector<CanvasLayerView> canvas_layers(const CanvasFrame& f) {
     for(const auto& l:f.overlays) out.push_back({l.panels,l.texts,l.images,l.clip,l.backdrop,l.shadow,l.content_transform,l.images_before_text});
     return out;
 }
+// Resolution-aware effect storage, bounded for small views and 4K surfaces.
+inline std::uint64_t effect_texture_budget(std::uint32_t w,std::uint32_t h){return std::clamp<std::uint64_t>(std::uint64_t(w)*h*32,64ull*1024*1024,256ull*1024*1024);}
 struct PixelClip final { std::uint32_t x,y,width,height; };
 inline PixelClip clip_pixels(CanvasLayerView l,double scale,std::uint32_t width,std::uint32_t height) {
     if(!l.clip) return {0,0,width,height};

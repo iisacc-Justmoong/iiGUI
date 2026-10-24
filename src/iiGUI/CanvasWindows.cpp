@@ -6,6 +6,7 @@
 #include <wrl/client.h>
 #include "NativeCanvas.h"
 #include "NativeText.h"
+#include "Image.h"
 #include "GpuEffects.h"
 #include <optional>
 #include <cstring>
@@ -19,7 +20,7 @@ void checked(HRESULT value, const char* operation) {
 const char shader[] = R"hlsl(
 struct Panel { float4 bounds, top, bottom; float radius,stroke; float2 padding; };
 StructuredBuffer<Panel> panels : register(t0);
-cbuffer View : register(b0) { float2 size; float2 padding; float4 effect_bounds, effect_tint, effect_border, effect_style; };
+cbuffer View : register(b0) { float2 size; float2 padding; float4 effect_bounds, effect_tint, effect_border, effect_style, effect_underlay, effect_base, effect_highlight; };
 struct Varying { float4 position : SV_POSITION; float2 local : TEXCOORD0;
     float2 size : TEXCOORD1; float4 top : COLOR0; float4 bottom : COLOR1; float radius : TEXCOORD2; float stroke : TEXCOORD3; };
 Varying vertex_main(uint vertex : SV_VertexID, uint instance : SV_InstanceID) {
@@ -47,32 +48,28 @@ float4 text_fragment(float4 position : SV_POSITION) : SV_TARGET {
     return float4(color.rgb*color.a,color.a);
 }
 
+Texture2D<float4> shape_image : register(t2);
+Texture2D<float4> underlay_image : register(t3);
 SamplerState linear_clamp : register(s0);
-float shape_distance(float2 point,float4 bounds,float radius) {
-    float2 q=abs(point-bounds.xy-bounds.zw*.5)-(bounds.zw*.5-radius);
+float shape_distance(float2 sample_point,float4 bounds,float radius) {
+    float2 q=abs(sample_point-bounds.xy-bounds.zw*.5)-(bounds.zw*.5-radius);
     return length(max(q,0))+min(max(q.x,q.y),0)-radius;
 }
-float shape_mask(float2 point) { return saturate(.5-shape_distance(point,effect_bounds,effect_style.x)*padding.x); }
+bool effect_flag(uint n){return (uint(effect_style.w)&n)!=0;}
+float shape_mask(float2 sample_point){if(effect_flag(2)){float2 uv=(sample_point-effect_bounds.xy)/effect_bounds.zw;if(any(uv<0)||any(uv>1))return 0;return shape_image.SampleLevel(linear_clamp,uv,0).a;}return saturate(.5-shape_distance(sample_point,effect_bounds,effect_style.x)*padding.x);}
+float4 effect_over(float4 a,float4 b){return a+b*(1-a.a);}
+float4 input_at(float2 sample_point){float4 value=float4(effect_base.rgb*effect_base.a,effect_base.a);if(effect_flag(8)){float4 scene=glyphs.SampleLevel(linear_clamp,sample_point/size,0);scene.rgb*=scene.a;value=effect_over(scene,value);}if(effect_flag(4)){float2 uv=(sample_point-effect_underlay.xy)/effect_underlay.zw;if(all(uv>=0)&&all(uv<=1)){float4 image=underlay_image.SampleLevel(linear_clamp,uv,0);if(effect_flag(16)){uint a=asuint(effect_highlight.z),b=asuint(effect_highlight.w);float4 tint=float4(f16tof32(a&65535),f16tof32(a>>16),f16tof32(b&65535),f16tof32(b>>16));image=float4(tint.rgb,image.a*tint.a);}image.rgb*=image.a;value=effect_over(image,value);}}return value;}
 float4 effect_fragment(float4 position : SV_POSITION) : SV_TARGET {
-    float scale=padding.x,opacity=padding.y,blur=effect_style.y;
-    float2 point=position.xy/scale;
-    bool shadow=effect_style.w>.5;
-    if(opacity<=0||shape_distance(point,effect_bounds,effect_style.x)>(shadow?blur+1:1))return 0;
-    float coverage=shape_mask(point);float3 paint;
-    if(shadow){
-        if(blur>.01){coverage=0;float total=0,sigma=blur/3,step_size=blur/6;
-            [loop] for(int y=-6;y<=6;++y)[loop] for(int x=-6;x<=6;++x){float2 offset=float2(x,y)*step_size;float weight=exp(-dot(offset,offset)/(2*sigma*sigma));coverage+=shape_mask(point+offset)*weight;total+=weight;}coverage/=total;}
-        float alpha=coverage*effect_tint.a*opacity;return float4(effect_tint.rgb*alpha,alpha);
-    }
-    float2 extent=size*scale;
-    if(blur>.01){paint=0;float total=0,sigma=blur/3,step_size=blur/6;
-        [loop] for(int y=-6;y<=6;++y)[loop] for(int x=-6;x<=6;++x){float2 offset=float2(x,y)*step_size;float weight=exp(-dot(offset,offset)/(2*sigma*sigma));paint+=glyphs.SampleLevel(linear_clamp,(position.xy+offset*scale)/extent,0).rgb*weight;total+=weight;}paint/=total;
-    }else paint=glyphs.SampleLevel(linear_clamp,position.xy/extent,0).rgb;
-    paint=lerp(paint,effect_tint.rgb,effect_tint.a);
-    float border_width=effect_style.z;
-    if(border_width>0&&effect_border.a>0){float4 inner=effect_bounds+float4(border_width,border_width,-2*border_width,-2*border_width);float inside=saturate(.5-shape_distance(point,inner,max(0,effect_style.x-border_width))*scale);paint=lerp(paint,effect_border.rgb,saturate((coverage-inside)/max(coverage,.0001))*effect_border.a);}
-    float alpha=coverage*opacity;return float4(paint*alpha,alpha);
+    float scale=padding.x,opacity=padding.y,blur=effect_style.y;float2 sample_point=position.xy/scale;bool shadow=effect_flag(1);
+    if(opacity<=0||shape_distance(sample_point,effect_bounds,effect_flag(2)?0:effect_style.x)>(shadow?blur+1:1))return 0;
+    float coverage=shape_mask(sample_point);float4 paint;
+    if(shadow){if(blur>.01){coverage=0;float total=0,sigma=blur/3,step_size=blur/6;[loop]for(int y=-6;y<=6;++y)[loop]for(int x=-6;x<=6;++x){float2 offset=float2(x,y)*step_size;float weight=exp(-dot(offset,offset)/(2*sigma*sigma));coverage+=shape_mask(sample_point+offset)*weight;total+=weight;}coverage/=total;}float alpha=coverage*effect_tint.a*opacity;return float4(effect_tint.rgb*alpha,alpha);}
+    if(blur>.01){paint=0;float total=0,sigma=blur/3,step_size=blur/6;[loop]for(int y=-6;y<=6;++y)[loop]for(int x=-6;x<=6;++x){float2 offset=float2(x,y)*step_size;float weight=exp(-dot(offset,offset)/(2*sigma*sigma));paint+=input_at(sample_point+offset)*weight;total+=weight;}paint/=total;}else paint=input_at(sample_point);
+    paint=effect_over(float4(effect_tint.rgb*effect_tint.a,effect_tint.a),paint);
+    float border_width=effect_style.z;if(border_width>0&&effect_border.a>0){float4 inner=effect_bounds+float4(border_width,border_width,-2*border_width,-2*border_width);float inside=saturate(.5-shape_distance(sample_point,inner,max(0,effect_style.x-border_width))*scale);float alpha=saturate((coverage-inside)/max(coverage,.0001))*effect_border.a;paint=effect_over(float4(effect_border.rgb*alpha,alpha),paint);}
+    float light=effect_highlight.x*saturate((coverage-shape_mask(sample_point-float2(0,effect_highlight.y)))/max(coverage,.0001));paint=effect_over(float4(light,light,light,light),paint);return paint*(coverage*opacity);
 }
+
 )hlsl";
 ComPtr<ID3DBlob> compile(const char* entry, const char* profile) {
     ComPtr<ID3DBlob> code, errors;
@@ -112,6 +109,15 @@ struct PlatformCanvas::Impl final {
     ComPtr<ID3D11RenderTargetView> target;
     struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key;PixelClip region{}; };
     std::vector<Layer> layers;
+    struct EffectAsset{std::shared_ptr<const RasterImage> image;ComPtr<ID3D11ShaderResourceView> view;};
+    std::vector<EffectAsset> effect_assets;
+    ID3D11ShaderResourceView* effect_image(std::shared_ptr<const RasterImage> image){
+        if(!image)return nullptr;
+        for(const auto& entry:effect_assets)if(entry.image==image)return entry.view.Get();
+        D3D11_TEXTURE2D_DESC desc{};desc.Width=image->width();desc.Height=image->height();desc.MipLevels=desc.ArraySize=1;desc.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;desc.SampleDesc.Count=1;desc.Usage=D3D11_USAGE_IMMUTABLE;desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+        D3D11_SUBRESOURCE_DATA data{image->rgba().data(),UINT(image->width()*4),0};ComPtr<ID3D11Texture2D> texture;checked(device->CreateTexture2D(&desc,&data,&texture),"Cannot upload effect image");EffectAsset asset{image,{}};checked(device->CreateShaderResourceView(texture.Get(),nullptr,&asset.view),"Cannot create effect image sampler");effect_assets.push_back(std::move(asset));++statistics.effect_image_uploads;return effect_assets.back().view.Get();
+    }
+
     std::optional<CanvasFrame> previous;
     double previous_scale=0;
     GraphicsInfo statistics;
@@ -233,6 +239,11 @@ struct PlatformCanvas::Impl final {
             context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
             auto* uniform=view.Get(); context->VSSetConstantBuffers(0,1,&uniform);context->PSSetConstantBuffers(0,1,&uniform);
             const auto views=canvas_layers(frame);layers.resize(views.size());statistics.foreground_texture_bytes=0;
+            std::vector<std::shared_ptr<const RasterImage>> needed;
+            for(const auto& layer:views){if(layer.backdrop){if(layer.backdrop->mask)needed.push_back(layer.backdrop->mask);if(layer.backdrop->underlay)needed.push_back(layer.backdrop->underlay);}if(layer.shadow&&layer.shadow->mask)needed.push_back(layer.shadow->mask);}
+            std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(needed,asset.image)==needed.end();});
+            std::vector<std::shared_ptr<const RasterImage>> unique;std::uint64_t bytes=0;for(const auto& image:needed)if(std::ranges::find(unique,image)==unique.end()){unique.push_back(image);bytes+=image->rgba().size();}statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);if(bytes>statistics.effect_texture_budget_bytes)throw std::runtime_error("Effect image storage exceeds the effect budget");for(const auto& image:unique)effect_image(image);statistics.effect_image_texture_bytes=bytes;
+
             for(std::size_t i=0;i<views.size();++i) {
             const auto layer=views[i];auto& cached=layers[i];
             const auto snapshot=[&](ID3D11Texture2D* destination){context->OMSetRenderTargets(0,nullptr,nullptr);context->CopyResource(destination,texture.Get());context->OMSetRenderTargets(1,&render,nullptr);};
@@ -244,9 +255,9 @@ struct PlatformCanvas::Impl final {
             context->RSSetScissorRects(1,&scissor);
             const auto effect_draw=[&](bool shadow){const auto params=effect_parameters(layer,frame.viewport,scale,shadow);context->UpdateSubresource(view.Get(),0,nullptr,&params,0,0);
                 auto* source=(!shadow&&layer.backdrop->source==BackdropSource::previous_layers)?current_view.Get():content_view.Get();
-                context->PSSetShaderResources(1,1,&source);auto* sampler=effect_sampler.Get();context->PSSetSamplers(0,1,&sampler);
+                ID3D11ShaderResourceView* sources[]{source,effect_image(shadow?layer.shadow->mask:layer.backdrop->mask),effect_image(shadow?std::shared_ptr<const RasterImage>{}:layer.backdrop->underlay)};context->PSSetShaderResources(1,3,sources);auto* sampler=effect_sampler.Get();context->PSSetSamplers(0,1,&sampler);
                 context->VSSetShader(text_vertex.Get(),nullptr,0);context->PSSetShader(effect_fragment.Get(),nullptr,0);context->Draw(6,0);
-                ID3D11ShaderResourceView* empty=nullptr;context->PSSetShaderResources(1,1,&empty);};
+                ID3D11ShaderResourceView* empty[3]{};context->PSSetShaderResources(1,3,empty);};
             if(layer.shadow)effect_draw(true);if(layer.backdrop)effect_draw(false);
             context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
             context->VSSetShader(vertex.Get(),nullptr,0); context->PSSetShader(fragment.Get(),nullptr,0);

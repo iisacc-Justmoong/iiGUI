@@ -255,3 +255,28 @@ and verify a staged installed consumer after changing source/header paths.
 Composed native buttons support asymmetric content insets, explicit indicator size,
 content spacing and optional width. See [container layout](docs/ContainerLayout.md);
 new layout test executables are compiled with runtime execution deferred.
+
+Native image composition supports source crops, rounded masks, borders, scrims,
+explicit foreground order and tightly allocated foreground textures. Pure retained
+paint providers expose native action state; see [image composition](docs/ImageComposition.md).
+
+See [native material inputs](docs/MaterialInputs.md) for immutable effect masks, preblur inputs and owned on-demand widget frame callbacks.
+
+[TextIndex](docs/TextBoundary.md) supplies an immutable, window-free UTF-8/UTF-16 map and extended grapheme/word movement with sparse ASCII storage. Unicode sources and license hashes are pinned in the package; execution checks remain deferred.
+
+[TextLine](docs/TextLine.md) shapes an unwrapped paragraph with native font services,
+returns UTF-16 caret/hit positions and visual selection spans, and rasterizes only
+the requested horizontal viewport. It constructs no OS text control.
+
+[TextRasterCache](docs/TextRasterCache.md) keeps native RGB and color-font palette
+pixels intact, bounds viewport images with an LRU, and reuses the same image when
+only opacity changes. Color and opacity checks are compiled; execution is deferred.
+
+[Custom text input providers](docs/TextInputProvider.md) expose bounded document
+ranges and caret geometry to native IME services without whole-document snapshot
+copies. Widgets share the host's Core event loop for owned timed work.
+
+[Widget interaction observers](docs/WidgetInteraction.md) keep weak, independent
+subscriptions to geometry, clipping and hover/press/focus metadata. Explicit
+popup frames and input regions support a painted bubble tail while preserving
+the origin's focus, click and pointer capture. Runtime checks remain deferred.

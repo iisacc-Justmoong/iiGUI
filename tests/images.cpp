@@ -21,7 +21,7 @@ void contracts() {
     static_assert(std::is_same_v<decltype(std::declval<const gui::RasterImage&>().rgba()),std::span<const std::uint8_t>>);
     check(!gui::rgba_image(0,1,{}),"zero size rejected");
     check(!gui::rgba_image(1,1,{1,2,3}),"truncated RGBA rejected");
-    check(!gui::rgba_image(2049,1,{}),"image dimensions bounded");
+    check(!gui::rgba_image(8193,1,{}),"image dimensions bounded");
     gui::CanvasFrame frame{.viewport={0,0,80,80}};
     frame.images.push_back({{1,1,16,16},solid(255,0,0)});
     check(gui::valid_canvas(frame),"image admitted through common canvas API");
@@ -85,7 +85,7 @@ void gpu(gui::Renderer renderer) {
         auto info=host.graphics_info();good(info,"GPU cache statistics");
         if(renderer==gui::Renderer::vulkan) check(info->api==gui::GraphicsApi::vulkan,"explicit Vulkan image path");
         check(info->foreground_rasterizations==2,"each changed layer rasterizes once");
-        check(info->foreground_texture_bytes==std::uint64_t(captured->width)*captured->height*8,"foreground VRAM accounted per active layer");
+        check(info->foreground_texture_bytes==std::uint64_t(std::ceil(64*scale))*std::uint64_t(std::ceil(64*scale))*4+std::uint64_t(std::ceil(16*scale))*std::uint64_t(std::ceil(16*scale))*4,"foreground VRAM uses the actual image regions");
         frame.overlays[0].panels[0].top={1,1,0,1};frame.overlays[0].panels[0].bottom={1,1,0,1};
         good(host.set_canvas(frame),"overlay background changes");captured=host.capture_canvas();good(captured,"updated background capture");
         check(at(32,32,0)>250 && at(32,32,1)>250,"background-only change reaches GPU");
@@ -99,7 +99,7 @@ void gpu(gui::Renderer renderer) {
         check(at(32,32,0)>250 && at(32,32,1)<5 && at(44,44,2)>250 && at(50,44,2)<5,"layer clip must cover both panels and foreground images");
         check(host.graphics_info()->foreground_rasterizations==3,"clip-only update rerasterized cached foreground");
         frame.overlays.clear();good(host.set_canvas(frame),"popup dismissed");good(host.capture_canvas(),"base content restored");
-        check(host.graphics_info()->foreground_texture_bytes==std::uint64_t(captured->width)*captured->height*4,"dismissal releases overlay foreground storage");
+        check(host.graphics_info()->foreground_texture_bytes==std::uint64_t(std::ceil(64*scale))*std::uint64_t(std::ceil(64*scale))*4,"dismissal releases overlay foreground storage");
         good(host.request_close(),"image host closes");
     }}),"native image rendering lifecycle");
 }

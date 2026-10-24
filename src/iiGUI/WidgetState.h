@@ -7,6 +7,7 @@ struct WidgetFrameHooks final {
     std::function<void(bool)> activity;
     std::shared_ptr<MotionPreferences> preferences;
     Renderer renderer=Renderer::automatic;
+    std::function<core::Result<runtime::EventLoop*>()> events;
 };
 class WidgetState final : public std::enable_shared_from_this<WidgetState> {
 public:
@@ -16,6 +17,11 @@ public:
     ~WidgetState();
     [[nodiscard]] core::Result<void> ready() const;
     [[nodiscard]] core::Result<WidgetAppearance> appearance() const;
+    [[nodiscard]] core::Result<std::shared_ptr<MotionPreferences>> motion_preferences();
+    [[nodiscard]] core::Result<std::reference_wrapper<runtime::EventLoop>> event_loop();
+    [[nodiscard]] core::Result<void> ensure_frame_tick();
+    [[nodiscard]] core::Result<void> frame_handler(std::size_t,WidgetFrameHandler,bool);
+    [[nodiscard]] core::Result<void> request_frames(std::size_t);
     [[nodiscard]] core::Result<void> button_options(std::size_t,ButtonOptions);
     [[nodiscard]] core::Result<void> default_content(Widget,Widget);
     [[nodiscard]] core::Result<Widget> add(WidgetKind, Widget, std::string_view,
@@ -50,6 +56,9 @@ public:
     [[nodiscard]] core::Result<Widget> find(std::string_view);
     [[nodiscard]] core::Result<WidgetSnapshot> snapshot(std::size_t);
     [[nodiscard]] core::Result<WidgetPlacement> placement(std::size_t)const;
+    [[nodiscard]] core::Result<WidgetInteraction> interaction(std::size_t);
+    [[nodiscard]] core::Result<Size> measure(std::size_t,double);
+    [[nodiscard]] core::Result<void> observe_interaction(std::size_t,std::shared_ptr<const WidgetInteractionPort>);
     [[nodiscard]] core::Result<std::vector<WidgetSnapshot>> snapshots();
     [[nodiscard]] core::Result<void> text(std::size_t, std::string_view);
     [[nodiscard]] core::Result<void> label_options(std::size_t,LabelOptions);
@@ -91,6 +100,10 @@ public:
     [[nodiscard]] core::Result<void> paint_handler(std::size_t,WidgetPaintHandler,Widget);
     [[nodiscard]] core::Result<void> repaint(std::size_t);
     [[nodiscard]] core::Result<void> input_handler(std::size_t,WidgetInputHandler);
+    [[nodiscard]] core::Result<void> text_input_provider(std::size_t,std::shared_ptr<const TextInputProvider>);
+    [[nodiscard]] core::Result<TextInputState> text_input_state(std::size_t);
+    [[nodiscard]] core::Result<TextContent> text_content(std::size_t,TextRange);
+    [[nodiscard]] core::Result<std::size_t> text_position(std::size_t,double,double);
     [[nodiscard]] core::Result<void> stack_options(std::size_t,StackOptions);
     [[nodiscard]] core::Result<void> button_style(std::size_t,ButtonStyle);
     [[nodiscard]] core::Result<void> button_icon(std::size_t,std::shared_ptr<const RasterImage>,std::string_view);
@@ -111,6 +124,8 @@ private:
     Widget publish(std::size_t, WidgetKind, std::string_view);
     CanvasFrame frame(Size,std::size_t* popup_start=nullptr);
     core::Result<void> flush_viewports();
+    core::Result<void> flush_interactions();
+    core::Result<void> input_impl(const WidgetInput&);
     core::Result<bool> route_input_handler(const WidgetInput&);
     core::Result<void> create_popup_content(std::size_t);
     core::Result<void> route_content(const WidgetInput&,bool& handled);

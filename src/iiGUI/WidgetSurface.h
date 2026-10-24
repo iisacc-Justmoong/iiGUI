@@ -13,6 +13,8 @@ struct WidgetSurfaceCallbacks final {
     std::function<std::vector<WidgetSnapshot>()> accessibility;
     std::function<WidgetSnapshot(std::string_view)> lookup;
     std::function<void(std::exception_ptr)> failure;
+    std::function<core::Result<TextContent>(std::string_view,TextRange)> text_content;
+    std::function<core::Result<std::size_t>(std::string_view,double,double)> text_position;
     Renderer renderer=Renderer::automatic;
 };
 class WidgetSurface final {

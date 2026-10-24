@@ -192,7 +192,8 @@ struct Host::Impl {
                 if(!draining)guard([&]{refresh_frames();});
             },
             .preferences=motion_preferences,
-            .renderer=options.renderer
+            .renderer=options.renderer,
+            .events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;}
         };
     }
     void refresh_frames() {

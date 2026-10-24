@@ -1,6 +1,7 @@
 #include "VulkanCanvas.h"
 #include "VulkanWindow.h"
 #include "NativeText.h"
+#include "Image.h"
 #include "GpuEffects.h"
 #include "VulkanShaders.h"
 #include <algorithm>
@@ -71,7 +72,7 @@ struct VulkanCanvas::Impl final {
     VkFramebuffer framebuffer=VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptor_layout=VK_NULL_HANDLE;
     VkDescriptorPool descriptors=VK_NULL_HANDLE;
-    std::array<VkDescriptorSet,MaximumLayers*3> descriptor{};
+    std::array<VkDescriptorSet,MaximumLayers*4> descriptor{};
     VkPipelineLayout pipeline_layout=VK_NULL_HANDLE;
     VkPipeline panels_pipeline=VK_NULL_HANDLE,text_pipeline=VK_NULL_HANDLE,effect_pipeline=VK_NULL_HANDLE;
     VkSampler sampler=VK_NULL_HANDLE;
@@ -86,6 +87,16 @@ struct VulkanCanvas::Impl final {
         bool glyph_initialized=false,upload=false,foreground=false;
     };
     std::vector<Layer> layers;
+    struct EffectAsset{std::shared_ptr<const RasterImage> source;std::unique_ptr<Image> texture;std::unique_ptr<Buffer> upload;bool pending=true;};
+    std::vector<EffectAsset> effect_assets;
+    VkImageView effect_image(std::shared_ptr<const RasterImage> source){
+        for(const auto& asset:effect_assets)if(asset.source==source)return asset.texture->view;
+        const auto width=source?source->width():1,height=source?source->height():1;
+        auto pixels=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);auto upload=buffer(std::size_t(width)*height*4,VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+        if(source)std::memcpy(upload->mapped,source->rgba().data(),source->rgba().size());else std::memset(upload->mapped,0,4);
+        effect_assets.push_back({source,std::move(pixels),std::move(upload),true});++statistics.effect_image_uploads;return effect_assets.back().texture->view;
+    }
+
     std::optional<CanvasFrame> previous;
     double previous_scale=0;
     GraphicsInfo statistics;
@@ -107,7 +118,7 @@ struct VulkanCanvas::Impl final {
             if (command_pool) vkDestroyCommandPool(device,command_pool,nullptr);
             if (fence) vkDestroyFence(device,fence,nullptr);
             if (available) vkDestroySemaphore(device,available,nullptr);
-            color.reset();effect_content.reset();effect_current.reset(); layers.clear();
+            color.reset();effect_content.reset();effect_current.reset(); layers.clear();effect_assets.clear();
             vkDestroyDevice(device,nullptr);
         }
         if (surface) vkDestroySurfaceKHR(instance,surface,nullptr);
@@ -294,22 +305,24 @@ struct VulkanCanvas::Impl final {
         checked(vkCreateRenderPass(device,&pass,nullptr,&load_pass),"Cannot create retained Vulkan render pass");
         VkDescriptorSetLayoutBinding bindings[]{
             {0,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1,VK_SHADER_STAGE_VERTEX_BIT,nullptr},
-            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr}};
+            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
+            {2,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
+            {3,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr}};
         VkDescriptorSetLayoutCreateInfo layout{}; layout.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layout.bindingCount=2; layout.pBindings=bindings;
+        layout.bindingCount=4; layout.pBindings=bindings;
         checked(vkCreateDescriptorSetLayout(device,&layout,nullptr,&descriptor_layout),"Cannot create Vulkan descriptors");
         VkPushConstantRange push{VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(GpuEffect)};
         VkPipelineLayoutCreateInfo pipeline_info{}; pipeline_info.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipeline_info.setLayoutCount=1; pipeline_info.pSetLayouts=&descriptor_layout;
         pipeline_info.pushConstantRangeCount=1; pipeline_info.pPushConstantRanges=&push;
         checked(vkCreatePipelineLayout(device,&pipeline_info,nullptr,&pipeline_layout),"Cannot create Vulkan pipeline layout");
-        const VkDescriptorPoolSize sizes[]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,MaximumLayers*3},{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,MaximumLayers*3}};
+        const VkDescriptorPoolSize sizes[]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,MaximumLayers*4},{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,MaximumLayers*12}};
         VkDescriptorPoolCreateInfo pool{}; pool.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool.maxSets=MaximumLayers*3; pool.poolSizeCount=2; pool.pPoolSizes=sizes;
+        pool.maxSets=MaximumLayers*4; pool.poolSizeCount=2; pool.pPoolSizes=sizes;
         checked(vkCreateDescriptorPool(device,&pool,nullptr,&descriptors),"Cannot create Vulkan descriptor pool");
         VkDescriptorSetAllocateInfo allocation{}; allocation.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        std::array<VkDescriptorSetLayout,MaximumLayers*3> layouts; layouts.fill(descriptor_layout);
-        allocation.descriptorPool=descriptors; allocation.descriptorSetCount=MaximumLayers*3; allocation.pSetLayouts=layouts.data();
+        std::array<VkDescriptorSetLayout,MaximumLayers*4> layouts; layouts.fill(descriptor_layout);
+        allocation.descriptorPool=descriptors; allocation.descriptorSetCount=MaximumLayers*4; allocation.pSetLayouts=layouts.data();
         checked(vkAllocateDescriptorSets(device,&allocation,descriptor.data()),"Cannot allocate Vulkan layer descriptor sets");
         VkSamplerCreateInfo sampling{}; sampling.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         sampling.magFilter=sampling.minFilter=VK_FILTER_LINEAR; sampling.mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
@@ -443,7 +456,24 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
         layers.resize(views.size());statistics.foreground_texture_bytes=0;
         const bool effects=std::ranges::any_of(views,[](const auto& layer){return layer.backdrop||layer.shadow;});
         if(effects&&!effect_content){effect_content=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);effect_current=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);statistics.cached_texture_bytes+=std::uint64_t(width)*height*8;}
-        if(effects)for(std::size_t i=0;i<views.size();++i)for(bool current:{false,true}){VkDescriptorImageInfo texture{sampler,current?effect_current->view:effect_content->view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};VkWriteDescriptorSet write{};write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;write.dstSet=descriptor[(current?2:1)*MaximumLayers+i];write.dstBinding=1;write.descriptorCount=1;write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pImageInfo=&texture;vkUpdateDescriptorSets(device,1,&write,0,nullptr);}
+        if(effects)for(std::size_t i=0;i<views.size();++i)for(unsigned bank:{1u,2u,3u}){VkDescriptorImageInfo texture{sampler,bank==2?effect_current->view:effect_content->view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};VkWriteDescriptorSet write{};write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;write.dstSet=descriptor[bank*MaximumLayers+i];write.dstBinding=1;write.descriptorCount=1;write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pImageInfo=&texture;vkUpdateDescriptorSets(device,1,&write,0,nullptr);}
+        std::vector<std::shared_ptr<const RasterImage>> needed;if(effects)needed.push_back({});
+        const auto need=[&](const auto& image){if(image&&std::ranges::find(needed,image)==needed.end())needed.push_back(image);};
+        for(const auto& view:views){if(view.shadow)need(view.shadow->mask);if(view.backdrop){need(view.backdrop->mask);need(view.backdrop->underlay);}}
+        std::uint64_t effect_bytes=0;for(const auto& image:needed)effect_bytes+=image?image->rgba().size():4;
+        statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);if(effect_bytes>statistics.effect_texture_budget_bytes)throw std::runtime_error("Effect image storage exceeds the effect budget");
+        std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(needed,asset.source)==needed.end();});
+        statistics.effect_image_texture_bytes=effect_bytes;
+        for(const auto& image:needed)effect_image(image);
+        if(effects)for(std::size_t i=0;i<views.size();++i){
+            const auto set_images=[&](std::size_t bank,std::shared_ptr<const RasterImage> mask,std::shared_ptr<const RasterImage> underlay){
+                const VkDescriptorImageInfo images[]{{sampler,effect_image(mask),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},{sampler,effect_image(underlay),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+                VkWriteDescriptorSet writes[2]{};for(unsigned index=0;index<2;++index){auto& w=writes[index];w.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;w.dstSet=descriptor[bank*MaximumLayers+i];w.dstBinding=index+2;w.descriptorCount=1;w.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;w.pImageInfo=&images[index];}vkUpdateDescriptorSets(device,2,writes,0,nullptr);
+            };
+            // Shadow and backdrop have independent descriptor banks so one draw
+            // cannot retroactively change another draw in the command buffer.
+            const auto& view=views[i];set_images(3,view.shadow?view.shadow->mask:std::shared_ptr<const RasterImage>{},{});set_images(1,view.backdrop?view.backdrop->mask:std::shared_ptr<const RasterImage>{},view.backdrop?view.backdrop->underlay:std::shared_ptr<const RasterImage>{});set_images(2,view.backdrop?view.backdrop->mask:std::shared_ptr<const RasterImage>{},view.backdrop?view.backdrop->underlay:std::shared_ptr<const RasterImage>{});
+        }
         for(std::size_t i=0;i<views.size();++i) {
             auto& layer=layers[i];const auto view=views[i];
             const auto instances=pack_panels(view.panels,view.content_transform);layer.panel_count=instances.size();
@@ -476,6 +506,12 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
     }
     begin();
     if (changed) {
+        for(auto& asset:effect_assets)if(asset.pending){
+            barrier(asset.texture->handle,VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,0,VK_ACCESS_TRANSFER_WRITE_BIT,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT);
+            VkBufferImageCopy copy{};copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};copy.imageExtent={asset.source?asset.source->width():1,asset.source?asset.source->height():1,1};
+            vkCmdCopyBufferToImage(command,asset.upload->handle,asset.texture->handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
+            barrier(asset.texture->handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);asset.pending=false;
+        }
         for(auto& layer:layers) if(layer.upload) {
             barrier(layer.glyphs->handle,layer.glyph_initialized?VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,layer.glyph_initialized?VK_ACCESS_SHADER_READ_BIT:0,VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -501,7 +537,7 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
             const auto clip=clip_pixels(views[i],scale,width,height);
             if(clip.width&&clip.height){
                 const VkRect2D scissor{{std::int32_t(clip.x),std::int32_t(clip.y)},{clip.width,clip.height}};vkCmdSetScissor(command,0,1,&scissor);
-                const auto effect=[&](bool shadow){const auto parameters=effect_parameters(views[i],frame.viewport,scale,shadow);const auto descriptor_index=(shadow||views[i].backdrop->source==BackdropSource::content?1:2)*MaximumLayers+i;vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&descriptor[descriptor_index],0,nullptr);vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(parameters),&parameters);vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,effect_pipeline);vkCmdDraw(command,6,1,0,0);};
+                const auto effect=[&](bool shadow){const auto parameters=effect_parameters(views[i],frame.viewport,scale,shadow);const auto descriptor_index=(shadow?3:views[i].backdrop->source==BackdropSource::content?1:2)*MaximumLayers+i;vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&descriptor[descriptor_index],0,nullptr);vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(parameters),&parameters);vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,effect_pipeline);vkCmdDraw(command,6,1,0,0);};
                 if(views[i].shadow)effect(true);if(views[i].backdrop)effect(false);
                 const float size[]{frame.viewport.width,frame.viewport.height};vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT,0,sizeof(size),size);
                 vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&descriptor[i],0,nullptr);

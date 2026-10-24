@@ -69,12 +69,23 @@ struct BackdropMaterial final {
     Color tint{0,0,0,0},border{0,0,0,0};
     float border_width=0;
     BackdropSource source=BackdropSource::content;
+    // A mask uses immutable image alpha mapped to bounds. Custom-mask borders
+    // belong in a vector/image foreground (border_width must be zero).
+    std::shared_ptr<const RasterImage> mask;
+    // Composited in linear premultiplied light before the Gaussian blur.
+    std::shared_ptr<const RasterImage> underlay;
+    Rect underlay_bounds;
+    Color base{0,0,0,0};
+    bool capture=true;
+    float inner_highlight_opacity=0,inner_highlight_offset_y=1;
+    std::optional<Color> underlay_tint;
     friend bool operator==(const BackdropMaterial&,const BackdropMaterial&)=default;
 };
 struct BoxShadow final {
     Rect bounds;
     float radius=0,blur_radius=32;
     Color color{0,0,0,.28f};
+    std::shared_ptr<const RasterImage> mask;
     friend bool operator==(const BoxShadow&,const BoxShadow&)=default;
 };
 struct ContentTransform final {
@@ -131,6 +142,7 @@ struct GraphicsInfo final {
     bool shadow_supported=false;
     std::uint64_t shadow_masks=0,shadow_blurs=0,shadow_texture_bytes=0;
     bool content_transform_supported=false;
+    std::uint64_t effect_image_uploads=0,effect_image_texture_bytes=0,effect_texture_budget_bytes=0;
 };
 struct PixelBuffer final {
     std::uint32_t width = 0, height = 0;

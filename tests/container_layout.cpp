@@ -55,7 +55,7 @@ void run(const std::string& name){
             check(take(child.snapshot()).parent_id==(name=="nested"?"inner":"slot")&&take(popup.snapshot()).parent_id=="host","Default slot redirected a popup owner or lost ordinary children");
             if(name=="cancellation"||name=="retirement"){
                 good(child.focus());const auto r=take(child.snapshot()).bounds;good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_down,.x=r.x+r.width/2,.y=r.y+r.height/2}));good(row.set_enabled(false));check(canceled==1,"Container disable did not cancel a descendant press");
-                if(name=="retirement")check(!child.snapshot(),"Cancellation receiver did not retire its scope");else{check(!take(child.snapshot()).enabled&&!take(child.snapshot()).focused&&!take(child.snapshot()).pressed&&!child.activate(),"Disabled ancestor retained active input");good(row.set_enabled(true));good(child.activate());check(clicked==1,"Ancestor re-enable did not restore requested child state");}
+                if(name=="retirement")check(!child.snapshot(),"Cancellation receiver did not retire its scope");else{check(!take(child.snapshot()).enabled&&!take(child.snapshot()).focused&&!take(child.snapshot()).pressed ,"Disabled ancestor retained active input");good(child.activate());check(clicked==0,"Disabled ancestor dispatched activation");good(row.set_enabled(true));good(child.activate());check(clicked==1,"Ancestor re-enable did not restore requested child state");}
             }
         }
         good(host.request_close());

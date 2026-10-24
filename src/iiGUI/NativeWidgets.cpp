@@ -18,6 +18,9 @@ core::Result<void> Widget::set_text(std::string_view text) const {
     return (*state)->text(index_, text);
 }
 core::Result<WidgetPlacement> Widget::placement()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->placement(index_);}
+core::Result<WidgetInteraction> Widget::interaction()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->interaction(index_);}
+core::Result<Size> Widget::measure(double w)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->measure(index_,w);}
+core::Result<void> Widget::observe_interaction(std::shared_ptr<const WidgetInteractionPort> p)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->observe_interaction(index_,std::move(p));}
 core::Result<void> Widget::set_label_options(LabelOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->label_options(index_,std::move(v));}
 core::Result<void> Widget::set_input_options(InputOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->input_options(index_,std::move(v));}
 core::Result<void> Widget::set_clip_content(bool v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->clip_content(index_,v);}
@@ -79,10 +82,17 @@ core::Result<void> Widget::set_content(WidgetFactory factory,std::function<core:
 core::Result<void> Widget::clear_content() const {return set_content({});}
 core::Result<Widget> Widget::content_item(std::string_view id) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->content_item(index_,id);}
 core::Result<void> Widget::set_layout_handler(std::function<void(Rect)> v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->layout_handler(index_,std::move(v));}
+core::Result<void> Widget::set_paint_handler(WidgetPaintHandler callback)const{return set_paint_handler(std::move(callback),Widget{});}
 core::Result<void> Widget::set_paint_handler(WidgetPaintHandler callback,Widget owner)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->paint_handler(index_,std::move(callback),owner);}
 core::Result<void> Widget::request_repaint()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->repaint(index_);}
+core::Result<void> Widget::set_frame_handler(WidgetFrameHandler h,bool active)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->frame_handler(index_,std::move(h),active);}
+core::Result<void> Widget::request_frames()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->request_frames(index_);}
+
 core::Result<void> Widget::set_drawing(WidgetDrawing v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->drawing(index_,std::move(v));}
 core::Result<void> Widget::set_input_handler(WidgetInputHandler v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->input_handler(index_,std::move(v));}
+core::Result<void> Widget::set_text_input_provider(std::shared_ptr<const TextInputProvider> v)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_input_provider(index_,std::move(v));}
+core::Result<TextContent> Widget::text_content(TextRange r)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_content(index_,r);}
+core::Result<std::size_t> Widget::text_position(double x,double y)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_position(index_,x,y);}
 core::Result<void> Widget::set_stack_options(StackOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->stack_options(index_,std::move(v));}
 core::Result<void> Widget::set_button_style(ButtonStyle v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->button_style(index_,std::move(v));}
 core::Result<void> Widget::set_button_icon(std::shared_ptr<const RasterImage> v,std::string_view name) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->button_icon(index_,std::move(v),name);}
@@ -101,6 +111,8 @@ core::Result<WidgetSnapshot> Widget::snapshot() const {
 WidgetMount::WidgetMount(std::weak_ptr<detail::WidgetState> state)
     : state_(std::move(state)), owner_(std::this_thread::get_id()) {}
 core::Result<WidgetAppearance> WidgetBuilder::appearance() const {return state_->appearance();}
+core::Result<std::shared_ptr<MotionPreferences>> WidgetBuilder::motion_preferences()const{return state_->motion_preferences();}
+core::Result<std::reference_wrapper<runtime::EventLoop>> WidgetBuilder::event_loop()const{return state_->event_loop();}
 core::Result<std::shared_ptr<detail::WidgetState>> WidgetMount::lock() const {
     if (owner_ != std::thread::id{} && owner_ != std::this_thread::get_id())
         return core::fail(core::ErrorCode::wrong_executor, "Native mount requires the host thread");

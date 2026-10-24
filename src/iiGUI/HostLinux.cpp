@@ -153,7 +153,7 @@ struct Host::Impl {
         auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{if(frames())(void)frames()->step();if(widgets)widgets->present();auto active=children;for(auto* child:active)if(child->phase==Phase::running)child->drain();});});}));
         if(!scheduled)throw std::runtime_error("Cannot admit native frame cadence");cadence=scheduled.token;
     }
-    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer};}
+    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;}};}
     void drain() noexcept {
         if (phase != Phase::running || draining) return;
         if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;if(callbacks.opened)callbacks.opened();}for(int i=0;i<64&&phase==Phase::running&&display&&XPending(display);++i){XEvent event{};XNextEvent(display,&event);native_event(event);}if(widgets)widgets->present();});return;}

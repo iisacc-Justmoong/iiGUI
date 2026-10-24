@@ -4,6 +4,8 @@
 #import <QuartzCore/CAMetalLayer.h>
 #include "NativeCanvas.h"
 #include "NativeText.h"
+#include "Image.h"
+#include "GpuEffects.h"
 #include <array>
 #include <optional>
 
@@ -51,21 +53,27 @@ fragment float4 text_fragment(float4 position [[position]], texture2d<float> gly
     float4 b=mix(premultiplied_read(glyphs,p+int2(0,1)),premultiplied_read(glyphs,p+int2(1,1)),f.x);
     return mix(a,b,f.y)*transform.w;
 }
-struct Material {float4 bounds,source,tint,border;float radius,border_width,pad0,pad1;};
-float rounded_distance(float2 local,float2 size,float radius) {
-    float2 q=abs(local-size*.5)-(size*.5-radius);
-    return length(max(q,float2(0)))+min(max(q.x,q.y),0.)-radius;
+struct Material {float4 bounds,source,tint,border;float radius,border_width,flags,opacity;float4 underlay,base,highlight;};
+float rounded_distance(float2 local,float2 size,float radius){float2 q=abs(local-size*.5)-(size*.5-radius);return length(max(q,float2(0)))+min(max(q.x,q.y),0.)-radius;}
+bool material_flag(constant Material& m,uint flag){return (uint(m.flags)&flag)!=0;}
+float material_mask(float2 point,constant Material& m,texture2d<float> shape){
+    if(material_flag(m,2)){float2 uv=(point-m.bounds.xy)/m.bounds.zw;if(any(uv<0)||any(uv>1))return 0;constexpr sampler filter(coord::normalized,address::clamp_to_zero,filter::linear);return shape.sample(filter,uv).a;}
+    return clamp(.5-rounded_distance(point-m.bounds.xy,m.bounds.zw,m.radius),0.,1.);
 }
-fragment float4 material_fragment(float4 position [[position]],texture2d<float> image [[texture(0)]],constant Material& m [[buffer(0)]]) {
-    float2 local=position.xy-m.bounds.xy;
-    float coverage=clamp(.5-rounded_distance(local,m.bounds.zw,m.radius),0.,1.);
-    float inner=clamp(.5-rounded_distance(local-m.border_width,m.bounds.zw-2*m.border_width,max(0.,m.radius-m.border_width)),0.,1.);
-    inner=min(inner,coverage);
-    uint2 uv=uint2(clamp(position.xy-m.source.xy,float2(0),m.source.zw-1));
-    float4 base=image.read(uv);
-    float3 fill=m.tint.rgb*m.tint.a+base.rgb*(1-m.tint.a);
-    float3 border=m.border.rgb*m.border.a+base.rgb*(1-m.border.a);
-    return float4(fill*inner+border*(coverage-inner),coverage);
+float4 material_over(float4 a,float4 b){return a+b*(1-a.a);}
+fragment float4 material_copy_fragment(float4 position [[position]],texture2d<float> scene [[texture(0)]],texture2d<float> underlay [[texture(2)]],constant Material& m [[buffer(0)]]){
+    float2 global=position.xy+m.source.xy;float4 base=float4(m.base.rgb*m.base.a,m.base.a);
+    if(material_flag(m,8)){uint2 point=uint2(clamp(global,float2(0),float2(scene.get_width()-1,scene.get_height()-1)));float4 value=scene.read(point);value.rgb*=value.a;base=material_over(value,base);}
+    if(material_flag(m,4)){float2 uv=(global-m.underlay.xy)/m.underlay.zw;if(all(uv>=0)&&all(uv<=1)){constexpr sampler filter(coord::normalized,address::clamp_to_zero,filter::linear);float4 value=underlay.sample(filter,uv);if(material_flag(m,16)){float4 tint=float4(float2(as_type<half2>(as_type<uint>(m.highlight.z))),float2(as_type<half2>(as_type<uint>(m.highlight.w))));value=float4(tint.rgb,value.a*tint.a);}value.rgb*=value.a;base=material_over(value,base);}}
+    return base;
+}
+fragment float4 material_fragment(float4 position [[position]],texture2d<float> image [[texture(0)]],texture2d<float> shape [[texture(1)]],constant Material& m [[buffer(0)]]){
+    float coverage=material_mask(position.xy,m,shape);uint2 uv=uint2(clamp(position.xy-m.source.xy,float2(0),m.source.zw-1));float4 paint=image.read(uv);paint=material_over(float4(m.tint.rgb*m.tint.a,m.tint.a),paint);
+    if(m.border_width>0&&m.border.a>0){float inner=clamp(.5-rounded_distance(position.xy-m.bounds.xy-m.border_width,m.bounds.zw-2*m.border_width,max(0.,m.radius-m.border_width)),0.,1.);float alpha=clamp((coverage-inner)/max(coverage,.0001),0.,1.)*m.border.a;paint=material_over(float4(m.border.rgb*alpha,alpha),paint);}
+    float highlight=m.highlight.x*clamp((coverage-material_mask(position.xy-float2(0,m.highlight.y),m,shape))/max(coverage,.0001),0.,1.);paint=material_over(float4(highlight),paint);return paint*(coverage*m.opacity);
+}
+fragment float4 image_mask_fragment(float4 position [[position]],texture2d<float> mask [[texture(0)]],constant float4& bounds [[buffer(0)]]){
+    float2 uv=(position.xy-bounds.xy)/bounds.zw;if(any(uv<0)||any(uv>1))return float4(0);constexpr sampler filter(coord::normalized,address::clamp_to_zero,filter::linear);return float4(mask.sample(filter,uv).a);
 }
 struct Shadow {float4 source,color,viewport;};
 struct ShadowVertex {float4 position [[position]];float2 uv;};
@@ -95,22 +103,34 @@ struct PlatformCanvas::Impl final {
     id<MTLLibrary> program=nil;
     id<MTLRenderPipelineState> pipeline = nil;
     id<MTLRenderPipelineState> text_pipeline = nil;
-    id<MTLRenderPipelineState> material_pipeline = nil;
-    id<MTLRenderPipelineState> shadow_mask_pipeline=nil,shadow_pipeline=nil;
+    id<MTLRenderPipelineState> material_pipeline = nil,material_copy_pipeline=nil;
+    id<MTLRenderPipelineState> shadow_mask_pipeline=nil,shadow_image_mask_pipeline=nil,shadow_pipeline=nil;
     id<MTLTexture> texture = nil;
     id<MTLCommandBuffer> submitted = nil;
     struct MaterialCache final {
         id<MTLTexture> source=nil,blurred=nil;MPSImageGaussianBlur* kernel=nil;
         Rect region;float sigma=0;BackdropSource source_kind=BackdropSource::content;
-        bool valid=false,copy_needed=false,blur_needed=false;
+        bool valid=false,copy_needed=false,blur_needed=false;BackdropMaterial inputs;
     };
     struct ShadowCache final {
         id<MTLTexture> mask=nil,blurred=nil;MPSImageGaussianBlur* kernel=nil;
         std::array<float,4> shape{};double scale=0;float padding=0;
-        bool valid=false,dirty=false;
+        bool valid=false,dirty=false;std::shared_ptr<const RasterImage> source_mask;
     };
     struct Layer final { id<MTLTexture> foreground=nil; ForegroundKey key;PixelClip region{};MaterialCache material;ShadowCache shadow; };
     std::vector<Layer> layers;
+    struct EffectAsset{std::shared_ptr<const RasterImage> image;id<MTLTexture> texture=nil;};std::vector<EffectAsset> effect_assets;
+    id<MTLTexture> effect_image(std::shared_ptr<const RasterImage> image){
+        for(const auto& asset:effect_assets)if(asset.image==image)return asset.texture;
+        const auto width=image?image->width():1,height=image?image->height():1;auto d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB width:width height:height mipmapped:NO];d.storageMode=MTLStorageModeShared;d.usage=MTLTextureUsageShaderRead;
+        auto texture=[device newTextureWithDescriptor:d];require(texture!=nil,"Cannot allocate effect image");const std::uint8_t empty[4]{};[texture replaceRegion:MTLRegionMake2D(0,0,width,height) mipmapLevel:0 withBytes:image?image->rgba().data():empty bytesPerRow:width*4];effect_assets.push_back({image,texture});++statistics.effect_image_uploads;return texture;
+    }
+    struct alignas(16) MaterialUniform{float bounds[4],source[4],tint[4],border[4],radius,border_width,flags,opacity,underlay[4],base[4],highlight[4];};
+    static_assert(sizeof(MaterialUniform)==128);
+    MaterialUniform material_uniform(const BackdropMaterial& m,Rect region,double scale,float opacity){
+        MaterialUniform u{{float(m.bounds.x*scale),float(m.bounds.y*scale),float(m.bounds.width*scale),float(m.bounds.height*scale)},{region.x,region.y,region.width,region.height},{m.tint.red,m.tint.green,m.tint.blue,m.tint.alpha},{m.border.red,m.border.green,m.border.blue,m.border.alpha},float(m.radius*scale),float(std::min(double(m.border_width),double(std::min(m.bounds.width,m.bounds.height)/2))*scale),float((m.mask?2:0)|(m.underlay?4:0)|(m.capture?8:0)|(m.underlay_tint?16:0)),opacity,{float(m.underlay_bounds.x*scale),float(m.underlay_bounds.y*scale),float(m.underlay_bounds.width*scale),float(m.underlay_bounds.height*scale)},{m.base.red,m.base.green,m.base.blue,m.base.alpha},{m.inner_highlight_opacity,float(m.inner_highlight_offset_y*scale),0,0}};if(m.underlay_tint){const auto tint=*m.underlay_tint;u.highlight[2]=half_pair(tint.red,tint.green);u.highlight[3]=half_pair(tint.blue,tint.alpha);}return u;
+    }
+
     std::optional<CanvasFrame> previous;
     double previous_scale=0;
     GraphicsInfo statistics;
@@ -145,6 +165,9 @@ struct PlatformCanvas::Impl final {
         descriptor.fragmentFunction=[library newFunctionWithName:@"material_fragment"];
         material_pipeline=[device newRenderPipelineStateWithDescriptor:descriptor error:&error];
         if(!material_pipeline)throw metal_error(error);
+        descriptor.fragmentFunction=[library newFunctionWithName:@"material_copy_fragment"];
+        material_copy_pipeline=[device newRenderPipelineStateWithDescriptor:descriptor error:&error];if(!material_copy_pipeline)throw metal_error(error);
+
         layer = [CAMetalLayer layer];
         layer.device = device;
         layer.pixelFormat = MTLPixelFormatBGRA8Unorm_sRGB;
@@ -177,6 +200,9 @@ struct PlatformCanvas::Impl final {
         descriptor.colorAttachments[0].pixelFormat=MTLPixelFormatR8Unorm;
         shadow_mask_pipeline=[device newRenderPipelineStateWithDescriptor:descriptor error:&error];
         if(!shadow_mask_pipeline)throw metal_error(error);
+        descriptor.vertexFunction=[program newFunctionWithName:@"text_vertex"];descriptor.fragmentFunction=[program newFunctionWithName:@"image_mask_fragment"];
+        shadow_image_mask_pipeline=[device newRenderPipelineStateWithDescriptor:descriptor error:&error];if(!shadow_image_mask_pipeline)throw metal_error(error);
+
         descriptor.vertexFunction=[program newFunctionWithName:@"shadow_vertex"];
         descriptor.fragmentFunction=[program newFunctionWithName:@"shadow_fragment"];
         auto color=descriptor.colorAttachments[0];color.pixelFormat=MTLPixelFormatBGRA8Unorm_sRGB;
@@ -197,13 +223,20 @@ struct PlatformCanvas::Impl final {
         for(std::size_t i=0;i<views.size();++i)if(views[i].backdrop){const auto& m=*views[i].backdrop;auto region=views[i];region.content_transform={};const auto p=m.blur_radius;region.clip=Rect{m.bounds.x-p,m.bounds.y-p,m.bounds.width+2*p,m.bounds.height+2*p};auto r=clip_pixels(region,scale,width,height);regions[i]={float(r.x),float(r.y),float(r.width),float(r.height)};bytes+=std::uint64_t(r.width)*r.height*(m.blur_radius>0?12:4);}
         std::uint64_t shadow_bytes=0;
         for(const auto& layer:views)if(layer.shadow){const auto [w,h]=shadow_extent(*layer.shadow,scale);shadow_bytes+=std::uint64_t(w)*h*(layer.shadow->blur_radius>0?3:1);}
-        require(bytes+shadow_bytes<=64ull*1024*1024,"GPU shadow/backdrop working textures exceed 64 MiB");
+        std::vector<std::shared_ptr<const RasterImage>> needed;
+        if(std::ranges::any_of(views,[](const auto& view){return view.backdrop.has_value();}))needed.push_back({});
+        const auto add=[&](const auto& image){if(image&&std::ranges::find(needed,image)==needed.end())needed.push_back(image);};
+        for(const auto& view:views){if(view.backdrop){add(view.backdrop->mask);add(view.backdrop->underlay);}if(view.shadow)add(view.shadow->mask);}
+        std::uint64_t asset_bytes=0;for(const auto& image:needed)asset_bytes+=image?image->rgba().size():4;
+        statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);require(bytes+shadow_bytes+asset_bytes<=statistics.effect_texture_budget_bytes,"GPU shadow/backdrop working textures exceed the effect budget");
+        std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(needed,asset.image)==needed.end();});for(const auto& image:needed)effect_image(image);statistics.effect_image_texture_bytes=asset_bytes;
+
         for(std::size_t i=0;i<views.size();++i){auto& cached=layers[i].material;if(!views[i].backdrop||regions[i].width<=0||regions[i].height<=0){cached={};continue;}const auto& m=*views[i].backdrop;const auto region=regions[i];const auto sigma=m.blur_radius>0?float(std::max(.01,double(m.blur_radius)*scale/3)):0.f;
-            const bool geometry_changed=cached.region!=region;cached.copy_needed=!cached.valid||base_changed||geometry_changed||cached.source_kind!=m.source||m.source==BackdropSource::previous_layers;cached.blur_needed=sigma>0&&(cached.copy_needed||cached.sigma!=sigma||!cached.blurred);
-            if(!cached.source||cached.source.width!=region.width||cached.source.height!=region.height){auto d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm_sRGB width:NSUInteger(region.width) height:NSUInteger(region.height) mipmapped:NO];d.storageMode=MTLStorageModePrivate;d.usage=MTLTextureUsageShaderRead;cached.source=[device newTextureWithDescriptor:d];require(cached.source!=nil,"Cannot allocate GPU backdrop crop");cached.copy_needed=true;cached.blur_needed=sigma>0;}
+            const bool geometry_changed=cached.region!=region;const auto& previous=cached.inputs;const bool input_changed=previous.capture!=m.capture||previous.base!=m.base||previous.underlay!=m.underlay||previous.underlay_bounds!=m.underlay_bounds||previous.underlay_tint!=m.underlay_tint;cached.copy_needed=!cached.valid||geometry_changed||input_changed||(m.capture&&(base_changed||cached.source_kind!=m.source||m.source==BackdropSource::previous_layers));cached.blur_needed=sigma>0&&(cached.copy_needed||cached.sigma!=sigma||!cached.blurred);
+            if(!cached.source||cached.source.width!=region.width||cached.source.height!=region.height){auto d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm_sRGB width:NSUInteger(region.width) height:NSUInteger(region.height) mipmapped:NO];d.storageMode=MTLStorageModePrivate;d.usage=MTLTextureUsageShaderRead|MTLTextureUsageRenderTarget;cached.source=[device newTextureWithDescriptor:d];require(cached.source!=nil,"Cannot allocate GPU backdrop crop");cached.copy_needed=true;cached.blur_needed=sigma>0;}
             if(sigma>0){if(!cached.blurred||cached.blurred.width!=region.width||cached.blurred.height!=region.height){auto d=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float width:NSUInteger(region.width) height:NSUInteger(region.height) mipmapped:NO];d.storageMode=MTLStorageModePrivate;d.usage=MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;cached.blurred=[device newTextureWithDescriptor:d];require(cached.blurred!=nil,"Cannot allocate linear GPU blur target");cached.blur_needed=true;}if(!cached.kernel||cached.sigma!=sigma){cached.kernel=[[MPSImageGaussianBlur alloc] initWithDevice:device sigma:sigma];cached.kernel.edgeMode=MPSImageEdgeModeClamp;require(cached.kernel!=nil,"Cannot create native GPU Gaussian kernel");cached.blur_needed=true;}}
             else {cached.blurred=nil;cached.kernel=nil;}
-            cached.region=region;cached.sigma=sigma;cached.source_kind=m.source;if(cached.copy_needed||cached.blur_needed)cached.valid=false;
+            cached.region=region;cached.sigma=sigma;cached.source_kind=m.source;cached.inputs=m;if(cached.copy_needed||cached.blur_needed)cached.valid=false;
         }
         statistics.backdrop_texture_bytes=bytes;
         statistics.shadow_texture_bytes=shadow_bytes;
@@ -214,7 +247,7 @@ struct PlatformCanvas::Impl final {
             if(!views[index].shadow){cached={};continue;}
             const auto& shadow=*views[index].shadow;
             const std::array<float,4> shape{shadow.bounds.width,shadow.bounds.height,shadow.radius,shadow.blur_radius};
-            cached.dirty=!cached.valid||cached.shape!=shape||cached.scale!=scale;
+            cached.dirty=!cached.valid||cached.shape!=shape||cached.scale!=scale||cached.source_mask!=shadow.mask;
             if(!cached.dirty)continue;
             initialize_shadow_pipelines();
             const auto [width,height]=shadow_extent(shadow,scale);
@@ -230,21 +263,20 @@ struct PlatformCanvas::Impl final {
             attachment.texture=cached.mask;attachment.loadAction=MTLLoadActionClear;attachment.storeAction=MTLStoreActionStore;
             attachment.clearColor=MTLClearColorMake(0,0,0,0);
             auto encoder=[command renderCommandEncoderWithDescriptor:pass];require(encoder!=nil,"Cannot create shadow mask encoder");
-            [encoder setRenderPipelineState:shadow_mask_pipeline];
-            [encoder setVertexBytes:&panel length:sizeof(panel) atIndex:0];const float extent[]{float(width),float(height)};
-            [encoder setVertexBytes:extent length:sizeof(extent) atIndex:1];
-            [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:1];[encoder endEncoding];++masks;
+            if(shadow.mask){[encoder setRenderPipelineState:shadow_image_mask_pipeline];const float bounds[]{padding,padding,float(shadow.bounds.width*scale),float(shadow.bounds.height*scale)};[encoder setFragmentBytes:bounds length:sizeof(bounds) atIndex:0];[encoder setFragmentTexture:effect_image(shadow.mask) atIndex:0];[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];}
+            else{[encoder setRenderPipelineState:shadow_mask_pipeline];[encoder setVertexBytes:&panel length:sizeof(panel) atIndex:0];const float extent[]{float(width),float(height)};[encoder setVertexBytes:extent length:sizeof(extent) atIndex:1];[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 instanceCount:1];}
+            [encoder endEncoding];++masks;
             if(shadow.blur_radius>0){
                 if(!cached.blurred){auto descriptor=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatR16Float width:width height:height mipmapped:NO];descriptor.storageMode=MTLStorageModePrivate;descriptor.usage=MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;cached.blurred=[device newTextureWithDescriptor:descriptor];require(cached.blurred!=nil,"Cannot allocate blurred shadow mask");}
                 const auto sigma=float(std::max(.01,double(shadow.blur_radius)*scale/3));
                 if(!cached.kernel||cached.shape[3]!=shape[3]||cached.scale!=scale){cached.kernel=[[MPSImageGaussianBlur alloc] initWithDevice:device sigma:sigma];cached.kernel.edgeMode=MPSImageEdgeModeZero;require(cached.kernel!=nil,"Cannot create shadow Gaussian kernel");}
                 [cached.kernel encodeToCommandBuffer:command sourceTexture:cached.mask destinationTexture:cached.blurred];++blurs;
             }else{cached.blurred=nil;cached.kernel=nil;}
-            cached.shape=shape;cached.scale=scale;cached.padding=padding;cached.valid=false;
+            cached.source_mask=shadow.mask;cached.shape=shape;cached.scale=scale;cached.padding=padding;cached.valid=false;
         }
     }
-    void encode_material_source(id<MTLCommandBuffer> command,MaterialCache& cached,std::uint64_t& copies,std::uint64_t& blurs) {
-        if(cached.copy_needed){auto encoder=[command blitCommandEncoder];require(encoder!=nil,"Cannot create GPU backdrop copy encoder");[encoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(NSUInteger(cached.region.x),NSUInteger(cached.region.y),0) sourceSize:MTLSizeMake(NSUInteger(cached.region.width),NSUInteger(cached.region.height),1) toTexture:cached.source destinationSlice:0 destinationLevel:0 destinationOrigin:MTLOriginMake(0,0,0)];[encoder endEncoding];++copies;}
+    void encode_material_source(id<MTLCommandBuffer> command,MaterialCache& cached,const BackdropMaterial& material,double scale,std::uint64_t& copies,std::uint64_t& blurs){
+        if(cached.copy_needed){auto pass=[MTLRenderPassDescriptor renderPassDescriptor];auto color=pass.colorAttachments[0];color.texture=cached.source;color.loadAction=MTLLoadActionClear;color.storeAction=MTLStoreActionStore;color.clearColor=MTLClearColorMake(0,0,0,0);auto encoder=[command renderCommandEncoderWithDescriptor:pass];require(encoder!=nil,"Cannot create material input compositor");auto u=material_uniform(material,cached.region,scale,1);[encoder setRenderPipelineState:material_copy_pipeline];[encoder setFragmentTexture:texture atIndex:0];[encoder setFragmentTexture:effect_image(material.underlay) atIndex:2];[encoder setFragmentBytes:&u length:sizeof(u) atIndex:0];[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];[encoder endEncoding];++copies;}
         if(cached.blur_needed){[cached.kernel encodeToCommandBuffer:command sourceTexture:cached.source destinationTexture:cached.blurred];++blurs;}
     }
     void draw(const CanvasFrame& frame, double scale, double height) {
@@ -277,18 +309,22 @@ struct PlatformCanvas::Impl final {
             color.storeAction = MTLStoreActionStore;
             color.clearColor = MTLClearColorMake(frame.background.red, frame.background.green,
                                                 frame.background.blue, 1);
-            const auto views=canvas_layers(frame); layers.resize(views.size());
+            auto views=canvas_layers(frame);
+            for(auto& view:views){const auto t=view.content_transform;if(view.backdrop){auto& m=*view.backdrop;m.bounds=transform_rect(m.bounds,t);m.radius*=t.scale;m.blur_radius*=t.scale;m.border_width*=t.scale;m.inner_highlight_offset_y*=t.scale;if(m.underlay)m.underlay_bounds=transform_rect(m.underlay_bounds,t);}if(view.shadow){auto& shadow=*view.shadow;shadow.bounds=transform_rect(shadow.bounds,t);shadow.radius*=t.scale;shadow.blur_radius*=t.scale;shadow.color.alpha*=t.opacity;}}
+ layers.resize(views.size());
             prepare_materials(frame,scale,width,pixels_high,views);
             encode_shadows(command,views,scale,shadow_masks,shadow_blurs);
             auto encoder = [command renderCommandEncoderWithDescriptor:pass];
             require(encoder != nil, "Cannot create a Metal render encoder");
             statistics.foreground_texture_bytes=0;
             for(std::size_t index=0;index<views.size();++index) {
-                if(index==1){bool pending=false;for(const auto& l:layers)pending=pending||(l.material.source_kind==BackdropSource::content&&(l.material.copy_needed||l.material.blur_needed));if(pending){[encoder endEncoding];for(auto& l:layers)if(l.material.source_kind==BackdropSource::content&&(l.material.copy_needed||l.material.blur_needed))encode_material_source(command,l.material,copies,blurs);color.loadAction=MTLLoadActionLoad;encoder=[command renderCommandEncoderWithDescriptor:pass];require(encoder!=nil,"Cannot resume Metal render after content capture");}}
+                if(index==1){bool pending=false;for(const auto& l:layers)pending=pending||(l.material.source_kind==BackdropSource::content&&(l.material.copy_needed||l.material.blur_needed));if(pending){[encoder endEncoding];for(std::size_t j=0;j<layers.size();++j){auto& l=layers[j];if(views[j].backdrop&&l.material.source_kind==BackdropSource::content&&(l.material.copy_needed||l.material.blur_needed))encode_material_source(command,l.material,*views[j].backdrop,scale,copies,blurs);}color.loadAction=MTLLoadActionLoad;encoder=[command renderCommandEncoderWithDescriptor:pass];require(encoder!=nil,"Cannot resume Metal render after content capture");}}
                 const auto content=views[index]; auto& cached=layers[index];
                 const auto clip=clip_pixels(content,scale,width,pixels_high);
                 if(!clip.width || !clip.height) { cached.foreground=nil;cached.key={};continue; }
                 [encoder setScissorRect:MTLScissorRect{clip.x,clip.y,clip.width,clip.height}];
+                // Snapshot preceding layers before this layer's own shadow.
+                if(content.backdrop&&cached.material.source){auto& m=cached.material;if(m.source_kind==BackdropSource::previous_layers&&(m.copy_needed||m.blur_needed)){[encoder endEncoding];encode_material_source(command,m,*content.backdrop,scale,copies,blurs);color.loadAction=MTLLoadActionLoad;encoder=[command renderCommandEncoderWithDescriptor:pass];require(encoder!=nil,"Cannot resume Metal render after material capture");[encoder setScissorRect:MTLScissorRect{clip.x,clip.y,clip.width,clip.height}];}}
                 if(content.shadow&&cached.shadow.mask){
                     const auto& shadow=*content.shadow;const auto& mask=cached.shadow;
                     struct alignas(16) Uniform final {float source[4],color[4],viewport[4];};static_assert(sizeof(Uniform)==48);
@@ -298,9 +334,9 @@ struct PlatformCanvas::Impl final {
                     [encoder setFragmentBytes:&u length:sizeof(u) atIndex:0];[encoder setFragmentTexture:mask.blurred?mask.blurred:mask.mask atIndex:0];
                     [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
                 }
-                if(content.backdrop&&cached.material.source){auto& m=cached.material;if(m.source_kind==BackdropSource::previous_layers&&(m.copy_needed||m.blur_needed)){[encoder endEncoding];encode_material_source(command,m,copies,blurs);color.loadAction=MTLLoadActionLoad;encoder=[command renderCommandEncoderWithDescriptor:pass];require(encoder!=nil,"Cannot resume Metal render after material capture");[encoder setScissorRect:MTLScissorRect{clip.x,clip.y,clip.width,clip.height}];}
-                    const auto& f=*content.backdrop;struct alignas(16) Uniform final {float bounds[4],source[4],tint[4],border[4],radius,border_width,padding[2];};static_assert(sizeof(Uniform)==80);Uniform u{{float(f.bounds.x*scale),float(f.bounds.y*scale),float(f.bounds.width*scale),float(f.bounds.height*scale)},{m.region.x,m.region.y,m.region.width,m.region.height},{f.tint.red,f.tint.green,f.tint.blue,f.tint.alpha},{f.border.red,f.border.green,f.border.blue,f.border.alpha},float(f.radius*scale),float(std::min(double(f.border_width),double(std::min(f.bounds.width,f.bounds.height)/2))*scale),{0,0}};
-                    [encoder setRenderPipelineState:material_pipeline];[encoder setFragmentTexture:m.blurred?m.blurred:m.source atIndex:0];[encoder setFragmentBytes:&u length:sizeof(u) atIndex:0];[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
+                if(content.backdrop&&cached.material.source){auto& m=cached.material;
+                    const auto& f=*content.backdrop;const auto u=material_uniform(f,m.region,scale,content.content_transform.opacity);
+                    [encoder setRenderPipelineState:material_pipeline];[encoder setFragmentTexture:m.blurred?m.blurred:m.source atIndex:0];[encoder setFragmentTexture:effect_image(f.mask) atIndex:1];[encoder setFragmentBytes:&u length:sizeof(u) atIndex:0];[encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
                 }
                 [encoder setRenderPipelineState:pipeline];
                 const auto panels=pack_panels(content.panels,content.content_transform);

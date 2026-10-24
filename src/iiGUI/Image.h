@@ -8,7 +8,10 @@
 #include <vector>
 
 namespace ii::gui {
+inline constexpr std::uint32_t maximum_image_dimension=8192;
+inline constexpr std::uint64_t maximum_image_pixels=16ull*1024*1024;
 enum class ImageFit {stretch,contain,cover};
+enum class ImageStatus {empty,ready};
 // Immutable encoded-sRGB, straight-alpha RGBA8. Pointer identity is a stable
 // render-cache key. Creation transfers the byte buffer; clients cannot mutate it.
 class IIGUI_EXPORT RasterImage final {
@@ -26,7 +29,7 @@ private:
     std::uint32_t width,std::uint32_t height,std::vector<std::uint8_t> rgba);
 // Memory-only PNG, <=8 MiB and 1..2048 pixels per dimension. No file/network I/O.
 [[nodiscard]] IIGUI_EXPORT core::Result<std::shared_ptr<const RasterImage>> png_image(std::span<const std::uint8_t>);
-// Static native SVG assets, <=1 MiB input, 1..2048 pixels per output dimension.
+// Static native SVG assets, <=1 MiB input, 1..8192 pixels per output dimension and at most 16 Mi pixels.
 // External resources and implicit system-font loading are disabled in the codec.
 // Filters/animation/scripts return unsupported rather than silently wrong icons.
 [[nodiscard]] IIGUI_EXPORT core::Result<std::shared_ptr<const RasterImage>> svg_image(

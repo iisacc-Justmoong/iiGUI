@@ -4,6 +4,7 @@
 #include "Image.h"
 #include "ColorPicker.h"
 #include "Motion.h"
+#include "WidgetInteraction.h"
 #include <iiSDKCore/Animation/Timeline.h>
 #include <thread>
 #include <optional>
@@ -55,15 +56,22 @@ struct WidgetDrawing final {
     std::vector<TextRun> texts;
     std::vector<ImageRun> images;
     bool images_before_text=false;
+    std::optional<BackdropMaterial> backdrop;
+    std::optional<BoxShadow> shadow;
     friend bool operator==(const WidgetDrawing&,const WidgetDrawing&)=default;
 };
 struct WidgetPaintState final {
     Size size;
     bool enabled=true,hovered=false,pressed=false,focused=false,checked=false;
+    std::size_t content_children=0;
+    double backing_scale=1;
     friend bool operator==(const WidgetPaintState&,const WidgetPaintState&)=default;
 };
 // Pure, owner-thread paint provider. UI queries/mutations during it are rejected.
 using WidgetPaintHandler=std::function<core::Result<std::shared_ptr<const WidgetDrawing>>(const WidgetPaintState&)>;
+// Owner-thread Core frames may update widgets. False stops this request;
+// request_frames restarts it. All handlers in a View share one frame slot.
+using WidgetFrameHandler=std::function<core::Result<bool>(runtime::Clock::time_point)>;
 struct LabelOptions final { std::string text; double font_size = 14; bool selectable = true; TextRole role=TextRole::description;std::optional<WidgetColor> color;TextAlignment alignment=TextAlignment::left;double line_height=0;std::optional<unsigned> font_weight;bool elide_right=false;friend bool operator==(const LabelOptions&,const LabelOptions&)=default; };
 struct ButtonStyle final {
     std::optional<WidgetColor> fill,hover_fill,pressed_fill,disabled_fill,text,disabled_text,border;
@@ -172,6 +180,7 @@ struct PopoverTransition final {
     double overshoot=1.70158,collapsed_scale=1;
     bool enabled=true;
     std::shared_ptr<MotionPreferences> preferences;
+    Size origin{.5,.5}; // Normalized scale pivot; existing popovers stay centered.
 };
 enum class SheetDetent { fit,medium,large };
 // Retained modal surface: desktop center or a full-width mobile bottom sheet.
@@ -200,6 +209,10 @@ struct PopoverOptions final {
     std::optional<PopoverShadow> shadow;
     std::optional<PopoverTransition> transition;
     std::optional<SheetLayoutOptions> sheet_layout;
+    // Explicit popup geometry in absolute native-surface coordinates. The
+    // optional local input rectangle leaves a painted tail transparent to hits.
+    std::optional<Rect> bounds,input_bounds;
+    bool preserve_input=false; // Nonmodal, no focus-on-open; keeps the origin's grab.
 };
 struct PopoverEvents final {runtime::Task opened,closed,canceled;};
 struct MenuItemOptions final {
@@ -267,13 +280,30 @@ struct ColorSurfaceOptions final {
     std::string accessibility_name="Color field";
 };
 enum class WidgetInputKind { pointer_move, pointer_down, pointer_up, pointer_leave, key_down, key_up,
-    text, composition, focus_lost, activate, focus, increment, decrement, context_request, close_popup, scroll, drop };
-enum class WidgetKey { none, tab, enter, space, escape, left, right, up, down, home, end, backspace, delete_forward, select_all, character, copy, cut };
+    text, composition, focus_lost, activate, focus, increment, decrement, context_request, close_popup, scroll, drop, commit_composition };
+enum class WidgetKey { none, tab, enter, space, escape, left, right, up, down, home, end, backspace, delete_forward, select_all, character, copy, cut, page_up, page_down, insert, undo, redo };
 enum class PointerDevice { mouse, pen, eraser, touch };
 // Native text services use UTF-16 code units. A range may never split a scalar.
 struct TextRange final {
     std::size_t location=0,length=0;
     friend bool operator==(const TextRange&,const TextRange&)=default;
+};
+struct TextInputState final {
+    std::size_t length = 0;
+    TextRange selection;
+    std::optional<TextRange> marked;
+    Rect caret; // Local widget coordinates, already clipped to its viewport.
+    bool read_only = false, multiline = true, auto_focus_on_press = true;
+};
+struct TextContent final { TextRange range; std::string text; };
+// OS text services query bounded ranges rather than copying the whole document
+// into WidgetSnapshot. state/read/position are owner-thread read providers and
+// must not call Widget APIs. focus_changed is an ordinary mutation callback.
+struct TextInputProvider final {
+    std::function<core::Result<TextInputState>()> state;
+    std::function<core::Result<TextContent>(TextRange)> read;
+    std::function<core::Result<std::size_t>(double x,double y)> position;
+    std::function<core::Result<void>(bool)> focus_changed;
 };
 // Logical, top-left surface coordinates. OS adapters translate events only;
 // iiGUI owns targeting, capture, focus, editing, control state and activation.
@@ -350,19 +380,30 @@ struct WidgetSnapshot final {
     bool custom_content=false,text_underline=false;
     std::optional<WidgetColor> foreground_color;
     std::string accessibility_description;
+    std::size_t child_count=0;
+    bool text_input=false,multiline=false;
+    std::size_t text_length=0;
+    Rect caret_bounds;
 };
 // Opaque generation identity plus actual parent/sibling placement. The weak
 // identity never owns a native tree and cannot expose its implementation.
 struct WidgetPlacement final {
     std::weak_ptr<const void> scope;
     std::uint64_t parent=std::uint64_t(-1),sibling=0;
+    std::weak_ptr<const void> domain;
 };
 // Weak, generation-specific UI handles. Mutations require the host thread.
 // A replaced/unmounted/closed tree returns closed, never targets its successor.
 class IIGUI_EXPORT Widget final {
 public:
     Widget() = default;
+    [[nodiscard]] bool is_null()const noexcept{return owner_==std::thread::id{};}
     [[nodiscard]] core::Result<WidgetPlacement> placement() const;
+    [[nodiscard]] core::Result<WidgetInteraction> interaction()const;
+    [[nodiscard]] core::Result<Size> measure(double available_width)const;
+    // Weak, independent subscription; never replaces an input/focus handler.
+    // Coalesced after input/layout settles; final alive=false on retirement.
+    [[nodiscard]] core::Result<void> observe_interaction(std::shared_ptr<const WidgetInteractionPort>)const;
     [[nodiscard]] core::Result<void> set_text(std::string_view) const;
     // Explicit replacement; programmatic changes emit no user-edit callback.
     [[nodiscard]] core::Result<void> set_label_options(LabelOptions) const;
@@ -420,9 +461,16 @@ public:
     [[nodiscard]] core::Result<Widget> content_item(std::string_view id={}) const;
     [[nodiscard]] core::Result<void> set_layout_handler(std::function<void(Rect)>) const;
     [[nodiscard]] core::Result<void> set_drawing(WidgetDrawing) const;
-    [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler,Widget interaction_owner={}) const;
+    [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler) const;
+    [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler,Widget interaction_owner) const;
     [[nodiscard]] core::Result<void> request_repaint() const;
+    [[nodiscard]] core::Result<void> set_frame_handler(WidgetFrameHandler,bool active=false) const;
+    [[nodiscard]] core::Result<void> request_frames() const;
     [[nodiscard]] core::Result<void> set_input_handler(WidgetInputHandler) const;
+    [[nodiscard]] core::Result<void> set_text_input_provider(std::shared_ptr<const TextInputProvider>) const;
+    [[nodiscard]] core::Result<TextContent> text_content(TextRange) const;
+    // Position in absolute, top-left native surface coordinates.
+    [[nodiscard]] core::Result<std::size_t> text_position(double x,double y) const;
     [[nodiscard]] core::Result<void> set_stack_options(StackOptions) const;
     [[nodiscard]] core::Result<void> set_button_style(ButtonStyle) const;
     [[nodiscard]] core::Result<void> set_button_options(ButtonOptions) const;
@@ -465,6 +513,8 @@ public:
     WidgetBuilder(const WidgetBuilder&) = delete;
     WidgetBuilder& operator=(const WidgetBuilder&) = delete;
     [[nodiscard]] core::Result<WidgetAppearance> appearance() const;
+    [[nodiscard]] core::Result<std::shared_ptr<MotionPreferences>> motion_preferences() const;
+    [[nodiscard]] core::Result<std::reference_wrapper<runtime::EventLoop>> event_loop() const;
     // Only future ordinary children are redirected. Popups retain their owner.
     [[nodiscard]] core::Result<void> set_default_content(Widget host,Widget slot);
     [[nodiscard]] core::Result<Widget> vstack(Widget parent, std::string_view id, StackOptions = {});
