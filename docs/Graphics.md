@@ -99,9 +99,10 @@ capture staging storage and text raster/upload storage. A counter or compiled bi
 target execution or a Qt performance comparison. See Verification.md for
 the recorded hardware/runtime evidence and deferred platforms.
 
-Optional [backdrop materials, inner strokes and fixed line metrics](BackdropMaterials.md)
-extend these contracts. Backdrop working textures have a separate 64 MiB bound
-and explicit capability/counters; they are not included in `cached_texture_bytes`.
+[배경 머티리얼·내부 테두리·고정 줄 메트릭](BackdropMaterials.md)은 같은 그래픽 계약을 확장한다.
+효과 작업 공간의 별도 예산은 물리 뷰포트 픽셀당 32바이트를 기준으로 최소 64 MiB,
+최대 256 MiB이다. 현재 한도는 `effect_texture_budget_bytes`로 제공하며
+`cached_texture_bytes`에는 포함하지 않는다. 상세 범위는 [머티리얼 입력](MaterialInputs.md)을 참조한다.
 
 `TextRun::clip` adds an optional paint clip in the coordinate space of `bounds`.
 Native shaping, wrapping and ellipsis still use the original bounds. Core Text,

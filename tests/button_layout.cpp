@@ -11,7 +11,7 @@ void good(core::Result<void> r){if(!r)throw std::runtime_error(r.error().message
 bool near(double a,double b){return std::abs(a-b)<.01;}
 std::shared_ptr<const gui::RasterImage> solid(bool red){std::vector<std::uint8_t> pixels(4*4*4,255);for(unsigned i=0;i<16;++i){pixels[i*4]=red?255:0;pixels[i*4+1]=0;pixels[i*4+2]=red?0:255;}return take(gui::rgba_image(4,4,std::move(pixels)));}
 void run(const std::string& name){
-    gui::Host host({.size={300,200}});gui::WidgetMount mount;gui::Widget button;unsigned clicks=0;
+    gui::Host host({.size={300,200},.minimum_size={240,160}});gui::WidgetMount mount;gui::Widget button;unsigned clicks=0;
     gui::ButtonOptions options{.text="",.tone=gui::ButtonTone::normal,.icon=solid(true),.indicator=solid(false),.icon_size=18,.icon_mode=true,.height=22,.left_padding=4,.right_padding=2,.content_spacing=-2,.indicator_size=18};
     good(host.run({.opened=[&]{
         mount=take(host.mount_widgets([&](auto& b)->core::Result<void>{auto row=take(b.hstack({},"root",{.spacing=0,.alignment=gui::StackAlignment::leading}));button=take(b.button(row,"button",options,[&]{++clicks;}));return {};}));

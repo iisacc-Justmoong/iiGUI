@@ -30,3 +30,12 @@ accessibility_description은 접근성 설명에, snapshot.child_count는 같은
 새 합성·마스크·영역·캐시·그리기 admission·수명·포커스 사례 17개와 기존 이미지 캐시
 검사를 갱신한다. 모든 테스트·앱·self-test 실행은 전체 작업 마지막의 일괄 단계로
 보류한다. 컴파일·정적 검사와 실제 픽셀·메모리·플랫폼 실행 검증을 구분한다.
+
+일반 위젯 트리와 팝업의 Tab·Shift+Tab 순회는 모두 `tab_focusable=false`인
+ActionSurface를 건너뛴다. 명시적 `Widget::focus()`는 계속 허용하며,
+`pointer_focusable=false`는 포인터로 활성화할 때 기존 포커스를 빼앗지 않는다.
+이 규칙은 운영체제 입력 어댑터 아래의 공통 위젯 상태에 적용한다.
+
+paint provider는 팩터리 부착 중에도 호출될 수 있다. 캡처 오류 경계 검사는 정상
+provider로 부착한 뒤 실패를 주입하고 repaint를 요청한다. 이로써 팩터리 실패와
+캡처 `Result`의 오류 전달을 분리해서 검증한다. 검사 콜백의 오류 원인도 보존한다.

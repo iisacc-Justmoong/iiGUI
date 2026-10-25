@@ -280,3 +280,5 @@ copies. Widgets share the host's Core event loop for owned timed work.
 subscriptions to geometry, clipping and hover/press/focus metadata. Explicit
 popup frames and input regions support a painted bubble tail while preserving
 the origin's focus, click and pointer capture. Runtime checks remain deferred.
+
+Related implementation contracts: [Retained popup effects](docs/RetainedPopupEffects.md).

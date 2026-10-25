@@ -56,7 +56,12 @@ void budget(){
         for(int i=0;i<16;++i)frame.overlays.emplace_back().shadow=gui::BoxShadow{.bounds={0,0,1100,1100},.radius=40,.blur_radius=64,.color={0,0,0,.28}};
         check(gui::valid_canvas(frame),"Budget test failed value validation");
         good(host.set_canvas(frame));auto image=host.capture_canvas();
-        check(!image&&image.error().message.find("64 MiB")!=std::string::npos,"GPU working texture budget was not enforced before allocation");
+        check(!image,"GPU working texture budget admitted an oversized scene");
+        check(image.error().message.find("effect budget")!=std::string::npos,image.error().message.c_str());
+        const auto info=take(host.graphics_info());
+        constexpr std::uint64_t mib=1024*1024;
+        check(info.effect_texture_budget_bytes>=64*mib&&info.effect_texture_budget_bytes<=256*mib,"Reported adaptive effect budget is outside its documented bounds");
+        check(info.shadow_masks==0&&info.shadow_texture_bytes==0&&info.effect_image_texture_bytes==0,"Rejected scene allocated GPU effect working textures");
         good(host.request_close());
     }}));
 }

@@ -9,7 +9,7 @@ using namespace ii;
 namespace {
 void check(bool b,const char* m){if(!b)throw std::runtime_error(m);}
 template<class T>T take(core::Result<T> r){if(!r)throw std::runtime_error(r.error().message);return std::move(*r);}
-void good(core::Result<void> r){if(!r)throw std::runtime_error(r.error().message);}
+void good(core::Result<void> r){if(!r){if(r.error().cause)std::rethrow_exception(r.error().cause);throw std::runtime_error(r.error().message);}}
 std::shared_ptr<const gui::RasterImage> solid(std::uint8_t r,std::uint8_t g,std::uint8_t b,std::uint8_t a=255){return take(gui::rgba_image(1,1,{r,g,b,a}));}
 unsigned at(const gui::PixelBuffer& b,unsigned x,unsigned y,unsigned c){return b.rgba[(std::size_t(y)*b.width+x)*4+c];}
 void pure(const std::string& name){
@@ -23,22 +23,22 @@ void pure(const std::string& name){
     else throw std::runtime_error("Unknown pure image case");
 }
 void window(const std::string& name){
-    gui::Host host({.size={300,200}});gui::WidgetMount mount;gui::Widget root,shape,last;gui::WidgetPaintState painted;unsigned calls=0,clicked=0;bool rejected=false;
+    gui::Host host({.size={300,200},.minimum_size={240,160}});gui::WidgetMount mount;gui::Widget root,shape,last;gui::WidgetPaintState painted;unsigned calls=0,clicked=0;bool rejected=false,paint_error_armed=false;
     good(host.run({.opened=[&]{
         if(name=="order"){gui::CanvasFrame frame{.viewport={0,0,64,32}};frame.texts={{.bounds={0,0,64,32},.text="X",.font_size=24}};frame.images={{{0,0,64,32},solid(255,0,0)}};auto legacy=gui::detail::rasterize_foreground(frame.viewport,gui::detail::canvas_layers(frame)[0],1);frame.images_before_text=true;auto ordered=gui::detail::rasterize_foreground(frame.viewport,gui::detail::canvas_layers(frame)[0],1);check(legacy.rgba!=ordered.rgba,"Text was hidden behind a foreground image");}
         else if(name=="metrics"){auto wide=take(gui::measure_text_layout({.text="WWW",.font_size=13})),narrow=take(gui::measure_text_layout({.text="iii",.font_size=13}));check(wide.width>narrow.width&&wide.height>0,"Public native text metrics did not use shaped glyph widths");check(!gui::measure_text_layout({.text="x",.font_size=0}),"Invalid text metrics admitted");}
         else{
             mount=take(host.mount_widgets([&](auto& b)->core::Result<void>{auto row=take(b.vstack({},"row",{.spacing=4,.alignment=gui::StackAlignment::leading}));root=take(b.action_surface(row,"action",{.width=80,.height=40,.checkable=true,.tab_focusable=name!="focus",.pointer_focusable=name!="focus"},[&]{++clicked;}));shape=take(b.absolute_stack(root,"shape",{80,40}));
-                good(shape.set_paint_handler([&](const gui::WidgetPaintState& state)->core::Result<std::shared_ptr<const gui::WidgetDrawing>>{++calls;painted=state;if(name=="paint_error")return core::fail(core::ErrorCode::failed,"Intentional paint failure");if(name=="mutation"){auto result=root.set_checked(false);rejected=!result&&result.error().code==core::ErrorCode::busy;}auto d=std::make_shared<gui::WidgetDrawing>();d->panels={{{0,0,80,40},state.checked?gui::Color{0,1,0,1}:gui::Color{1,0,0,1},state.checked?gui::Color{0,1,0,1}:gui::Color{1,0,0,1},0}};return std::shared_ptr<const gui::WidgetDrawing>{d};},root));
+                good(shape.set_paint_handler([&](const gui::WidgetPaintState& state)->core::Result<std::shared_ptr<const gui::WidgetDrawing>>{++calls;painted=state;if(name=="paint_error"&&paint_error_armed)return core::fail(core::ErrorCode::failed,"Intentional paint failure");if(name=="mutation"){auto result=root.set_checked(false);rejected=!result&&result.error().code==core::ErrorCode::busy;}auto d=std::make_shared<gui::WidgetDrawing>();d->panels={{{0,0,80,40},state.checked?gui::Color{0,1,0,1}:gui::Color{1,0,0,1},state.checked?gui::Color{0,1,0,1}:gui::Color{1,0,0,1},0}};return std::shared_ptr<const gui::WidgetDrawing>{d};},root));
                 if(name=="slot"){good(b.set_default_content(root,shape));take(b.label(root,"content",{.text="Content"}));}
                 last=take(b.button(row,"last",{.text="Last"}));if(name=="paint"){check(!shape.set_paint_handler({},last),"Non-ancestor paint owner accepted");}
                 return {};
             }));
-            if(name=="paint_error"){check(!host.capture_canvas(),"Paint error escaped the capture Result boundary");good(shape.set_paint_handler({}));}
+            if(name=="paint_error"){paint_error_armed=true;good(shape.request_repaint());check(!host.capture_canvas(),"Paint error escaped the capture Result boundary");paint_error_armed=false;good(shape.set_paint_handler({}));}
             else{take(host.capture_canvas());check(calls>0&&painted.size==gui::Size{80,40},"Paint provider did not receive native local geometry");
                 if(name=="paint"||name=="checked"||name=="mutation"){good(root.activate());take(host.capture_canvas());check(clicked==1&&painted.checked,"Checkable action state was not exposed to its paint provider");if(name=="mutation")check(rejected&&take(root.snapshot()).checked,"UI mutation during paint was not rejected");if(name=="checked"){good(root.set_checked(false));check(!take(root.action_options()).checked&&clicked==1,"Programmatic check state invoked a click or was not retained");}}
                 else if(name=="slot")check(painted.content_children==1&&take(take(mount.find("content")).snapshot()).parent_id=="shape","Paint content count did not follow the default slot");
-                else if(name=="focus"){good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::tab}));check(take(last.snapshot()).focused&&!take(root.snapshot()).focused,"No-tab action remained in keyboard traversal");auto r=take(root.snapshot()).bounds;good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_down,.x=r.x+5,.y=r.y+5}));good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_up,.x=r.x+5,.y=r.y+5}));check(!take(root.snapshot()).focused,"No-pointer-focus action stole focus");}
+                else if(name=="focus"){good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::tab}));check(take(last.snapshot()).focused&&!take(root.snapshot()).focused,"No-tab action remained in keyboard traversal");good(root.focus());check(take(root.snapshot()).focused,"No-tab policy disabled explicit focus");good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::tab,.shift=true}));check(take(last.snapshot()).focused&&!take(root.snapshot()).focused,"No-tab action remained in reverse keyboard traversal");auto r=take(root.snapshot()).bounds;good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_down,.x=r.x+5,.y=r.y+5}));good(mount.dispatch_input({.kind=gui::WidgetInputKind::pointer_up,.x=r.x+5,.y=r.y+5}));check(!take(root.snapshot()).focused,"No-pointer-focus action stole focus");}
                 else if(name=="retirement"){good(host.unmount_widgets());check(!shape.request_repaint(),"Paint handle survived its generation");}
                 else throw std::runtime_error("Unknown paint case");
             }

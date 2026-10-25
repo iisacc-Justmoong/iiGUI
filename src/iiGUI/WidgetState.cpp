@@ -2103,6 +2103,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming) {
     else if(event.kind==WidgetInputKind::key_down && event.key==WidgetKey::tab) {
         const auto count=impl_->nodes.size(); auto current=impl_->focused;
         for(std::size_t k=0;k<count;++k) { current=current==absent?(event.shift?count-1:0):(current+count+(event.shift?-1:1))%count;
+            if(impl_->nodes[current].action_surface&&!impl_->nodes[current].action_surface->tab_focusable)continue;
             if((interactive(impl_->nodes[current].kind)||impl_->nodes[current].input_handler) && impl_->nodes[current].enabled && impl_->logical_visible(current) && !impl_->blocked(current)) return focus(current); }
     } else if(impl_->focused!=absent) {
         const auto index=impl_->focused; auto& n=impl_->nodes[index];
@@ -2452,22 +2453,24 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
     for(auto index:impl_->visual_popups) {
         const auto& n=impl_->nodes[index];const auto& p=*n.popup;if(!impl_->visible(index)||n.bounds.width<=0||n.bounds.height<=0)continue;
         const bool animated=p.popover&&p.popover->transition.has_value();
-        if(p.popover&&p.popover->dim){auto tint=p.popover->backdrop_color;if(animated)tint.alpha*=std::clamp(p.motion.progress,0.,1.);auto& dim=f.overlays.emplace_back();layer_panel(dim,impl_->popup_viewport(size),tint);}
+        if(p.popover&&p.popover->dim){auto tint=p.popover->backdrop_color;if(animated)tint.alpha*=std::clamp(p.motion.progress,0.,1.);auto& dim=f.overlays.emplace_back();if(animated){const auto c=color(tint);dim.panels.push_back({impl_->popup_viewport(size),c,c,0});}else layer_panel(dim,impl_->popup_viewport(size),tint);}
         auto background=p.options.background.value_or(impl_->appearance.window);background.alpha*=p.options.opacity;
         const auto radius=p.popover&&p.popover->cylinder?std::min(n.bounds.width,n.bounds.height)/2:std::min(float(p.options.corner_radius),std::min(n.bounds.width,n.bounds.height)*float(p.popover?p.popover->corner_limit:.5));
         auto& backdrop=f.overlays.emplace_back();
         if(p.popover&&p.popover->shadow){const auto& shadow=*p.popover->shadow;backdrop.shadow=BoxShadow{.bounds={n.bounds.x+float(shadow.offset_x),n.bounds.y+float(shadow.offset_y),n.bounds.width,n.bounds.height},.radius=radius,.blur_radius=float(shadow.blur_radius),.color=color(shadow.color)};}
         if(animated){
-            const auto& o=*p.popover;backdrop.content_transform=impl_->transform(index);
+            const auto& o=*p.popover;const auto transform=impl_->transform(index);
+            backdrop.content_transform.opacity=transform.opacity;
             // The authored shadow and glass are unscaled siblings of the card.
             // Glass closes immediately; the retained card alone fades out.
             if(p.opened&&o.blur_radius)backdrop.backdrop=BackdropMaterial{.bounds=n.bounds,.radius=radius,.blur_radius=float(*o.blur_radius),.source=BackdropSource::content};
-            if(o.opaque_base&&!o.blur_radius)layer_panel(backdrop,n.bounds,{20./255,20./255,20./255,1},radius);
+            auto& card=f.overlays.emplace_back();card.content_transform=transform;
+            if(o.opaque_base&&!o.blur_radius)layer_panel(card,n.bounds,{20./255,20./255,20./255,1},radius);
             const auto border=float(std::min(o.border_width,double(std::min(n.bounds.width,n.bounds.height)/2)));
             if(border>0&&o.border_color.alpha>0){
-                layer_panel(backdrop,{n.bounds.x+border,n.bounds.y+border,std::max(0.f,n.bounds.width-2*border),std::max(0.f,n.bounds.height-2*border)},background,std::max(0.f,radius-border));
-                auto c=color(o.border_color);backdrop.panels.push_back({n.bounds,c,c,radius,border});
-            }else layer_panel(backdrop,n.bounds,background,radius);
+                layer_panel(card,{n.bounds.x+border,n.bounds.y+border,std::max(0.f,n.bounds.width-2*border),std::max(0.f,n.bounds.height-2*border)},background,std::max(0.f,radius-border));
+                auto c=color(o.border_color);card.panels.push_back({n.bounds,c,c,radius,border});
+            }else layer_panel(card,n.bounds,background,radius);
         }else if(p.popover&&(!p.popover->opaque_base||p.popover->blur_radius)){const auto& o=*p.popover;backdrop.backdrop=BackdropMaterial{.bounds=n.bounds,.radius=radius,.blur_radius=float(o.blur_radius.value_or(0)),.tint=color(background),.border=color(o.border_color),.border_width=float(o.border_width),.source=o.blur_radius?BackdropSource::content:BackdropSource::previous_layers};}
         else{layer_panel(backdrop,n.bounds,{20.0/255,20.0/255,20.0/255,1},radius);layer_panel(backdrop,n.bounds,background,radius);}
         const auto content_index=f.overlays.size();f.overlays.emplace_back();if(!p.popover||p.popover->clip_content)f.overlays[content_index].clip=p.content;if(animated)f.overlays[content_index].content_transform=impl_->transform(index);
