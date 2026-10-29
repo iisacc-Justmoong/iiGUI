@@ -1,6 +1,6 @@
 #include <iiGUI/iiGUI.h>
 #ifndef IIGUI_INSTALLED_CONSUMER
-#include "../src/iiGUI/GpuEffects.h"
+#include "../src/Graphics/GpuEffects.h"
 #endif
 #include <cmath>
 #include <iostream>

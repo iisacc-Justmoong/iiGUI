@@ -23,4 +23,4 @@ for name in ('panels.vert','panels.frag','text.vert','text.frag','effect.frag'):
     lines += ['    '+','.join(f'0x{w:08x}u' for w in words[i:i+8])+',' for i in range(0,len(words),8)]
     lines += ['};']
 lines += ['} // namespace ii::gui::detail','']
-(root/'src/iiGUI/VulkanShaders.h').write_text('\n'.join(lines))
+(root/'src/Graphics/VulkanShaders.h').write_text('\n'.join(lines))

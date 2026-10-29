@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "README.md",
-    "sha256": "ae3be149ef993276f3c4b1cfb6ac989355f67e8e7cf88165587b371273a55d97",
-    "bytes": 20446,
-    "line_count": 355,
+    "sha256": "40119e0aa5dcfb5e906a5ffbf5e415dd050c089b9b5f1e0fc04fb346fe09cbdb",
+    "bytes": 20647,
+    "line_count": 357,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -880,7 +880,7 @@
       "kind": "paragraph",
       "start_line": 287,
       "end_line": 291,
-      "raw": "Public headers and implementations live together in `src/iiGUI/`.\nThere is no separate authored `include/` tree. Existing public `#include` names\nand exported CMake targets are unchanged; installation still places only public\nheaders in the package include directory. Generated export headers belong to\n`build/`, not to the authored source tree.\n"
+      "raw": "Public headers and implementations live together in responsibility directories below `src/`.\nThere is no separate authored `include/` tree. Existing public `#include` names\nand exported CMake targets are unchanged; installation still places only public\nheaders in the package include directory. Generated export headers belong to\n`build/`, not to the authored source tree.\n"
     },
     {
       "id": "b000108",
@@ -1087,32 +1087,46 @@
     },
     {
       "id": "b000137",
-      "kind": "html",
+      "kind": "paragraph",
       "start_line": 348,
       "end_line": 348,
-      "raw": "<!-- workspace-docs:readme:start -->\n"
+      "raw": "Source and adjacent headers are organized by responsibility under `src/`; installed `<iiGUI/...>` include paths remain unchanged. See [source layout](docs/SourceLayout.md).\n"
     },
     {
       "id": "b000138",
-      "kind": "heading",
+      "kind": "blank",
       "start_line": 349,
       "end_line": 349,
+      "raw": "\n"
+    },
+    {
+      "id": "b000139",
+      "kind": "html",
+      "start_line": 350,
+      "end_line": 350,
+      "raw": "<!-- workspace-docs:readme:start -->\n"
+    },
+    {
+      "id": "b000140",
+      "kind": "heading",
+      "start_line": 351,
+      "end_line": 351,
       "raw": "## Documentation entry points\n",
       "level": 2,
       "title": "Documentation entry points"
     },
     {
-      "id": "b000139",
+      "id": "b000141",
       "kind": "blank",
-      "start_line": 350,
-      "end_line": 350,
+      "start_line": 352,
+      "end_line": 352,
       "raw": "\n"
     },
     {
-      "id": "b000140",
+      "id": "b000142",
       "kind": "list",
-      "start_line": 351,
-      "end_line": 354,
+      "start_line": 353,
+      "end_line": 356,
       "raw": "- Human overview: this English `README.md`.\n- Agent instructions: [AGENT.md](AGENT.md).\n- Human documentation: [documentation index](docs/README.md).\n- Structured agent documentation: [agent index](docs/agent-index.json).\n",
       "items": [
         {
@@ -1138,10 +1152,10 @@
       ]
     },
     {
-      "id": "b000141",
+      "id": "b000143",
       "kind": "html",
-      "start_line": 355,
-      "end_line": 355,
+      "start_line": 357,
+      "end_line": 357,
       "raw": "<!-- workspace-docs:readme:end -->\n"
     }
   ],
@@ -1203,12 +1217,12 @@
       "start_line": 285
     },
     {
-      "block_id": "b000138",
+      "block_id": "b000140",
       "parent_id": "b000001",
       "level": 2,
       "title": "Documentation entry points",
       "anchor": "documentation-entry-points",
-      "start_line": 349
+      "start_line": 351
     }
   ],
   "indexes": {
@@ -1612,25 +1626,32 @@
         "line": 343
       },
       {
-        "block_id": "b000140",
+        "block_id": "b000137",
+        "label": "source layout",
+        "target": "docs/SourceLayout.md",
+        "kind": "relative",
+        "line": 348
+      },
+      {
+        "block_id": "b000142",
         "label": "AGENT.md",
         "target": "AGENT.md",
         "kind": "relative",
-        "line": 352
+        "line": 354
       },
       {
-        "block_id": "b000140",
+        "block_id": "b000142",
         "label": "documentation index",
         "target": "docs/README.md",
         "kind": "relative",
-        "line": 353
+        "line": 355
       },
       {
-        "block_id": "b000140",
+        "block_id": "b000142",
         "label": "agent index",
         "target": "docs/agent-index.json",
         "kind": "relative",
-        "line": 354
+        "line": 356
       }
     ],
     "tables": [

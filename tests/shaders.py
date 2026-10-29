@@ -5,7 +5,7 @@ import re
 import sys
 
 root=Path(sys.argv[1])
-header=(root/'src/iiGUI/VulkanShaders.h').read_text()
+header=(root/'src/Graphics/VulkanShaders.h').read_text()
 for name in ('panels.vert','panels.frag','text.vert','text.frag','effect.frag'):
     source=root/'src/shaders'/name
     digest=hashlib.sha256(source.read_bytes()).hexdigest()

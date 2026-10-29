@@ -2,7 +2,7 @@
 #include "NativeObjectHandlesRuntime.generated.h"
 #include "NativeObjectRootRuntime.generated.h"
 #include "NativeObjectRowsRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 #include <stdexcept>
 using namespace ii;

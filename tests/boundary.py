@@ -6,7 +6,8 @@ import sys
 
 root = Path(sys.argv[1])
 violations = []
-public_headers = {root / 'src/iiGUI' / name for name in
+sources = {p.name: p for area in ('API', 'Core', 'Graphics', 'Platform', 'Presentation', 'Text', 'Widgets') for p in (root / 'src' / area).iterdir() if p.is_file()}
+public_headers = {sources[name] for name in
                   ('Graphics.h', 'Image.h', 'Host.h', 'Text.h', 'NativeWidgets.h', 'Appearance.h', 'Application.h', 'iiGUI.h')}
 for header in public_headers:
     if not header.is_file():
@@ -34,7 +35,7 @@ manifest = json.loads((root / 'examples/HelloGUI/iiSDKBuilder.json').read_text()
 if any(kit['name'] == 'LVUI' for kit in manifest['sdks']):
     violations.append('The standalone HelloGUI SDK graph must not build LVUI')
 for name in ('NativeWidgetsMac.mm', 'Host.mm'):
-    source=(root/'src/iiGUI'/name).read_text()
+    source=(sources[name]).read_text()
     if re.search(r'\b(?:NSButton|NSTextField|NSStackView|NSControl|NSLayoutConstraint)\b',source):
         violations.append(f'{name}: OS control/layout used instead of iiGUI widget rendering')
 if {kit['platform'] for kit in manifest['kits']} != {'windows', 'macos', 'linux'}:

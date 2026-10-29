@@ -1,4 +1,4 @@
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <cmath>
 #include <iostream>
 #include <limits>

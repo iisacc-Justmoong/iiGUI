@@ -1,0 +1,173 @@
+#pragma once
+#include <iiGUI/NativeWidgets.h>
+#include <iiGUI/FontDatabase.h>
+
+namespace ii::gui::detail {
+struct WidgetFrameHooks final {
+    std::function<core::Result<runtime::FrameLoop*>()> frames;
+    std::function<void(bool)> activity;
+    std::shared_ptr<MotionPreferences> preferences;
+    Renderer renderer=Renderer::automatic;
+    std::function<core::Result<runtime::EventLoop*>()> events;
+    std::function<core::Result<void>(const WindowGeometry&)> window_geometry;
+    std::shared_ptr<FontDatabase> fonts;
+    std::shared_ptr<PresentationStream> presentations;
+    // Optional owner-thread accessibility observer, independent of an OS surface.
+    std::function<void()> accessibility_changed;
+};
+class WidgetState final : public std::enable_shared_from_this<WidgetState> {
+public:
+    // invoke is the synchronous owner-thread Host exception/admission barrier;
+    // it must complete or reject work before returning, never queue it.
+    explicit WidgetState(std::function<void(runtime::Task)> invoke, WidgetAppearance = {},WidgetFrameHooks = {});
+    ~WidgetState();
+    [[nodiscard]] core::Result<void> ready() const;
+    [[nodiscard]] core::Result<void> construct(WidgetFactory);
+    [[nodiscard]] core::Result<WidgetAppearance> appearance() const;
+    [[nodiscard]] core::Result<void> window_properties(WindowProperties);
+    [[nodiscard]] core::Result<WindowProperties> window_properties() const;
+    [[nodiscard]] core::Result<void> commit_window_properties();
+    [[nodiscard]] core::Result<std::shared_ptr<MotionPreferences>> motion_preferences();
+    [[nodiscard]] core::Result<std::reference_wrapper<runtime::EventLoop>> event_loop();
+    [[nodiscard]] core::Result<void> ensure_frame_tick();
+    [[nodiscard]] core::Result<void> frame_handler(std::size_t,WidgetFrameHandler,bool);
+    [[nodiscard]] core::Result<void> request_frames(std::size_t);
+    [[nodiscard]] core::Result<void> button_options(std::size_t,ButtonOptions);
+    [[nodiscard]] core::Result<void> default_content(Widget,Widget);
+    [[nodiscard]] core::Result<Widget> add(WidgetKind, Widget, std::string_view,
+        StackOptions, LabelOptions, ButtonOptions, runtime::Task);
+    [[nodiscard]] core::Result<Widget> check(WidgetKind, Widget, std::string_view, CheckOptions, std::function<void(bool)>);
+    [[nodiscard]] core::Result<Widget> input_field(Widget, std::string_view, InputOptions, std::function<void(std::string)>, runtime::Task);
+    [[nodiscard]] core::Result<Widget> slider(Widget, std::string_view, SliderOptions, std::function<void(double)>);
+    [[nodiscard]] core::Result<Widget> progress(Widget, std::string_view, ProgressOptions);
+    [[nodiscard]] core::Result<Widget> absolute_stack(Widget,std::string_view,Size);
+    [[nodiscard]] core::Result<Widget> scroll_view(Widget,std::string_view,ScrollOptions);
+    [[nodiscard]] core::Result<Widget> content_host(Widget,std::string_view,Size);
+    [[nodiscard]] core::Result<Widget> action_surface(Widget,std::string_view,ActionOptions,runtime::Task);
+    [[nodiscard]] core::Result<void> action_options(std::size_t,ActionOptions);
+    [[nodiscard]] core::Result<ActionOptions> action_options(std::size_t)const;
+    [[nodiscard]] core::Result<void> content(std::size_t,WidgetFactory,std::function<core::Result<void>()>,
+        std::optional<std::size_t> replacement_allowance={},std::string scope_namespace={},bool preserve_keyed=false,bool defer_layout=false);
+    [[nodiscard]] core::Result<Widget> content_item(std::size_t,std::string_view);
+    [[nodiscard]] core::Result<void> keyed_content(std::size_t,std::vector<KeyedContentItem>,KeyedContentOptions);
+    [[nodiscard]] core::Result<Widget> keyed_content_item(std::size_t,std::string_view,std::string_view);
+    [[nodiscard]] core::Result<std::vector<std::string>> keyed_content_keys(std::size_t);
+    [[nodiscard]] core::Result<Widget> image(Widget,std::string_view,ImageOptions);
+    [[nodiscard]] core::Result<Widget> color_surface(Widget,std::string_view,ColorSurfaceOptions,std::function<void(WidgetColor)>);
+    [[nodiscard]] core::Result<Widget> color_button(Widget,std::string_view,ColorButtonOptions,ControlEvents);
+    [[nodiscard]] core::Result<Widget> tab(Widget,std::string_view,TabOptions,runtime::Task);
+    [[nodiscard]] core::Result<Widget> tab_bar(Widget,std::string_view,TabBarOptions,std::function<void(int)>);
+    [[nodiscard]] core::Result<Widget> combo_box(Widget,std::string_view,ComboBoxOptions,ControlEvents);
+    [[nodiscard]] core::Result<Widget> stepper(Widget,std::string_view,StepperOptions,std::function<void(int)>,ControlEvents);
+    [[nodiscard]] core::Result<Widget> segmented_control(Widget,std::string_view,SegmentedOptions);
+    [[nodiscard]] core::Result<Widget> menu(Widget,std::string_view,MenuOptions,MenuEvents);
+    [[nodiscard]] core::Result<Widget> popover(Widget,std::string_view,PopoverOptions,PopoverEvents);
+    [[nodiscard]] core::Result<Widget> menu_item(Widget,std::string_view,MenuItemOptions,runtime::Task);
+    [[nodiscard]] core::Result<Widget> menu_divider(Widget,std::string_view,MenuDividerOptions);
+    [[nodiscard]] core::Result<void> attach(void* parent);
+    [[nodiscard]] core::Result<void> retain(std::shared_ptr<void>);
+    [[nodiscard]] core::Result<void> on_publish(runtime::Task);
+    // Called by the native host only after a root mount has committed.
+    void commit_publication() noexcept;
+    [[nodiscard]] core::Result<void> on_retire(runtime::Task);
+    void close() noexcept;
+    [[nodiscard]] core::Result<Widget> find(std::string_view);
+    [[nodiscard]] core::Result<WidgetSnapshot> snapshot(std::size_t);
+    [[nodiscard]] core::Result<WidgetPlacement> placement(std::size_t)const;
+    [[nodiscard]] core::Result<WidgetInteraction> interaction(std::size_t);
+    [[nodiscard]] core::Result<Size> measure(std::size_t,double);
+    [[nodiscard]] core::Result<void> observe_interaction(std::size_t,std::shared_ptr<const WidgetInteractionPort>);
+    [[nodiscard]] core::Result<std::vector<WidgetSnapshot>> snapshots();
+    // Owner-thread, bounded scene inspection. Does not create an OS surface.
+    [[nodiscard]] core::Result<CanvasFrame> drawing_snapshot(Size);
+    [[nodiscard]] core::Result<void> text(std::size_t, std::string_view);
+    [[nodiscard]] core::Result<void> label_options(std::size_t,LabelOptions);
+    [[nodiscard]] core::Result<void> label_color(std::size_t,std::optional<WidgetColor>);
+    [[nodiscard]] core::Result<void> input_options(std::size_t,InputOptions);
+    [[nodiscard]] core::Result<void> clip_content(std::size_t,bool);
+    [[nodiscard]] core::Result<void> opacity(std::size_t,double);
+    [[nodiscard]] core::Result<void> accessibility_name(std::size_t,std::string_view);
+    [[nodiscard]] core::Result<void> accessibility_semantics(std::size_t,std::optional<AccessibilitySemantics>);
+    [[nodiscard]] core::Result<void> enabled(std::size_t, bool);
+    [[nodiscard]] core::Result<void> checked(std::size_t, bool);
+    [[nodiscard]] core::Result<void> value(std::size_t, double);
+    [[nodiscard]] core::Result<void> selected(std::size_t,bool);
+    [[nodiscard]] core::Result<void> current_index(std::size_t,int);
+    [[nodiscard]] core::Result<void> focus(std::size_t);
+    [[nodiscard]] core::Result<void> activate(std::size_t);
+    [[nodiscard]] core::Result<void> step(std::size_t,int);
+    [[nodiscard]] core::Result<void> open_at(std::size_t,double,double);
+    [[nodiscard]] core::Result<void> open_for(std::size_t,Widget,double,double);
+    [[nodiscard]] core::Result<void> close_popup(std::size_t,bool canceled=false);
+    [[nodiscard]] core::Result<void> popup_factory(std::size_t,WidgetFactory,Widget anchor={});
+    [[nodiscard]] core::Result<Widget> popup_content(std::size_t,std::string_view);
+    [[nodiscard]] core::Result<void> selected_index(std::size_t,int);
+    [[nodiscard]] core::Result<void> menu_state(std::size_t,MenuItemState);
+    [[nodiscard]] core::Result<void> menu_expanded(std::size_t,bool);
+    [[nodiscard]] core::Result<void> context_menu(std::size_t,Widget);
+    [[nodiscard]] core::Result<void> color_model(std::size_t,std::shared_ptr<ColorPickerModel>);
+    [[nodiscard]] core::Result<std::shared_ptr<ColorPickerModel>> color_model(std::size_t);
+    [[nodiscard]] core::Result<void> color_field(std::size_t,ColorField);
+    [[nodiscard]] core::Result<void> color_button_size(std::size_t,double);
+    [[nodiscard]] core::Result<void> show_hue_ring(std::size_t,bool);
+    [[nodiscard]] core::Result<void> fixed_frame(std::size_t,Rect);
+    [[nodiscard]] core::Result<void> extent(std::size_t,Size);
+    [[nodiscard]] core::Result<void> flex(std::size_t,double);
+    [[nodiscard]] core::Result<void> scroll_options(std::size_t,ScrollOptions);
+    [[nodiscard]] core::Result<void> scroll_offset(std::size_t,double);
+    [[nodiscard]] core::Result<void> horizontal_scroll_offset(std::size_t,double);
+    [[nodiscard]] core::Result<void> scroll_position(std::size_t,double,double);
+    [[nodiscard]] core::Result<void> virtual_scroll_content(std::size_t,Size,double,double);
+    [[nodiscard]] core::Result<void> scroll_handler(std::size_t,std::function<void(const ScrollViewport&)>);
+    [[nodiscard]] core::Result<void> layout_handler(std::size_t,std::function<void(Rect)>);
+    [[nodiscard]] core::Result<void> measurement_handler(std::size_t,std::function<void(const WidgetMeasurement&)>);
+    [[nodiscard]] core::Result<void> drawing(std::size_t,WidgetDrawing);
+    [[nodiscard]] core::Result<void> paint_handler(std::size_t,WidgetPaintHandler,Widget);
+    [[nodiscard]] core::Result<void> repaint(std::size_t);
+    [[nodiscard]] core::Result<void> input_handler(std::size_t,WidgetInputHandler);
+    [[nodiscard]] core::Result<void> text_input_provider(std::size_t,std::shared_ptr<const TextInputProvider>);
+    [[nodiscard]] core::Result<void> text_input_changed(std::size_t,bool);
+    [[nodiscard]] core::Result<TextInputState> text_input_state(std::size_t);
+    [[nodiscard]] core::Result<TextContent> text_content(std::size_t,TextRange);
+    [[nodiscard]] core::Result<std::size_t> text_position(std::size_t,double,double);
+    [[nodiscard]] core::Result<void> stack_options(std::size_t,StackOptions);
+    [[nodiscard]] core::Result<void> stack_layout(std::size_t,StackLayoutOptions);
+    [[nodiscard]] core::Result<StackLayoutOptions> stack_layout(std::size_t);
+    [[nodiscard]] core::Result<void> button_style(std::size_t,ButtonStyle);
+    [[nodiscard]] core::Result<void> button_icon(std::size_t,std::shared_ptr<const RasterImage>,std::string_view);
+    [[nodiscard]] core::Result<void> control_events(std::size_t,ControlEvents);
+    [[nodiscard]] core::Result<void> image_options(std::size_t,ImageOptions);
+    [[nodiscard]] core::Result<void> popover_options(std::size_t,PopoverOptions);
+    [[nodiscard]] core::Result<void> visibility(std::size_t,bool);
+    [[nodiscard]] core::Result<void> image(std::size_t,std::shared_ptr<const RasterImage>);
+    [[nodiscard]] core::Result<void> escape_action(std::size_t,runtime::Task);
+    [[nodiscard]] core::Result<void> input(const WidgetInput&);
+    [[nodiscard]] core::Result<GraphicsInfo> graphics_info();
+    [[nodiscard]] core::Result<PixelBuffer> capture();
+    void present();
+    bool native_event(const void*);
+    void set_frame_paced(bool);
+private:
+    [[nodiscard]] bool published_in_tree() const noexcept;
+    void deliver_publication() noexcept;
+    [[nodiscard]] core::Result<void> observe_fonts();
+    void fonts_changed();
+    void apply_appearance(const WidgetAppearance&);
+    [[nodiscard]] core::Result<std::size_t> prepare(Widget, std::string_view,WidgetKind=WidgetKind::label);
+    Widget publish(std::size_t, WidgetKind, std::string_view);
+    CanvasFrame frame(Size,std::size_t* popup_start=nullptr);
+    core::Result<void> flush_viewports();
+    core::Result<void> flush_interactions();
+    core::Result<void> input_impl(const WidgetInput&);
+    core::Result<bool> route_input_handler(const WidgetInput&);
+    core::Result<void> create_popup_content(std::size_t);
+    core::Result<void> route_content(const WidgetInput&,bool& handled);
+    core::Result<void> route_host_content(const WidgetInput&,bool& handled);
+    core::Result<void> focus_content(std::size_t,int);
+    bool has_escape_handler() const;
+    Size global_offset() const;
+    core::Result<void> prepare_motion(PopoverOptions&);
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+} // namespace ii::gui::detail

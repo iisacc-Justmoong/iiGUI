@@ -1,6 +1,6 @@
 #include "NativeColorsRuntime.generated.h"
 #include <LVUI/NativeWidgetColors.h>
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 #include <stdexcept>
 #include <thread>

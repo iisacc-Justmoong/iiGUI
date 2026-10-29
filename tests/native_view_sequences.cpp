@@ -2,7 +2,7 @@
 #include "NativeViewSequenceRowsRuntime.generated.h"
 #include "NativeViewSequenceRootRuntime.generated.h"
 #include "NativeViewSequenceOverrideRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>

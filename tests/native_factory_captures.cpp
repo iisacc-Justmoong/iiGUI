@@ -1,6 +1,6 @@
 #include "NativeFactoryCapturesRuntime.generated.h"
 #include "NativeFactoryCapturePostfixRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 using namespace ii;
 namespace {

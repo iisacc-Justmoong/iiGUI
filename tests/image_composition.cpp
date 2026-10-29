@@ -1,6 +1,6 @@
 #include <iiGUI/iiGUI.h>
 #include <iiGUI/Text.h>
-#include "../src/iiGUI/NativeText.h"
+#include "../src/Text/NativeText.h"
 #include <cmath>
 #include <iostream>
 #include <limits>

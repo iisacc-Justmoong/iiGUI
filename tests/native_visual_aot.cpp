@@ -1,7 +1,7 @@
 #include "NativeVisualRuntime.generated.h"
 #include "NativeVisualConditionalRuntime.generated.h"
 #include "NativeVisualEmptyRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 using namespace ii;
 namespace {

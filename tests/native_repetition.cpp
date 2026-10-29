@@ -2,7 +2,7 @@
 #include "NativeNestedRepetitionRuntime.generated.h"
 #include "NativeListValuesRuntime.generated.h"
 #include "NativeSharedRepetitionRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 #include <stdexcept>
 using namespace ii;

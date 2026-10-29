@@ -56,6 +56,7 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/ScrollViews.md`](ScrollViews.md) | [JSON](ScrollViews.agent.json) |
 | [`docs/SelfRenderedWidgets.md`](SelfRenderedWidgets.md) | [JSON](SelfRenderedWidgets.agent.json) |
 | [`docs/Shadows.md`](Shadows.md) | [JSON](Shadows.agent.json) |
+| [`docs/SourceLayout.md`](SourceLayout.md) | [JSON](SourceLayout.agent.json) |
 | [`docs/StackLayout.md`](StackLayout.md) | [JSON](StackLayout.agent.json) |
 | [`docs/TextBoundary.md`](TextBoundary.md) | [JSON](TextBoundary.agent.json) |
 | [`docs/TextInputProvider.md`](TextInputProvider.md) | [JSON](TextInputProvider.agent.json) |

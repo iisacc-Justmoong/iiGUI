@@ -4,7 +4,7 @@
 #include "NativeScalarConditionalRuntime.generated.h"
 #include "NativeScalarRootRuntime.generated.h"
 #include "NativeScalarFunctionDefaultRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 #include <stdexcept>
 using namespace ii;

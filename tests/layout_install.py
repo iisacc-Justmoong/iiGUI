@@ -35,12 +35,13 @@ def main():
         abi=re.search(r'set\(iiGUI_NATIVE_ABI_ID "([0-9a-f]+)"\)',exported)
         assert abi
         repo=Path(__file__).resolve().parents[1]
-        abi_input=''.join(f'{name}:{hashlib.sha256((repo/"src/iiGUI"/name).read_bytes()).hexdigest()};' for name in
-            ('NativeWidgets.h','Host.h','Graphics.h','WidgetInteraction.h','WidgetLayout.h','WindowProperties.h','Appearance.h'))
+        sources={p.name:p for area in ('API','Core','Graphics','Platform','Presentation','Text','Widgets') for p in (repo/'src'/area).glob('*.h')}
+        abi_input=''.join(f'{name}:{hashlib.sha256(sources[name].read_bytes()).hexdigest()};' for name in
+            ('NativeWidgets.h','Host.h','Graphics.h','WidgetInteraction.h','WidgetLayout.h','WindowProperties.h','Appearance.h','FontDatabase.h','Image.h','Presentation.h','NativeView.h'))
         assert abi[1]==hashlib.sha256(abi_input.encode()).hexdigest()
         if (build/'build.ninja').is_file():
             regeneration=next(line for line in (build/'build.ninja').read_text().splitlines() if line.startswith('build build.ninja') and ': RERUN_CMAKE' in line)
-            assert all('/src/iiGUI/'+name in regeneration for name in ('NativeWidgets.h','Host.h','Graphics.h','WidgetInteraction.h','WidgetLayout.h','WindowProperties.h','Appearance.h'))
+            assert all(str(sources[name]) in regeneration for name in ('NativeWidgets.h','Host.h','Graphics.h','WidgetInteraction.h','WidgetLayout.h','WindowProperties.h','Appearance.h'))
         report={'installed':True,'relocated':True,'consumer_compiled_linked_executed':True,
                 'generated_dynamic_layout_factory_compiled_linked':True,'generated_dynamic_window_factory_compiled_linked':True,
                 'unopened_native_host_window_api_executed':True,

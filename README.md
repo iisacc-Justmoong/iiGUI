@@ -284,7 +284,7 @@ weights retain their respective licenses.
 
 ## Source header layout
 
-Public headers and implementations live together in `src/iiGUI/`.
+Public headers and implementations live together in responsibility directories below `src/`.
 There is no separate authored `include/` tree. Existing public `#include` names
 and exported CMake targets are unchanged; installation still places only public
 headers in the package include directory. Generated export headers belong to
@@ -344,6 +344,8 @@ Native C++ visual providers can be composed with [NativeView](docs/NativeView.md
 Source identity retains edits and focus; candidate failures preserve the previous
 view, and parent retirement closes weak endpoints. Existing native drawing,
 input capture and frame data APIs remain the rendering path.
+
+Source and adjacent headers are organized by responsibility under `src/`; installed `<iiGUI/...>` include paths remain unchanged. See [source layout](docs/SourceLayout.md).
 
 <!-- workspace-docs:readme:start -->
 ## Documentation entry points

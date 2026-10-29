@@ -14,7 +14,7 @@ foreach(_case host_contract wayland_policy host_input_queue pipe_write surface_r
     endif()
     add_executable(${_case} "${_source}/tests/${_case}.cpp")
     if(_case STREQUAL "host_contract")
-        target_sources(${_case} PRIVATE "${_source}/src/iiGUI/HostCapabilities.cpp")
+        target_sources(${_case} PRIVATE "${_source}/src/Platform/HostCapabilities.cpp")
     endif()
     target_link_libraries(${_case} PRIVATE iiSDKCore::Contracts)
     target_include_directories(${_case} PRIVATE "${_source}/src" "${IIGUI_GENERATED_INCLUDE}")

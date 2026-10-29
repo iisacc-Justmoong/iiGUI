@@ -1,6 +1,6 @@
 #include "NativeCallableFieldsRuntime.generated.h"
 #include "NativeCallableFieldPostfixRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 using namespace ii;
 namespace {

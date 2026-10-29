@@ -1,5 +1,5 @@
 #include "NativeWorkRuntime.generated.h"
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <condition_variable>
 #include <iostream>
 #include <stdexcept>

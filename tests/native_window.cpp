@@ -2,7 +2,7 @@
 #include "NativeWindowStaticRuntime.generated.h"
 #include "NativeWindowRootRuntime.generated.h"
 #include <LVUI/NativeWindowValues.h>
-#include "../src/iiGUI/WidgetState.h"
+#include "../src/Widgets/WidgetState.h"
 #include <iostream>
 #include <limits>
 #include <stdexcept>

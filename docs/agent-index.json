@@ -21,7 +21,7 @@
       "document_id": "urn:iisacc:document:ef5fec3efb43960dbf1478ca169dd57dfe2f53ba11e5167dff79274ff86e13b0",
       "source": "README.md",
       "agent_json": "docs/entrypoints/README.agent.json",
-      "source_sha256": "ae3be149ef993276f3c4b1cfb6ac989355f67e8e7cf88165587b371273a55d97",
+      "source_sha256": "40119e0aa5dcfb5e906a5ffbf5e415dd050c089b9b5f1e0fc04fb346fe09cbdb",
       "role": "overview"
     },
     {
@@ -301,7 +301,7 @@
       "document_id": "urn:iisacc:document:3ca137bd019282d4d77a813d3611f7b93b2813854f88abd6aeac83254b351beb",
       "source": "docs/README.md",
       "agent_json": "docs/README.agent.json",
-      "source_sha256": "d495551d08a19680005a8fabc9c8a26fcd917037a8bd26b38e1c7c7da1895f3d",
+      "source_sha256": "b2335a1202fa6e47c84fd66cc9a68424260542eeb8146b2962c82e0dcbcd737e",
       "role": "overview"
     },
     {
@@ -344,6 +344,13 @@
       "source": "docs/Shadows.md",
       "agent_json": "docs/Shadows.agent.json",
       "source_sha256": "36a5e1deef129f3fcc8ebe3fac81ba91ddc1c7c246820e2f77bbd85bdb958eb1",
+      "role": "guide"
+    },
+    {
+      "document_id": "urn:iisacc:document:7c06eb9f41f4e57b7fb7d9d23dbdddfc6a6c5d152ff37ba9718f346679119b75",
+      "source": "docs/SourceLayout.md",
+      "agent_json": "docs/SourceLayout.agent.json",
+      "source_sha256": "5a44d71ea33dc5ed1f5a09cd007b06d2dd568244889cb33d05856dd40ddd4cf2",
       "role": "guide"
     },
     {
