@@ -1,0 +1,12 @@
+{
+  "protocol": "xdg-shell",
+  "upstream": "https://gitlab.freedesktop.org/wayland/wayland-protocols",
+  "version": "1.44",
+  "scanner": "wayland-scanner 1.23.1",
+  "license": "MIT (inline in XML and generated files)",
+  "files": {
+    "xdg-shell-client-protocol.h": "1fa7e6cdfd0adafe3a2d9870af6fbc7d36de500ca7ad09f3fd51130a8dfa450e",
+    "xdg-shell.xml": "9d9e27038ca722f159a361293f8c6cd270dab907ab52de5b8ecfbb8d6b9651c2",
+    "xdg-shell-protocol.c": "1ffea71e9cbe07758b437a7e43a60ee6f93c406d020eca568df220e9488ae999"
+  }
+}

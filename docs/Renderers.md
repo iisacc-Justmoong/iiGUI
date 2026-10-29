@@ -1,20 +1,26 @@
 # Native rendering and Vulkan fallback
 
-iiGUI uses the platform window system directly. LVUI describes the view;
-iiGUI measures native fonts, lays out boxes and draws native GPU graphics.
+iiGUI uses the platform window system directly and provides native font
+measurement and GPU graphics. The application may compose it with LVUI, whose
+document adapter owns the corresponding box layout.
 Qt, a browser engine, WebView, SDL and a JavaScript application runtime are
 not part of this rendering path.
+
+이 문서는 기존 데스크톱 GPU 경로를 설명한다. 직접 Wayland는 xdg-shell/Vulkan,
+Android는 NativeActivity/Vulkan, Web은 C++23 AOT Wasm/OffscreenCanvas/WebGL2로
+확장되었다. Web에는 브라우저 API bridge가 존재한다. 새 대상의 지원 범위·선택·제약은
+[HostPlatforms.md](HostPlatforms.md)를 기준으로 삼는다.
 
 | Platform | Window/text host | Automatic graphics selection |
 |---|---|---|
 | macOS | Cocoa/AppKit, native text shaping, NSView/CAMetalLayer | Metal, then Vulkan/MoltenVK on native accelerator failure |
 | Windows | Win32, DirectWrite/Direct2D, native child HWND | Direct3D 11 hardware, then Vulkan on native accelerator failure |
-| Linux | X11/XWayland, Pango/Cairo, native child Window | Vulkan directly |
+| Linux | Wayland/xdg-shell 또는 X11, Pango/Cairo | Vulkan directly |
 
 The previous Linux EGL/GLES renderer is retired from this source. WARP is no
 longer the automatic Windows fallback. `GraphicsApi::opengl_es3` retains its
 old enum value for source compatibility; it does not enable a GLES backend.
-Direct Wayland and mobile window systems are outside the desktop host scope.
+Direct Wayland and mobile host contracts are documented in HostPlatforms.md.
 
 ## Selection and failures
 
@@ -28,6 +34,7 @@ Direct Wayland and mobile window systems are outside the desktop host scope.
 - `Renderer::vulkan`: use Vulkan directly, including for verification.
 
 ```cpp
+#include <LVUI/NativeDocument.h> // Application composes LVUI and iiGUI.
 auto document = lvui::parse(source);
 // Production default: Metal/Direct3D hardware first, Vulkan fallback.
 auto shown = host.set_view(*document);

@@ -7,7 +7,7 @@ import sys
 root = Path(sys.argv[1])
 violations = []
 public_headers = {root / 'src/iiGUI' / name for name in
-                  ('Graphics.h', 'Image.h', 'Host.h', 'LVUI.h', 'NativeWidgets.h', 'Appearance.h', 'Application.h', 'iiGUI.h')}
+                  ('Graphics.h', 'Image.h', 'Host.h', 'Text.h', 'NativeWidgets.h', 'Appearance.h', 'Application.h', 'iiGUI.h')}
 for header in public_headers:
     if not header.is_file():
         violations.append(f'{header}: public header missing from source directory')
@@ -16,17 +16,23 @@ for base in (root / 'src',):
         if not file.is_file() or file.suffix not in {'.h', '.hpp', '.cpp', '.cc', '.mm', '.m'}:
             continue
         source = file.read_text()
+        if re.search(r'^\s*#\s*(?:include|import)\s*[<"]LVUI/|\blvui::|namespace\s+lvui\b', source, re.M):
+            violations.append(f'{file}: lower-level host depends on LVUI')
         if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:Qt|Q[A-Z]|SDL|WebKit|WebView|webkit|cef_)', source, re.M):
             violations.append(f'{file}: GUI-framework dependency')
         if file in public_headers and re.search(
-                r'^\s*#\s*(?:include|import)\s*[<"](?:AppKit|Foundation|CoreFoundation|Metal|QuartzCore|CoreGraphics|objc|[Ww]indows\.h|[Dd]3[dD]|[Dd][Xx][Gg][Ii]|d2d|dwrite|vulkan/|EGL/|GLES|X11/|wayland|sys/)', source, re.M):
+                r'^\s*#\s*(?:include|import)\s*[<"](?:AppKit|Foundation|CoreFoundation|Metal|QuartzCore|CoreGraphics|objc|[Ww]indows\.h|[Dd]3[dD]|[Dd][Xx][Gg][Ii]|d2d|dwrite|vulkan/|EGL/|GLES|X11/|wayland|android/|emscripten|sys/)', source, re.M):
             violations.append(f'{file}: native type leaked into public API')
         if re.search(r'\b(?:ofstream|fopen|freopen|creat)\s*\(', source):
             violations.append(f'{file}: file creation bypasses iiFileProvider')
 for file in (root / 'CMakeLists.txt', root / 'cmake/iiGUIConfig.cmake.in'):
     if re.search(r'(?:find_package|find_dependency)\s*\(\s*(?:Qt|SDL|WebKit|WebView|CEF)', file.read_text()):
         violations.append(f'{file}: framework package dependency')
+    if re.search(r'(?:find_package|find_dependency)\s*\(\s*LVUI\b|target_link_libraries\s*\(\s*iiGUI\b[^)]*\bLVUI::', file.read_text(), re.S):
+        violations.append(f'{file}: host or package depends on LVUI')
 manifest = json.loads((root / 'examples/HelloGUI/iiSDKBuilder.json').read_text())
+if any(kit['name'] == 'LVUI' for kit in manifest['sdks']):
+    violations.append('The standalone HelloGUI SDK graph must not build LVUI')
 for name in ('NativeWidgetsMac.mm', 'Host.mm'):
     source=(root/'src/iiGUI'/name).read_text()
     if re.search(r'\b(?:NSButton|NSTextField|NSStackView|NSControl|NSLayoutConstraint)\b',source):
@@ -40,4 +46,4 @@ if re.search(r'^\s*#\s*(?:if|elif)', hello, re.M):
     violations.append('HelloGUI must use the same C++23 application code on every desktop')
 if violations:
     raise SystemExit('\n'.join(violations))
-print('iiGUI source/package boundary: C++23 public API, Core/LVUI SDKs, no Qt/SDL/browser/WebView/file creation')
+print('iiGUI source/package boundary: C++23 public API, no LVUI/Qt/SDL/WebView or file-provider bypass')

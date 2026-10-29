@@ -1,7 +1,9 @@
+#include "FontDatabase.h"
 #include "WidgetSurface.h"
 #include "NativeCanvas.h"
 #include "DesktopCommon.h"
 #include "NativeDesktop_p.hpp"
+#include "XInputPenState.h"
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
@@ -22,8 +24,14 @@ struct WidgetSurface::Impl final {
     Display* display;Window parent;WidgetSurfaceCallbacks callbacks;std::function<double()> scale;NativeCanvas canvas;
     Window drag_source=0;double drag_x=0,drag_y=0;bool drag_supported=false;
     bool dirty=true,frame_paced=false,xi=false;int xi_opcode=0;XIM method=nullptr;XIC context=nullptr;
-    struct Axis final{int pressure=-1,tilt_x=-1,tilt_y=-1,rotation=-1;double pressure_min=0,pressure_max=1;bool pen=false,eraser=false;};std::map<int,Axis> axes;
-    Impl(const X11WidgetParent& native,WidgetSurfaceCallbacks value):display(static_cast<Display*>(native.display)),parent(native.window),callbacks(std::move(value)),scale(native.scale),canvas(reinterpret_cast<void*>(parent),display,Acceleration::prefer_hardware,callbacks.renderer){
+    struct Axis final {
+        int pressure=-1,tilt_x=-1,tilt_y=-1,rotation=-1;
+        double pressure_min=0,pressure_max=1;
+        bool pen=false,eraser=false;
+        XInputPenState sensors;
+    };
+    std::map<int,Axis> axes;
+    Impl(const X11WidgetParent& native,WidgetSurfaceCallbacks value):display(static_cast<Display*>(native.display)),parent(native.window),callbacks(std::move(value)),scale(native.scale),canvas(reinterpret_cast<void*>(parent),display,Acceleration::prefer_hardware,callbacks.renderer,callbacks.presentations){
         XWindowAttributes attributes{};XGetWindowAttributes(display,parent,&attributes);
         XSelectInput(display,parent,attributes.your_event_mask|ExposureMask|KeyPressMask|KeyReleaseMask|FocusChangeMask|ButtonPressMask|ButtonReleaseMask|PointerMotionMask|PropertyChangeMask);
         int event=0,error=0;if(XQueryExtension(display,"XInputExtension",&xi_opcode,&event,&error)){int major=2,minor=2;if(XIQueryVersion(display,&major,&minor)==Success){unsigned char mask[XIMaskLen(XI_TouchEnd)]{};for(int code:{XI_ButtonPress,XI_ButtonRelease,XI_Motion,XI_TouchBegin,XI_TouchUpdate,XI_TouchEnd})XISetMask(mask,code);XIEventMask selection{XIAllMasterDevices,int(sizeof(mask)),mask};xi=XISelectEvents(display,parent,&selection,1)==Success;}}
@@ -39,17 +47,74 @@ struct WidgetSurface::Impl final {
     void send(WidgetInput value){callbacks.input(std::move(value));invalidate();caret();}
     std::optional<WidgetSnapshot> editor()const{for(auto& value:callbacks.accessibility())if(value.focused&&value.text_input)return value;return {};}
     void caret(){if(!context)return;auto value=editor();if(!value)return;auto r=value->caret_bounds;XPoint point{short(std::clamp(r.x*dpi(),-32768.,32767.)),short(std::clamp((r.y+r.height)*dpi(),-32768.,32767.))};auto list=XVaCreateNestedList(0,XNSpotLocation,&point,nullptr);if(list){XSetICValues(context,XNPreeditAttributes,list,nullptr);XFree(list);}}
-    Axis& device(int id){if(auto found=axes.find(id);found!=axes.end())return found->second;Axis axis;int count=0;auto* devices=XIQueryDevice(display,id,&count);if(devices&&count){std::string name=devices[0].name?devices[0].name:"";std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return char(std::tolower(c));});axis.eraser=name.find("eraser")!=name.npos;
-        for(int i=0;i<devices[0].num_classes;++i){auto* base=devices[0].classes[i];if(base->type!=XIValuatorClass)continue;auto* value=reinterpret_cast<XIValuatorClassInfo*>(base);char* label=value->label?XGetAtomName(display,value->label):nullptr;std::string_view text=label?label:"";
-            if(text=="Abs Pressure"){axis.pressure=value->number;axis.pressure_min=value->min;axis.pressure_max=value->max;axis.pen=true;}else if(text=="Abs Tilt X")axis.tilt_x=value->number;else if(text=="Abs Tilt Y")axis.tilt_y=value->number;else if(text=="Abs Rotation")axis.rotation=value->number;if(label)XFree(label);}}
-        if(devices)XIFreeDeviceInfo(devices);return axes.emplace(id,axis).first->second;}
+    Axis& device(int id) {
+        if(auto found=axes.find(id);found!=axes.end()) return found->second;
+        Axis axis;
+        XInputPenUpdate initial;
+        int count=0;
+        auto* devices=XIQueryDevice(display,id,&count);
+        if(devices&&count) {
+            std::string name=devices[0].name?devices[0].name:"";
+            std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return char(std::tolower(c));});
+            axis.eraser=name.find("eraser")!=name.npos;
+            for(int i=0;i<devices[0].num_classes;++i) {
+                auto* base=devices[0].classes[i];
+                if(base->type!=XIValuatorClass) continue;
+                auto* info=reinterpret_cast<XIValuatorClassInfo*>(base);
+                char* label=info->label?XGetAtomName(display,info->label):nullptr;
+                const std::string_view text=label?label:"";
+                if(text=="Abs Pressure") {
+                    axis.pressure=info->number;axis.pressure_min=info->min;axis.pressure_max=info->max;axis.pen=true;
+                    if(std::isfinite(info->value) && std::isfinite(info->min) && std::isfinite(info->max) && info->max>info->min)
+                        initial.pressure=std::clamp((info->value-info->min)/(info->max-info->min),0.,1.);
+                } else if(text=="Abs Tilt X") {
+                    axis.tilt_x=info->number;
+                    if(std::isfinite(info->value)) initial.tilt_x=std::clamp(info->value,-90.,90.);
+                } else if(text=="Abs Tilt Y") {
+                    axis.tilt_y=info->number;
+                    if(std::isfinite(info->value)) initial.tilt_y=std::clamp(info->value,-90.,90.);
+                } else if(text=="Abs Rotation") {
+                    axis.rotation=info->number;
+                    if(std::isfinite(info->value)) initial.rotation=info->value;
+                }
+                if(label) XFree(label);
+            }
+        }
+        if(devices) XIFreeDeviceInfo(devices);
+        (void)axis.sensors.merge(initial);
+        return axes.emplace(id,std::move(axis)).first->second;
+    }
     bool extended(XGenericEventCookie& cookie){if(!xi||cookie.extension!=xi_opcode||!XGetEventData(display,&cookie))return false;struct Release final{Display* display;XGenericEventCookie* cookie;~Release(){XFreeEventData(display,cookie);}}release{display,&cookie};const auto type=cookie.evtype;
         if(type!=XI_ButtonPress&&type!=XI_ButtonRelease&&type!=XI_Motion&&type!=XI_TouchBegin&&type!=XI_TouchUpdate&&type!=XI_TouchEnd)return false;auto* native=static_cast<XIDeviceEvent*>(cookie.data);if(native->event!=parent)return false;
         const bool touch=type==XI_TouchBegin||type==XI_TouchUpdate||type==XI_TouchEnd,down=type==XI_ButtonPress||type==XI_TouchBegin,up=type==XI_ButtonRelease||type==XI_TouchEnd;
         if(!touch&&native->detail>=4&&native->detail<=7){if(down){auto value=input(WidgetInputKind::scroll,native->mods.effective,native->time);value.x=native->event_x/dpi();value.y=native->event_y/dpi();if(native->detail<6)value.scroll_y=native->detail==4?48:-48;else value.scroll_x=native->detail==6?48:-48;send(std::move(value));}return true;}
         auto value=input(down?WidgetInputKind::pointer_down:up?WidgetInputKind::pointer_up:WidgetInputKind::pointer_move,native->mods.effective,native->time);value.x=native->event_x/dpi();value.y=native->event_y/dpi();value.device_id=native->sourceid;
-        const auto& axis=device(native->sourceid);value.device=touch?PointerDevice::touch:axis.eraser?PointerDevice::eraser:axis.pen?PointerDevice::pen:PointerDevice::mouse;
-        const double* values=native->valuators.values;for(int number=0;number<native->valuators.mask_len*8;++number){if(!XIMaskIsSet(native->valuators.mask,number))continue;const auto v=*values++;if(number==axis.pressure&&axis.pressure_max>axis.pressure_min)value.pressure=std::clamp((v-axis.pressure_min)/(axis.pressure_max-axis.pressure_min),0.,1.);else if(number==axis.tilt_x)value.tilt_x=std::clamp(v,-90.,90.);else if(number==axis.tilt_y)value.tilt_y=std::clamp(v,-90.,90.);else if(number==axis.rotation)value.rotation=v;}
+        auto& axis=device(native->sourceid);
+        value.device=touch?PointerDevice::touch:axis.eraser?PointerDevice::eraser:axis.pen?PointerDevice::pen:PointerDevice::mouse;
+        const bool pen=!touch&&(axis.pen||axis.eraser);
+        XInputPenUpdate update;
+        const double* values=native->valuators.values;
+        for(int number=0;number<native->valuators.mask_len*8;++number) {
+            if(!XIMaskIsSet(native->valuators.mask,number)) continue;
+            const auto v=*values++;
+            if(number==axis.pressure&&axis.pressure_max>axis.pressure_min) {
+                const auto pressure=std::isfinite(v)?std::clamp((v-axis.pressure_min)/(axis.pressure_max-axis.pressure_min),0.,1.):v;
+                if(pen) update.pressure=pressure;else value.pressure=pressure;
+            } else if(number==axis.tilt_x) {
+                const auto tilt=std::isfinite(v)?std::clamp(v,-90.,90.):v;
+                if(pen) update.tilt_x=tilt;else value.tilt_x=tilt;
+            } else if(number==axis.tilt_y) {
+                const auto tilt=std::isfinite(v)?std::clamp(v,-90.,90.):v;
+                if(pen) update.tilt_y=tilt;else value.tilt_y=tilt;
+            } else if(number==axis.rotation) {
+                if(pen) update.rotation=v;else value.rotation=v;
+            }
+        }
+        if(pen) {
+            // Preserve pointer down/up delivery even when a sensor update is invalid.
+            (void)axis.sensors.merge(update);
+            axis.sensors.fill(value);
+        }
         for(int button=1;button<=3;++button)if(XIMaskIsSet(native->buttons.mask,button))value.buttons|=button==1?1:button==3?2:4;if(down)value.buttons|=touch||native->detail==1?1:native->detail==3?2:4;
         if(down){XSetInputFocus(display,parent,RevertToParent,CurrentTime);XGrabPointer(display,parent,False,PointerMotionMask|ButtonReleaseMask,GrabModeAsync,GrabModeAsync,None,None,CurrentTime);}send(std::move(value));if(up)XUngrabPointer(display,CurrentTime);return true;
     }
@@ -86,7 +151,7 @@ WidgetSurface::~WidgetSurface()=default;void WidgetSurface::invalidate(){impl_->
 void WidgetSurface::accessibility_changed(){}void WidgetSurface::accessibility_value_changed(std::string_view){}
 void WidgetSurface::set_frame_paced(bool value){impl_->frame_paced=value;}void WidgetSurface::flush(){impl_->flush();}
 Size WidgetSurface::size()const{return impl_->size();}double WidgetSurface::backing_scale()const{return impl_->dpi();}
-std::string WidgetSurface::resolve_font_family(std::string_view value)const{return value.empty()?"sans-serif":std::string(value);}
+std::string WidgetSurface::resolve_font_family(std::string_view value)const{return FontDatabase::application()->resolve_family(value);}
 GraphicsInfo WidgetSurface::info(){return impl_->canvas.info();}PixelBuffer WidgetSurface::capture(){impl_->flush();return impl_->canvas.capture();}
 bool WidgetSurface::native_event(const void* value){try{return impl_->process(*static_cast<const XEvent*>(value));}catch(...){impl_->callbacks.failure(std::current_exception());return true;}}
 }

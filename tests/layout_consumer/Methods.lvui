@@ -1,0 +1,2 @@
+import vm LayoutModel
+Window { Label(text: vm.summary()) }

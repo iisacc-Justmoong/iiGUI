@@ -7,8 +7,10 @@
 #include "DesktopCommon.h"
 #include "TextBoundary.h"
 #include <iiSDKCore/Core/Text/Utf8.h>
+#include <exception>
 #include <limits>
 #include <map>
+#include <unordered_set>
 
 namespace ii::gui::detail {
 namespace {
@@ -21,12 +23,16 @@ bool geometry(double v) { return std::isfinite(v) && v>=0 && v<=32767; }
 float linear(double c) { return float(c<=.04045 ? c/12.92 : std::pow((c+.055)/1.055,2.4)); }
 Color color(WidgetColor c) { return {linear(c.red),linear(c.green),linear(c.blue),float(c.alpha)}; }
 bool valid_color(WidgetColor c) { return geometry(c.red) && geometry(c.green) && geometry(c.blue) && geometry(c.alpha) && c.red<=1 && c.green<=1 && c.blue<=1 && c.alpha<=1; }
-bool valid_stack(StackOptions o){if(!geometry(o.spacing)||!geometry(o.padding)||static_cast<unsigned>(o.alignment)>3||!geometry(o.minimum_width)||o.minimum_width>8192||!geometry(o.minimum_height)||o.minimum_height>8192)return false;for(auto insets:{o.insets,o.implicit_insets})if(insets)for(double n:{insets->left,insets->top,insets->right,insets->bottom})if(!geometry(n)||n>8192)return false;return true;}
+bool valid_stack(const StackOptions& o){return valid_stack_options(o);}
+double alignment_offset(StackAlignment alignment,double available,double content) {
+    if (alignment==StackAlignment::leading || alignment==StackAlignment::stretch) return 0;
+    return alignment==StackAlignment::trailing ? available-content : (available-content)/2;
+}
 bool valid_style(const ButtonStyle& s){for(const auto* c:{&s.fill,&s.hover_fill,&s.pressed_fill,&s.disabled_fill,&s.text,&s.disabled_text,&s.border})if(*c&&!valid_color(**c))return false;return geometry(s.border_width)&&geometry(s.line_height)&&s.line_height<=8192&&(!s.text_role||unsigned(*s.text_role)<=7)&&(!s.font_size||(std::isfinite(*s.font_size)&&*s.font_size>=1&&*s.font_size<=256));}
 bool valid_button(const ButtonOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&unsigned(o.tone)<=4&&valid_title(o.icon_name)&&o.icon_name.size()<=65536&&valid_title(o.accessibility_name)&&o.accessibility_name.size()<=65536&&geometry(o.icon_size)&&o.icon_size>=1&&o.icon_size<=256&&(!o.style||valid_style(*o.style))&&(!o.height||(geometry(*o.height)&&*o.height>=1))&&(!o.corner_radius||geometry(*o.corner_radius))&&(!o.horizontal_padding||geometry(*o.horizontal_padding))&&(!o.left_padding||geometry(*o.left_padding))&&(!o.right_padding||geometry(*o.right_padding))&&(!o.content_spacing||(std::isfinite(*o.content_spacing)&&*o.content_spacing>=-256&&*o.content_spacing<=8192))&&(!o.indicator_size||(geometry(*o.indicator_size)&&*o.indicator_size>=1&&*o.indicator_size<=256))&&(!o.width||(geometry(*o.width)&&*o.width>=1))&&(!o.icon_mode||o.icon);}
 bool valid_label(const LabelOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&std::isfinite(o.font_size)&&o.font_size>=1&&o.font_size<=256&&geometry(o.line_height)&&o.line_height<=8192&&unsigned(o.role)<=7&&unsigned(o.alignment)<=2&&(!o.color||valid_color(*o.color))&&(!o.font_weight||*o.font_weight==400||*o.font_weight==500||*o.font_weight==600||*o.font_weight==700);}
 bool valid_action(const ActionOptions& o){
-    if(!valid_title(o.accessibility_description)||o.accessibility_description.size()>65536||!valid_title(o.text)||o.text.size()>65536||!valid_title(o.accessibility_name)||o.accessibility_name.size()>65536||unsigned(o.role)>1||unsigned(o.text_role)>7||!std::isfinite(o.font_size)||o.font_size<1||o.font_size>256)return false;
+    if(!valid_title(o.accessibility_description)||o.accessibility_description.size()>65536||!valid_title(o.text)||o.text.size()>65536||!valid_title(o.accessibility_name)||o.accessibility_name.size()>65536||unsigned(o.role)>unsigned(ActionRole::menu_item)||unsigned(o.text_role)>7||!std::isfinite(o.font_size)||o.font_size<1||o.font_size>256)return false;
     for(auto n:{o.line_height,o.padding.left,o.padding.top,o.padding.right,o.padding.bottom,o.minimum_width,o.minimum_height,o.corner_radius})if(!geometry(n)||n>8192)return false;
     for(auto n:{o.width,o.height})if(n&&(!geometry(*n)||*n>8192))return false;
     for(auto c:{o.text_color,o.hover_text_color,o.pressed_text_color,o.disabled_text_color})if(c&&!valid_color(*c))return false;return true;
@@ -41,14 +47,16 @@ bool valid_transition(const std::optional<PopoverTransition>& value){
         std::isfinite(t.overshoot)&&t.overshoot>=0&&t.overshoot<=4&&std::isfinite(t.collapsed_scale)&&t.collapsed_scale>=.5&&t.collapsed_scale<=1&&std::isfinite(t.origin.width)&&std::isfinite(t.origin.height)&&t.origin.width>=0&&t.origin.width<=1&&t.origin.height>=0&&t.origin.height<=1;
 }
 bool valid_sheet(const std::optional<SheetLayoutOptions>& value){if(!value)return true;const auto& o=*value;return unsigned(o.detent)<=2&&geometry(o.preferred_height)&&o.preferred_height<=8192&&geometry(o.desktop_margin)&&o.desktop_margin<=8192&&geometry(o.top_safe_inset)&&o.top_safe_inset<=8192&&!o.viewport_id.empty()&&valid_title(o.viewport_id)&&valid_title(o.grabber_id);}
+bool valid_popup_rect(Rect r){return std::isfinite(r.x)&&std::isfinite(r.y)&&std::abs(r.x)<=32767&&std::abs(r.y)<=32767&&geometry(r.width)&&geometry(r.height)&&r.width<=8192&&r.height<=8192;}
+bool valid_adaptive(const std::optional<PopoverAdaptiveLayout>& value){return !value||(!value->viewport_id.empty()&&valid_title(value->viewport_id)&&bool(value->layout));}
 bool valid_popup_bounds(const PopoverOptions& o){
-    const auto valid=[](Rect r){return std::isfinite(r.x)&&std::isfinite(r.y)&&std::abs(r.x)<=32767&&std::abs(r.y)<=32767&&geometry(r.width)&&geometry(r.height)&&r.width<=8192&&r.height<=8192;};
     if(o.preserve_input&&(o.modal||o.focus_on_open))return false;
-    if(o.bounds&&(!valid(*o.bounds)||o.bounds->width<1||o.bounds->height<1||o.sheet_layout))return false;
-    if(o.input_bounds){const auto r=*o.input_bounds;if(!valid(r)||r.x<0||r.y<0)return false;if(o.bounds&&(r.x+r.width>o.bounds->width+.01f||r.y+r.height>o.bounds->height+.01f))return false;}
+    if(o.bounds&&(!valid_popup_rect(*o.bounds)||o.bounds->width<1||o.bounds->height<1||o.sheet_layout||o.adaptive_layout))return false;
+    if(o.adaptive_layout&&o.sheet_layout)return false;
+    if(o.input_bounds){const auto r=*o.input_bounds;if(!valid_popup_rect(r)||r.x<0||r.y<0)return false;if(o.bounds&&(r.x+r.width>o.bounds->width+.01f||r.y+r.height>o.bounds->height+.01f))return false;}
     return true;
 }
-bool valid_popover_options(const PopoverOptions& o){return valid_popup_bounds(o)&&valid_sheet(o.sheet_layout)&&(!o.sheet_layout||(o.padding==0&&o.placement==PopoverPlacement::centered))&&geometry(o.width)&&o.width<=8192&&geometry(o.height)&&o.height<=8192&&geometry(o.padding)&&o.padding<=8192&&geometry(o.margins)&&geometry(o.corner_radius)&&std::isfinite(o.surface_opacity)&&o.surface_opacity>=0&&o.surface_opacity<=1&&(!o.surface_color||valid_color(*o.surface_color))&&valid_title(o.accessibility_name)&&static_cast<unsigned>(o.placement)<=1&&geometry(o.minimum_width)&&geometry(o.maximum_width)&&o.maximum_width&&o.maximum_width<=8192&&o.minimum_width<=o.maximum_width&&geometry(o.minimum_height)&&std::isfinite(o.vertical_offset)&&std::abs(o.vertical_offset)<=32767&&valid_color(o.backdrop_color)&&std::isfinite(o.corner_limit)&&o.corner_limit>=0&&o.corner_limit<=.5&&geometry(o.border_width)&&valid_color(o.border_color)&&(!o.blur_radius||(geometry(*o.blur_radius)&&*o.blur_radius<=64))&&(!o.shadow||(std::isfinite(o.shadow->offset_x)&&std::abs(o.shadow->offset_x)<=8192&&std::isfinite(o.shadow->offset_y)&&std::abs(o.shadow->offset_y)<=8192&&geometry(o.shadow->blur_radius)&&o.shadow->blur_radius<=64&&valid_color(o.shadow->color)));}
+bool valid_popover_options(const PopoverOptions& o){return valid_popup_bounds(o)&&valid_sheet(o.sheet_layout)&&valid_adaptive(o.adaptive_layout)&&(!(o.sheet_layout||o.adaptive_layout)||(o.padding==0&&o.placement==PopoverPlacement::centered))&&geometry(o.width)&&o.width<=8192&&geometry(o.height)&&o.height<=8192&&geometry(o.padding)&&o.padding<=8192&&geometry(o.margins)&&geometry(o.corner_radius)&&std::isfinite(o.surface_opacity)&&o.surface_opacity>=0&&o.surface_opacity<=1&&(!o.surface_color||valid_color(*o.surface_color))&&valid_title(o.accessibility_name)&&static_cast<unsigned>(o.placement)<=1&&geometry(o.minimum_width)&&geometry(o.maximum_width)&&o.maximum_width&&o.maximum_width<=8192&&o.minimum_width<=o.maximum_width&&geometry(o.minimum_height)&&std::isfinite(o.vertical_offset)&&std::abs(o.vertical_offset)<=32767&&valid_color(o.backdrop_color)&&std::isfinite(o.corner_limit)&&o.corner_limit>=0&&o.corner_limit<=.5&&geometry(o.border_width)&&valid_color(o.border_color)&&(!o.blur_radius||(geometry(*o.blur_radius)&&*o.blur_radius<=64))&&(!o.shadow||(std::isfinite(o.shadow->offset_x)&&std::abs(o.shadow->offset_x)<=8192&&std::isfinite(o.shadow->offset_y)&&std::abs(o.shadow->offset_y)<=8192&&geometry(o.shadow->blur_radius)&&o.shadow->blur_radius<=64&&valid_color(o.shadow->color)));}
 bool contains(Rect r,double x,double y) { return x>=r.x && y>=r.y && x<r.x+r.width && y<r.y+r.height; }
 Rect intersect(Rect a,Rect b){const auto right=std::min(a.x+a.width,b.x+b.width),bottom=std::min(a.y+a.height,b.y+b.height);a.x=std::max(a.x,b.x);a.y=std::max(a.y,b.y);a.width=std::max(0.f,right-a.x);a.height=std::max(0.f,bottom-a.y);return a;}
 bool valid_scroll(ScrollOptions o){const auto extent=[](auto v){return !v||(std::isfinite(*v)&&*v>=0&&*v<=1e15);};return geometry(o.width)&&geometry(o.height)&&o.width<=8192&&o.height<=8192&&extent(o.virtual_content_height)&&extent(o.virtual_content_width);}
@@ -78,6 +86,7 @@ struct WidgetState::Impl final {
         } motion;
         MenuOptions options;
         std::optional<PopoverOptions> popover;
+        std::optional<core::Error> layout_failure;
         WidgetFactory content_factory;
         std::shared_ptr<WidgetState> content_view;
         std::size_t content_anchor=absent;
@@ -94,7 +103,18 @@ struct WidgetState::Impl final {
         MenuDirection horizontal=MenuDirection::right,vertical=MenuDirection::down;
     };
     struct Node final {
-        struct Content final {std::shared_ptr<WidgetState> view;std::uint64_t epoch=0;bool constructing=false;};
+        struct Content final {
+            struct Keyed final {
+                std::vector<std::string> keys;
+                std::vector<std::optional<Rect>> frames;
+                std::unordered_map<std::string,std::size_t> slots;
+                KeyedContentOptions options;
+            };
+            std::shared_ptr<WidgetState> view;
+            std::unique_ptr<Keyed> keyed;
+            std::uint64_t epoch=0;
+            bool constructing=false;
+        };
         std::unique_ptr<Content> content;
         struct Scroll final {ScrollOptions options;double offset=0,content_height=0,horizontal_offset=0,content_width=0;std::function<void(const ScrollViewport&)> changed;std::optional<ScrollViewport> delivered;bool notifying=false;};
         WidgetKind kind=WidgetKind::label;
@@ -118,6 +138,7 @@ struct WidgetState::Impl final {
         Size layout_measurement;
         std::optional<Rect> fixed_frame;
         bool shown=true,clip=false;
+        double opacity=1;
         runtime::Task escape;
         TabOptions tab;
         TabBarOptions tabbar;
@@ -132,6 +153,7 @@ struct WidgetState::Impl final {
         std::unique_ptr<ColorButton> color_button;
         std::unique_ptr<Scroll> scroll;
         std::optional<WidgetDrawing> drawing;
+        std::optional<AccessibilitySemantics> semantics;
         WidgetPaintHandler paint_handler;std::size_t paint_source=absent;
         WidgetFrameHandler frame_handler;bool frame_active=false;std::uint64_t frame_revision=0;
         WidgetInputHandler input_handler;
@@ -141,6 +163,8 @@ struct WidgetState::Impl final {
         std::size_t activation_owner=absent;
         bool enabled=true,checked=false,metrics_dirty=true;
         Size measured;
+        std::function<void(const WidgetMeasurement&)> measure_changed;
+        std::optional<WidgetMeasurement> delivered_measurement;
         Rect bounds;
         runtime::Task action;
         std::function<void(bool)> toggled;
@@ -151,10 +175,10 @@ struct WidgetState::Impl final {
     };
     static Insets padding(const Node& n){if(n.kind==WidgetKind::segmented_control)return {n.segments.horizontal_padding,n.segments.vertical_padding,n.segments.horizontal_padding,n.segments.vertical_padding};return n.stack.insets.value_or(Insets{n.stack.padding,n.stack.padding,n.stack.padding,n.stack.padding});}
     static Insets implicit_padding(const Node& n){return n.stack.implicit_insets.value_or(padding(n));}
-    static void configure_popup(Popup& p,PopoverOptions o){p.popover=o;p.options.left_padding=p.options.right_padding=o.padding;p.options.top_padding=p.options.bottom_padding=o.padding;p.options.edge_margin=o.margins;p.options.corner_radius=o.corner_radius;p.options.opacity=o.surface_opacity;p.options.background=o.surface_color.value_or(WidgetColor{20./255,20./255,20./255,1});p.options.dismiss_on_outside_press=p.options.dismiss_on_context_request=o.dismiss_on_outside_press;}
+    static void configure_popup(Popup& p,PopoverOptions o){p.popover=o;p.layout_failure.reset();p.options.left_padding=p.options.right_padding=o.padding;p.options.top_padding=p.options.bottom_padding=o.padding;p.options.edge_margin=o.margins;p.options.corner_radius=o.corner_radius;p.options.opacity=o.surface_opacity;p.options.background=o.surface_color.value_or(WidgetColor{20./255,20./255,20./255,1});p.options.dismiss_on_outside_press=o.dismiss_on_outside_press;p.options.dismiss_on_context_request=o.dismiss_on_context_request.value_or(o.dismiss_on_outside_press);}
     const std::thread::id owner=std::this_thread::get_id();
-    bool active=true,building=true,layout_dirty=true;
-    struct Domain final {std::size_t nodes=0,allowance=0;std::weak_ptr<WidgetState> staged;};
+    bool active=true,building=true,layout_dirty=true,published=false,publishing=false;
+    struct Domain final {std::size_t nodes=0,allowance=0;std::weak_ptr<WidgetState> staged;bool providing_popup_layout=false;};
     std::shared_ptr<Domain> domain=std::make_shared<Domain>();
     bool content_transition=false;
     std::weak_ptr<WidgetState> embedding_owner;
@@ -166,8 +190,12 @@ struct WidgetState::Impl final {
     mutable bool host_order_dirty=true;
     std::map<std::string,std::size_t,std::less<>> ids;
     std::vector<std::shared_ptr<void>> owners;
+    std::vector<runtime::Task> publication_hooks;
+    std::vector<runtime::Task> retirement_hooks;
     std::function<void(runtime::Task)> invoke;
     WidgetAppearance appearance;
+    std::shared_ptr<FontDatabase> fonts;
+    core::ObservableSubscription font_subscription;
     std::string resolved_font_family;
     std::string resolved_compact_font_family;
     std::unique_ptr<WidgetSurface> surface;
@@ -176,6 +204,8 @@ struct WidgetState::Impl final {
     std::vector<std::size_t> popups;
     std::vector<std::size_t> visual_popups;
     WidgetFrameHooks frame_hooks;
+    WindowProperties requested_window;
+    bool window_committed=false,updating_window=false,factory_started=false;
     std::vector<std::size_t> frame_nodes;
     runtime::FrameLoop* motion_frames=nullptr;
     std::optional<runtime::TickToken> motion_tick;
@@ -204,7 +234,11 @@ struct WidgetState::Impl final {
         if(!active)return nullptr;if(surface)return surface.get();
         if(auto parent=embedding_owner.lock())return parent->impl_->presentation_surface();return nullptr;
     }
-    void accessibility_changed() const {if(auto s=presentation_surface())s->accessibility_changed();}
+    void accessibility_changed() const {
+        auto notify=frame_hooks.accessibility_changed;
+        if(auto s=presentation_surface())s->accessibility_changed();
+        if(active&&notify)notify();
+    }
     void accessibility_value_changed(std::string_view id) const {if(auto s=presentation_surface())s->accessibility_value_changed(scope_prefix+std::string(id));}
     std::size_t active_nodes() const {auto count=nodes.size();for(const auto& n:nodes)if(auto child=n.content?n.content->view:n.popup?n.popup->content_view:nullptr)count+=child->impl_->active_nodes();return count;}
     std::size_t active_popups() const {auto count=popups.size();for(const auto& n:nodes)if(auto child=n.content?n.content->view:n.popup?n.popup->content_view:nullptr)count+=child->impl_->active_popups();return count;}
@@ -213,6 +247,28 @@ struct WidgetState::Impl final {
         if(i==absent)return {};const auto& n=nodes[i];return n.content?n.content->view:n.popup?n.popup->content_view:n.activation_owner!=absent?nodes[n.activation_owner].popup->content_view:std::shared_ptr<WidgetState>{};
     }
     bool focusable_content(std::size_t i)const {auto child=embedded_view(i);return child&&child->impl_->next_content(absent,absent,1)!=absent;}
+    struct KeyContext final {bool text=false,control=false,navigation=false;};
+    KeyContext key_context()const{
+        KeyContext result;result.navigation=!popups.empty();
+        if(focused==absent||focused>=nodes.size())return result;
+        const auto& node=nodes[focused];
+        if(auto child=embedded_view(focused);child&&child->impl_->active){result=child->impl_->key_context();result.navigation|=!popups.empty();return result;}
+        result.text=node.kind==WidgetKind::input_field||bool(node.text_input);
+        result.control=interactive(node.kind)||bool(node.text_input);
+        result.navigation|=result.text||node.kind==WidgetKind::slider||node.kind==WidgetKind::stepper||node.kind==WidgetKind::combo_box||bool(node.color)||
+            (node.semantics&&(node.semantics->role==AccessibilityRole::slider||node.semantics->role==AccessibilityRole::stepper));
+        for(auto n=focused;n!=absent;n=nodes[n].parent)result.navigation|=nodes[n].kind==WidgetKind::segmented_control||nodes[n].kind==WidgetKind::tab_bar||bool(nodes[n].popup);
+        return result;
+    }
+    KeyContext point_context(double x,double y)const{
+        const auto target=hit(x,y);if(target==absent)return {};
+        if(auto child=embedded_view(target);child&&child->impl_->active&&nodes[target].content){
+            const auto point=logical_point(target,x,y);const auto bounds=nodes[target].bounds;
+            return child->impl_->point_context(point.width-bounds.x,point.height-bounds.y);
+        }
+        const auto& node=nodes[target];
+        return {node.kind==WidgetKind::input_field||bool(node.text_input),interactive(node.kind)||bool(node.text_input)||bool(node.input_handler),bool(node.popup)};
+    }
     const std::vector<std::size_t>& ordered_hosts()const{
         if(!host_order_dirty)return host_order;host_order.clear();
         const auto visit=[&](auto&& self,std::size_t i)->void{if(nodes[i].content)host_order.push_back(i);for(auto child:nodes[i].children)self(self,child);};
@@ -280,7 +336,7 @@ struct WidgetState::Impl final {
     ContentTransform transform(std::size_t popup) const {
         const auto& n=nodes[popup];const auto& p=*n.popup;if(!p.popover)return {};
         const auto progress=p.motion.progress;
-        if(p.popover->sheet_layout&&p.popover->sheet_layout->mobile)return {.offset_y=float(n.bounds.height*(1-progress)+p.drag_offset)};
+        if((p.popover->sheet_layout&&p.popover->sheet_layout->mobile)||(p.popover->adaptive_layout&&p.popover->adaptive_layout->slide_from_bottom))return {.offset_y=float(n.bounds.height*(1-progress)+p.drag_offset)};
         if(!p.popover->transition)return {};
         return {.origin_x=float(n.bounds.x+n.bounds.width*p.popover->transition->origin.width),.origin_y=float(n.bounds.y+n.bounds.height*p.popover->transition->origin.height),
             .scale=float(p.popover->transition->collapsed_scale+(1-p.popover->transition->collapsed_scale)*progress),.opacity=float(std::clamp(progress,0.,1.))};
@@ -294,7 +350,9 @@ struct WidgetState::Impl final {
     }
     Rect popup_viewport(Size size) const {
         if(auto parent=embedding_owner.lock();parent&&embedding_popup<parent->impl_->nodes.size()){
-            auto offset=parent->global_offset();const auto body=parent->impl_->activation_rect(embedding_popup);auto window=presentation_surface()?presentation_surface()->size():size;
+            auto offset=parent->global_offset();const auto body=parent->impl_->activation_rect(embedding_popup);auto window=size;
+            if(auto surface=presentation_surface())window=surface->size();
+            else for(auto owner=parent;owner;owner=owner->impl_->embedding_owner.lock())if(owner->impl_->viewport.width>0&&owner->impl_->viewport.height>0)window=owner->impl_->viewport;
             return {-float(offset.width+body.x),-float(offset.height+body.y),float(window.width),float(window.height)};
         }return {0,0,float(size.width),float(size.height)};
     }
@@ -334,6 +392,16 @@ struct WidgetState::Impl final {
         if(auto parent=embedding_owner.lock())return parent->impl_->active&&parent->impl_->effective_enabled(embedding_popup);return true;
     }
     bool effective_enabled(std::size_t i)const{return effective_enabled(nodes[i]);}
+    double local_opacity(std::size_t i)const{
+        double value=1;
+        for(auto p=i;p!=absent;p=nodes[p].parent)value*=nodes[p].opacity;
+        return value;
+    }
+    double effective_opacity(std::size_t i)const{
+        const auto value=local_opacity(i);
+        if(auto parent=embedding_owner.lock())return value*parent->impl_->effective_opacity(embedding_popup);
+        return value;
+    }
     bool logical_visible(std::size_t i) const {
         if(auto parent=embedding_owner.lock();parent && (!parent->impl_->active || embedding_popup>=parent->impl_->nodes.size() || (parent->impl_->nodes[embedding_popup].popup&&!parent->impl_->nodes[embedding_popup].popup->opened) || !parent->impl_->logical_visible(parent->impl_->content_focus(embedding_popup))))return false;
         for(auto p=i;p!=absent;p=nodes[p].parent) if(!nodes[p].shown || (nodes[p].popup && !nodes[p].popup->opened)) return false;
@@ -431,7 +499,12 @@ struct WidgetState::Impl final {
                 });
             }
             if(popup.events.closed) callbacks.push_back(popup.events.closed);
-            if(*it==root&&canceled&&popup.canceled)callbacks.push_back(popup.canceled);
+            if(*it==root&&canceled&&popup.canceled){
+                const auto index=*it;const auto epoch=popup.epoch;auto notify=popup.canceled;
+                callbacks.push_back([this,index,epoch,notify=std::move(notify)]{
+                    if(index<nodes.size()&&nodes[index].popup&&!nodes[index].popup->opened&&nodes[index].popup->epoch==epoch)notify();
+                });
+            }
         }
         std::erase_if(popups,[&](auto p){return descendant(p,root);});
         std::erase_if(visual_popups,[&](auto i){return !nodes[i].popup->opened&&!nodes[i].popup->motion.active;});motion_activity();
@@ -480,10 +553,12 @@ struct WidgetState::Impl final {
         auto run=TextRun{.bounds=n.bounds,.text=n.text,.color=color(label&&n.label.color&&enabled?*n.label.color:WidgetColor{1,1,1,enabled?appearance.text_alpha[i]:appearance.text_alpha[7]}),
             .font_size=float(compact?12:label?n.label.font_size:13),
             .font_weight=compact?400u:role==TextRole::title || role==TextRole::title2 ? 700u : role==TextRole::header || role==TextRole::header2 || role==TextRole::description ? 600u : role==TextRole::body ? 500u : 400u,
-            .alignment=label?n.label.alignment:TextAlignment::left,.font_family=compact?"Inter":appearance.styled?appearance.font_family:std::string{},.line_height=label?float(n.label.line_height):0};
+            .alignment=label?n.label.alignment:TextAlignment::left,.font_family=fonts->resolve_family(compact?std::string_view("Inter"):appearance.styled?std::string_view(appearance.font_family):std::string_view{}),.line_height=label?float(n.label.line_height):0};
         if(label&&n.label.font_weight)run.font_weight=*n.label.font_weight;if(label)run.elide_right=n.label.elide_right;if(n.kind==WidgetKind::button&&n.button.style){run.line_height=float(n.button.style->line_height);if(n.button.style->font_size)run.font_size=float(*n.button.style->font_size);}
         if(n.action_surface){run.color=color(action_ink(n));run.font_size=float(n.action_surface->font_size);run.line_height=float(n.action_surface->line_height);run.underline=n.action_surface->underline;run.elide_right=true;}
-        if(n.kind==WidgetKind::input_field&&n.field.style){const auto& s=*n.field.style;run.font_size=float(s.font_size);run.line_height=float(s.line_height);if(s.text)run.color=color(*s.text);}return run;
+        if(n.kind==WidgetKind::input_field&&n.field.style){const auto& s=*n.field.style;run.font_size=float(s.font_size);run.line_height=float(s.line_height);if(s.text)run.color=color(*s.text);}
+        if(!compact&&!(label&&n.label.font_weight))for(const auto& token:lvrs_text_tokens())if(run.font_size==token.pixels)run.font_weight=unsigned(token.weight);
+        return run;
     }
     Size measure(std::size_t index) {
         auto& n=nodes[index]; if (!n.metrics_dirty) return n.measured;
@@ -495,7 +570,14 @@ struct WidgetState::Impl final {
             s.width=std::max(o.minimum_width,std::max(s.width,right-left)+o.padding.left+o.padding.right);s.height=std::max(o.minimum_height,std::max(s.height,bottom-top)+o.padding.top+o.padding.bottom);
             if(o.width)s.width=*o.width;if(o.height)s.height=*o.height;
         }
-        else if(n.content)s=n.extent;
+        else if(n.content){
+            s=n.extent;
+            if(auto child=n.content->view;child&&!child->impl_->nodes.empty()){
+                const auto intrinsic=child->impl_->measure(0);
+                if(!s.width)s.width=intrinsic.width;
+                if(!s.height)s.height=intrinsic.height;
+            }
+        }
         else if(n.activation_owner!=absent){auto view=embedded_view(index);if(view&&!view->impl_->nodes.empty()){s=view->impl_->measure(0);const auto p=padding(n);s.width+=p.left+p.right;s.height+=p.top+p.bottom;}}
         else if(n.fixed_frame) s={n.fixed_frame->width,n.fixed_frame->height};
         else if(n.kind==WidgetKind::absolute_stack) s=n.extent;
@@ -586,8 +668,13 @@ struct WidgetState::Impl final {
         if(n.layout_width&&*n.layout_width==available)return n.layout_measurement;
         auto s=measure(i);
         if(n.action_surface){s.width=std::min(available,s.width);}
-        else if(n.content){s.width=n.extent.width?std::min(available,n.extent.width):available;s.height=n.extent.height;}
-        else if(n.activation_owner!=absent){auto view=embedded_view(i);s={};if(view&&!view->impl_->nodes.empty()){const auto p=padding(n);s=view->impl_->measure_width(0,std::max(0.0,available-p.left-p.right));s.width=std::min(available,s.width+p.left+p.right);s.height+=p.top+p.bottom;if(n.stack.alignment==StackAlignment::stretch)s.width=available;}}
+        else if(n.content){
+            s.width=n.extent.width?std::min(available,n.extent.width):available;
+            s.height=n.extent.height;
+            if(!s.height)if(auto child=n.content->view;child&&!child->impl_->nodes.empty())
+                s.height=child->impl_->measure_width(0,s.width).height;
+        }
+        else if(n.activation_owner!=absent){auto view=embedded_view(i);s={};if(view&&!view->impl_->nodes.empty()){const auto p=padding(n);s=view->impl_->measure_width(0,std::max(0.0,available-p.left-p.right));s.width=std::min(available,s.width+p.left+p.right);s.height+=p.top+p.bottom;if(horizontal_alignment(n.stack)==StackAlignment::stretch)s.width=available;}}
         else if(n.scroll){s.width=n.scroll->options.width?std::min(available,n.scroll->options.width):available;for(auto child:n.children)if(!nodes[child].popup&&nodes[child].shown){auto c=measure_width(child,s.width);s.height=n.scroll->options.height?n.scroll->options.height:c.height;break;}}
         else if(!n.fixed_frame&&n.kind==WidgetKind::label){auto run=text_run(n);s.width=std::min(s.width,available);run.bounds.width=float(std::max(1.0,s.width));s.height=measure_text(run);}
         else if(!n.fixed_frame&&stack_kind(n.kind)&&n.kind!=WidgetKind::absolute_stack){
@@ -597,10 +684,38 @@ struct WidgetState::Impl final {
             for(auto child:n.children)if(!nodes[child].popup&&(nodes[child].shown||n.stack.measure_hidden_children)){const auto& node=nodes[child];const bool grow=horizontal_kind(n.kind)&&(node.flex>0||node.kind==WidgetKind::spacer);const auto child_width=grow?(node.kind==WidgetKind::spacer?measure(child).width:0)+remaining*(node.flex>0?node.flex:1)/weight:horizontal_kind(n.kind)?std::min(width,measure(child).width):width;auto c=measure_width(child,child_width);if(grow)c.width=child_width;
                 if(n.kind==WidgetKind::vertical_stack){s.width=std::max(s.width,c.width);s.height+=c.height;}else if(horizontal_kind(n.kind)){s.width+=c.width;s.height=std::max(s.height,c.height);}else{s.width=std::max(s.width,c.width);s.height=std::max(s.height,c.height);}}
             if(n.kind==WidgetKind::vertical_stack)s.height+=gaps;else if(horizontal_kind(n.kind))s.width+=gaps;
-            const auto natural=implicit_padding(n);s.width=std::min(available,s.width+natural.left+natural.right);s.height+=natural.top+natural.bottom;if(n.stack.alignment==StackAlignment::stretch&&n.kind==WidgetKind::vertical_stack&&!n.stack.intrinsic_width)s.width=available;
+            const auto natural=implicit_padding(n);s.width=std::min(available,s.width+natural.left+natural.right);s.height+=natural.top+natural.bottom;if(horizontal_alignment(n.stack)==StackAlignment::stretch&&n.kind==WidgetKind::vertical_stack&&!n.stack.intrinsic_width)s.width=available;
         }
         if(stack_kind(n.kind)&&!n.fixed_frame){s.width=std::min(available,std::max(s.width,n.stack.minimum_width));s.height=std::max(s.height,n.stack.minimum_height);if(n.extent.width>0)s.width=std::min(available,n.extent.width);if(n.extent.height>0)s.height=n.extent.height;}
         n.layout_width=available;n.layout_measurement=s;return s;
+    }
+    core::Result<Rect> adaptive_frame(std::size_t index,Rect area) {
+        const auto& popup=*nodes[index].popup;const auto& options=*popup.popover;const auto& adaptive=*options.adaptive_layout;
+        auto viewport_node=ids.find(adaptive.viewport_id);
+        if(viewport_node==ids.end()||!nodes[viewport_node->second].scroll||!descendant(viewport_node->second,index))
+            return core::fail(core::ErrorCode::invalid_argument,"Adaptive popup viewport must belong to its retained content");
+        auto content=std::ranges::find_if(nodes[index].children,[&](auto child){return !nodes[child].popup&&nodes[child].shown;});
+        if(content==nodes[index].children.end())return core::fail(core::ErrorCode::invalid_argument,"Adaptive popup requires retained content");
+        const auto evaluate=[&](PopoverLayoutMeasure measure)->core::Result<Rect>{
+            struct Guard final{bool& flag;explicit Guard(bool& value):flag(value){flag=true;}~Guard(){flag=false;}}guard(domain->providing_popup_layout);
+            try{
+                auto result=adaptive.layout(measure);
+                if(!result)return std::unexpected(result.error());
+                if(!valid_popup_rect(*result))return core::fail(core::ErrorCode::invalid_argument,"Adaptive popup returned invalid geometry");
+                return *result;
+            }catch(...){return core::fail(core::ErrorCode::failed,"Adaptive popup layout threw an exception",std::current_exception());}
+        };
+        const auto viewport=Size{area.width,area.height};
+        auto first=evaluate({viewport,{},0});if(!first)return first;
+        const auto measured=measure_width(*content,first->width);
+        const auto body=nodes[viewport_node->second].layout_measurement.height;
+        auto final=evaluate({viewport,measured,body});if(!final)return final;
+        if(std::abs(final->width-first->width)>.01)return core::fail(core::ErrorCode::invalid_argument,"Adaptive popup changed width after content measurement");
+        if(options.input_bounds){const auto input=*options.input_bounds;if(input.x+input.width>final->width+.01f||input.y+input.height>final->height+.01f)
+            return core::fail(core::ErrorCode::invalid_argument,"Adaptive popup input bounds exceed its frame");}
+        final->x+=area.x;final->y+=area.y+float(options.vertical_offset);
+        if(!valid_popup_rect(*final))return core::fail(core::ErrorCode::invalid_argument,"Adaptive popup offset exceeds geometry limits");
+        return final;
     }
     void arrange(std::size_t i,Rect bounds) {
         auto& n=nodes[i]; n.bounds=bounds;
@@ -634,20 +749,21 @@ struct WidgetState::Impl final {
         if (!stack_kind(n.kind)) return;
         const auto p=padding(n);auto x=bounds.x+float(p.left), y=bounds.y+float(p.top);
         const auto width=std::max(0.f,bounds.width-float(p.left+p.right)),height=std::max(0.f,bounds.height-float(p.top+p.bottom));
+        const auto align_x=horizontal_alignment(n.stack), align_y=vertical_alignment(n.stack);
         if(n.kind==WidgetKind::vertical_stack&&std::ranges::any_of(n.children,[&](auto child){return nodes[child].shown&&!nodes[child].popup&&nodes[child].flex>0;})){
             std::size_t count=0;double fixed=0,weight=0;
             for(auto child:n.children)if(nodes[child].shown&&!nodes[child].popup){++count;const auto& c=nodes[child];const auto size=measure_width(child,width);if(c.flex>0)weight+=c.flex;else if(c.kind==WidgetKind::spacer){++weight;fixed+=size.height;}else fixed+=size.height;}
             const auto remaining=std::max(0.,height-fixed-(count?count-1:0)*n.stack.spacing);
-            for(auto child:n.children)if(nodes[child].shown&&!nodes[child].popup){const auto& node=nodes[child];auto c=measure_width(child,width);if(node.flex>0)c.height=remaining*node.flex/weight;else if(node.kind==WidgetKind::spacer)c.height+=remaining/weight;if(n.stack.alignment==StackAlignment::stretch)c.width=width;const auto offset=n.stack.alignment==StackAlignment::leading||n.stack.alignment==StackAlignment::stretch?0:n.stack.alignment==StackAlignment::trailing?width-c.width:(width-c.width)/2;arrange(child,{x+float(offset),y,float(c.width),float(c.height)});y+=float(c.height+n.stack.spacing);}return;
+            for(auto child:n.children)if(nodes[child].shown&&!nodes[child].popup){const auto& node=nodes[child];auto c=measure_width(child,width);if(node.flex>0)c.height=remaining*node.flex/weight;else if(node.kind==WidgetKind::spacer)c.height+=remaining/weight;if(align_x==StackAlignment::stretch)c.width=width;const auto offset=alignment_offset(align_x,width,c.width);arrange(child,{x+float(offset),y,float(c.width),float(c.height)});y+=float(c.height+n.stack.spacing);}return;
         }
-        if(n.layout_width||n.stack.alignment!=StackAlignment::center){
+        if(n.layout_width||align_x!=StackAlignment::center||align_y!=StackAlignment::center){
             (void)measure_width(i,bounds.width);double fixed=0,weight=0,desired=0;std::size_t count=0,fillers=0;
             for(auto child:n.children)if(!nodes[child].popup&&nodes[child].shown){++count;const auto& c=nodes[child];if(horizontal_kind(n.kind)){if(c.flex>0||c.kind==WidgetKind::spacer){weight+=c.flex>0?c.flex:1;if(c.kind==WidgetKind::spacer)fixed+=measure(child).width;}else fixed+=measure(child).width;}else {desired+=measure_width(child,width).height;if(c.kind==WidgetKind::spacer)++fillers;}}
             const auto gaps=count?n.stack.spacing*(count-1):0.0;const auto remaining=std::max(0.0,width-fixed-gaps),extra=fillers?std::max(0.0,height-desired-gaps)/fillers:0;
             for(auto child:n.children)if(!nodes[child].popup&&nodes[child].shown){const auto& node=nodes[child];const bool grow=horizontal_kind(n.kind)&&(node.flex>0||node.kind==WidgetKind::spacer);const auto child_width=grow?(node.kind==WidgetKind::spacer?measure(child).width:0)+remaining*(node.flex>0?node.flex:1)/weight:horizontal_kind(n.kind)?std::min(double(width),measure(child).width):double(width);auto c=measure_width(child,child_width);if(grow)c.width=child_width;
-                if(n.kind==WidgetKind::vertical_stack){if(node.kind==WidgetKind::spacer)c.height+=extra;if(n.stack.alignment==StackAlignment::stretch)c.width=width;const auto offset=n.stack.alignment==StackAlignment::leading||n.stack.alignment==StackAlignment::stretch?0:n.stack.alignment==StackAlignment::trailing?width-c.width:(width-c.width)/2;arrange(child,{x+float(offset),y,float(c.width),float(c.height)});y+=float(c.height+n.stack.spacing);}
-                else if(horizontal_kind(n.kind)){if(n.stack.alignment==StackAlignment::stretch)c.height=height;const auto offset=n.stack.alignment==StackAlignment::leading||n.stack.alignment==StackAlignment::stretch?0:n.stack.alignment==StackAlignment::trailing?height-c.height:(height-c.height)/2;arrange(child,{x,y+float(offset),float(c.width),float(c.height)});x+=float(c.width+n.stack.spacing);}
-                else {if(n.stack.alignment==StackAlignment::stretch){c.width=width;c.height=height;}const bool leading=n.stack.alignment==StackAlignment::leading||n.stack.alignment==StackAlignment::stretch;arrange(child,{leading?x:x+(width-float(c.width))/2,leading?y:y+(height-float(c.height))/2,float(c.width),float(c.height)});}
+                if(n.kind==WidgetKind::vertical_stack){if(node.kind==WidgetKind::spacer)c.height+=extra;if(align_x==StackAlignment::stretch)c.width=width;const auto offset=alignment_offset(align_x,width,c.width);arrange(child,{x+float(offset),y,float(c.width),float(c.height)});y+=float(c.height+n.stack.spacing);}
+                else if(horizontal_kind(n.kind)){if(align_y==StackAlignment::stretch)c.height=height;const auto offset=alignment_offset(align_y,height,c.height);arrange(child,{x,y+float(offset),float(c.width),float(c.height)});x+=float(c.width+n.stack.spacing);}
+                else {if(align_x==StackAlignment::stretch)c.width=width;if(align_y==StackAlignment::stretch)c.height=height;arrange(child,{x+float(alignment_offset(align_x,width,c.width)),y+float(alignment_offset(align_y,height,c.height)),float(c.width),float(c.height)});}
             }
             return;
         }
@@ -671,7 +787,7 @@ struct WidgetState::Impl final {
         }
     }
     bool constrained(std::size_t i) const {
-        const auto& n=nodes[i];if(n.flex>0||n.stack.alignment!=StackAlignment::center||n.stack.insets||n.stack.minimum_width||n.stack.minimum_height||n.stack.implicit_insets||n.stack.intrinsic_width||n.stack.measure_hidden_children)return true;
+        const auto& n=nodes[i];if(n.flex>0||horizontal_alignment(n.stack)!=StackAlignment::center||vertical_alignment(n.stack)!=StackAlignment::center||n.stack.insets||n.stack.minimum_width||n.stack.minimum_height||n.stack.implicit_insets||n.stack.intrinsic_width||n.stack.measure_hidden_children)return true;
         for(auto child:n.children)if(!nodes[child].popup&&nodes[child].shown&&constrained(child))return true;
         return false;
     }
@@ -686,6 +802,13 @@ struct WidgetState::Impl final {
         const auto area=popup_viewport(size);
         for(auto index:visual_popups) {
             auto& n=nodes[index];auto& p=*n.popup;auto natural=measure(index);const auto& o=p.options;
+            if(p.popover&&p.popover->adaptive_layout){
+                auto resolved=adaptive_frame(index,area);
+                if(!resolved){p.layout_failure=resolved.error();continue;}
+                p.layout_failure.reset();n.bounds=p.content=*resolved;p.content_height=resolved->height;p.scroll=0;
+                for(auto child:n.children)if(!nodes[child].popup&&nodes[child].shown){arrange(child,p.content);break;}
+                continue;
+            }
             if(p.popover&&p.popover->bounds){
                 auto frame=*p.popover->bounds;frame.x+=area.x;frame.y+=area.y;n.bounds=p.content=frame;p.content_height=frame.height;p.scroll=0;
                 for(auto child:n.children)if(!nodes[child].popup&&nodes[child].shown){arrange(child,frame);break;}
@@ -755,8 +878,46 @@ WidgetState::WidgetState(std::function<void(runtime::Task)> invoke,WidgetAppeara
     for (auto alpha:appearance.text_alpha) if (!std::isfinite(alpha) || alpha<0 || alpha>1) throw std::invalid_argument("Invalid text alpha");
     impl_->appearance=std::move(appearance); impl_->invoke=std::move(invoke);
     impl_->frame_hooks=std::move(hooks);
+    impl_->fonts=impl_->frame_hooks.fonts?impl_->frame_hooks.fonts:FontDatabase::application();
+    (void)impl_->fonts->system_family();
+    impl_->resolved_font_family=impl_->fonts->resolve_family(impl_->appearance.font_family);
+    impl_->resolved_compact_font_family=impl_->fonts->resolve_family("Inter");
+    impl_->frame_hooks.fonts=impl_->fonts;
+}
+core::Result<void> WidgetState::observe_fonts(){
+    if(auto parent=impl_->embedding_owner.lock();parent&&parent->impl_->fonts==impl_->fonts)return parent->observe_fonts();
+    if(impl_->font_subscription.active())return {};
+    try{const auto weak=weak_from_this();impl_->font_subscription=impl_->fonts->observe([weak]{if(auto state=weak.lock();state&&state->impl_->active)state->fonts_changed();});return {};}
+    catch(...){return core::fail(core::ErrorCode::failed,"Cannot observe application fonts",std::current_exception());}
+}
+void WidgetState::fonts_changed(){
+    // One font lease per root, not per row activation. Candidate generations
+    // borrow that root too, so include the unpublished construction chain.
+    std::vector<std::shared_ptr<WidgetState>> pending{shared_from_this()};
+    for(auto staged=impl_->domain->staged.lock();staged;staged=staged->impl_->embedding_owner.lock())pending.push_back(staged);
+    std::unordered_set<WidgetState*> visited;
+    while(!pending.empty()){
+        auto state=std::move(pending.back());pending.pop_back();auto& view=*state->impl_;
+        if(!view.active||view.fonts!=impl_->fonts||!visited.insert(state.get()).second)continue;
+        view.resolved_font_family=view.fonts->resolve_family(view.appearance.font_family);
+        view.resolved_compact_font_family=view.fonts->resolve_family("Inter");
+        for(auto& node:view.nodes){
+            node.metrics_dirty=true;node.layout_width.reset();
+            if(auto child=node.content?node.content->view:node.popup?node.popup->content_view:nullptr)pending.push_back(std::move(child));
+        }
+        view.layout_dirty=true;
+    }
+    impl_->invalidate(true);
 }
 WidgetState::~WidgetState() { close(); }
+core::Result<void> WidgetState::construct(WidgetFactory factory) {
+    if(auto r=ready();!r)return r;
+    if(!factory)return core::fail(core::ErrorCode::invalid_argument,"Native widget factory is empty");
+    if(impl_->factory_started||!impl_->nodes.empty())return core::fail(core::ErrorCode::busy,"Native widget factory already started");
+    impl_->factory_started=true;
+    try {WidgetBuilder builder(shared_from_this());auto result=factory(builder);if(!result){close();return result;}return ready();}
+    catch(...){close();return core::fail(core::ErrorCode::failed,"Native widget factory failed",std::current_exception());}
+}
 core::Result<void> WidgetState::prepare_motion(PopoverOptions& options) {
     if(!options.transition)return {};
     auto& transition=*options.transition;
@@ -799,6 +960,15 @@ core::Result<void> WidgetState::text_input_provider(std::size_t i,std::shared_pt
     }
     impl_->accessibility_changed();impl_->invalidate();return {};
 }
+core::Result<void> WidgetState::text_input_changed(std::size_t i,bool value_changed){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size()||!impl_->nodes[i].text_input)
+        return core::fail(core::ErrorCode::invalid_argument,"Text input notification requires a custom provider");
+    const auto id=impl_->nodes[i].id;
+    impl_->invalidate();impl_->accessibility_changed();
+    if(value_changed&&impl_->active)impl_->accessibility_value_changed(id);
+    return {};
+}
 core::Result<TextInputState> WidgetState::text_input_state(std::size_t i){
     if(auto r=ready();!r)return std::unexpected(r.error());
     if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Text input owner was not found");
@@ -807,7 +977,7 @@ core::Result<TextInputState> WidgetState::text_input_state(std::size_t i){
         if(n.kind!=WidgetKind::input_field)return core::fail(core::ErrorCode::unsupported,"Widget has no text input provider");
         const auto first=std::min(n.anchor,n.cursor),last=std::max(n.anchor,n.cursor);
         TextInputState value{.length=utf16_count(n.text),.selection={utf16_count(std::string_view(n.text).substr(0,first)),utf16_count(std::string_view(n.text).substr(first,last-first))},
-            .caret={8,std::max(0.f,n.bounds.height-22),1,16},.read_only=n.field.read_only,.multiline=n.field.multiline};
+            .caret={8,std::max(0.f,n.bounds.height-22),1,16},.read_only=n.field.read_only,.multiline=n.field.multiline,.password=n.field.password};
         if(!n.marked.empty()){value.marked=TextRange{value.selection.location,utf16_count(n.marked)};value.length=value.length-value.selection.length+value.marked->length;value.selection={value.marked->location+n.marked_selection.location,n.marked_selection.length};}
         return value;
     }
@@ -871,12 +1041,14 @@ core::Result<void> WidgetState::ready() const {
     if (impl_->owner!=std::this_thread::get_id()) return core::fail(core::ErrorCode::wrong_executor,"Widgets require the owning UI thread");
     if(impl_->painting)return core::fail(core::ErrorCode::busy,"UI access is not allowed inside a paint provider");
     if(impl_->providing_text)return core::fail(core::ErrorCode::busy,"UI access is not allowed inside a text read provider");
+    if(impl_->domain->providing_popup_layout)return core::fail(core::ErrorCode::busy,"UI access is not allowed inside a popup layout provider");
     if (!impl_->active) return core::fail(core::ErrorCode::closed,"Widget tree is closed");
     if(!impl_->scope_prefix.empty()){auto parent=impl_->embedding_owner.lock();if(!parent||!parent->impl_->active)return core::fail(core::ErrorCode::closed,"Content owner is closed");}
     return {};
 }
 core::Result<std::size_t> WidgetState::prepare(Widget parent,std::string_view id,WidgetKind kind) {
     if (auto r=ready();!r) return std::unexpected(r.error());
+    if(auto observed=observe_fonts();!observed)return std::unexpected(observed.error());
     if (!impl_->building) return core::fail(core::ErrorCode::closed,"Widget construction finished");
     if (impl_->nodes.size()>=impl_->node_capacity||impl_->domain->nodes>=4096+impl_->domain->allowance) return core::fail(core::ErrorCode::out_of_range,"Active widget domain limit is 4096");
     if (id.empty() || id.starts_with("@iiscope:") || !valid_title(id) || impl_->ids.contains(id)) return core::fail(core::ErrorCode::invalid_argument,"Widget id must be unique nonempty UTF-8, outside the reserved @iiscope namespace");
@@ -901,6 +1073,50 @@ core::Result<std::size_t> WidgetState::prepare(Widget parent,std::string_view id
     return parent.index_;
 }
 core::Result<WidgetAppearance> WidgetState::appearance() const {if(auto r=ready();!r)return std::unexpected(r.error());return impl_->appearance;}
+core::Result<WindowProperties> WidgetState::window_properties() const {
+    if(auto r=ready();!r)return std::unexpected(r.error());
+    if(!impl_->frame_hooks.window_geometry)return core::fail(core::ErrorCode::unsupported,"Embedded content does not own a window");
+    return impl_->requested_window;
+}
+void WidgetState::apply_appearance(const WidgetAppearance& appearance) {
+    const bool measure=impl_->appearance.font_family!=appearance.font_family||impl_->appearance.button_height!=appearance.button_height||
+        impl_->appearance.button_padding!=appearance.button_padding;
+    impl_->appearance=appearance;
+    impl_->resolved_font_family=impl_->fonts->resolve_family(appearance.font_family);
+    impl_->resolved_compact_font_family=impl_->fonts->resolve_family("Inter");
+    if(measure)for(auto& node:impl_->nodes)node.metrics_dirty=true;
+    for(auto& node:impl_->nodes){
+        if(node.content&&node.content->view)node.content->view->apply_appearance(appearance);
+        if(node.popup&&node.popup->content_view)node.popup->content_view->apply_appearance(appearance);
+    }
+    impl_->invalidate(measure);
+}
+core::Result<void> WidgetState::window_properties(WindowProperties value) {
+    if(auto r=ready();!r)return r;
+    if(!impl_->frame_hooks.window_geometry)return core::fail(core::ErrorCode::unsupported,"Embedded content does not own a window");
+    if(impl_->updating_window)return core::fail(core::ErrorCode::busy,"A Window properties update is active");
+    if(value==impl_->requested_window)return {};
+    auto delta=impl_->window_committed?window_properties_delta(impl_->requested_window,value):value;
+    if(auto valid=validate_window_properties(delta);!valid)return valid;
+    if(!impl_->window_committed){if(value.appearance)apply_appearance(*value.appearance);impl_->requested_window=std::move(value);return {};}
+    struct Reset{bool& flag;~Reset(){flag=false;}}reset{impl_->updating_window};impl_->updating_window=true;
+    if(!empty_window_geometry(delta.geometry))if(auto applied=impl_->frame_hooks.window_geometry(delta.geometry);!applied)return applied;
+    if(auto r=ready();!r)return r;
+    if(delta.appearance)apply_appearance(*delta.appearance);
+    impl_->requested_window=std::move(value);return {};
+}
+core::Result<void> WidgetState::commit_window_properties() {
+    if(auto r=ready();!r)return r;
+    if(impl_->window_committed)return {};
+    if(!impl_->frame_hooks.window_geometry)return {};
+    if(impl_->updating_window)return core::fail(core::ErrorCode::busy,"A Window properties commit is active");
+    struct Reset{bool& flag;~Reset(){flag=false;}}reset{impl_->updating_window};impl_->updating_window=true;
+    if(!empty_window_geometry(impl_->requested_window.geometry))
+        if(auto applied=impl_->frame_hooks.window_geometry(impl_->requested_window.geometry);!applied)return applied;
+    if(auto r=ready();!r)return r;
+    if(impl_->requested_window.appearance)apply_appearance(*impl_->requested_window.appearance);
+    impl_->window_committed=true;return {};
+}
 core::Result<void> WidgetState::default_content(Widget host,Widget slot){
     if(auto result=ready();!result)return result;
     if(!impl_->building)return core::fail(core::ErrorCode::closed,"Default content is a construction-time contract");
@@ -1061,6 +1277,7 @@ core::Result<void> WidgetState::attach(void* parent) {
     for(const auto& n:impl_->nodes) if(n.popup && n.popup->options.selected_index>=0 &&
         (std::size_t(n.popup->options.selected_index)>=n.popup->entries.size() || impl_->nodes[n.popup->entries[std::size_t(n.popup->options.selected_index)]].kind!=WidgetKind::menu_item))
         return core::fail(core::ErrorCode::out_of_range,"Initial menu selection must name a menu item");
+    if(auto loaded=impl_->fonts->load_bundled_fonts();!loaded)return std::unexpected(loaded.error());
     auto weak=weak_from_this();
     auto surface=std::make_unique<WidgetSurface>(parent,WidgetSurfaceCallbacks{
         .frame=[weak](Size s) { auto owner=weak.lock(); return owner?owner->frame(s):CanvasFrame{}; },
@@ -1070,7 +1287,7 @@ core::Result<void> WidgetState::attach(void* parent) {
         .failure=[weak](std::exception_ptr error) { if(auto owner=weak.lock()) { auto invoke=owner->impl_->invoke; invoke([error] { std::rethrow_exception(error); }); } },
         .text_content=[weak](std::string_view id,TextRange range)->core::Result<TextContent>{if(auto owner=weak.lock()){auto w=owner->find(id);if(!w)return std::unexpected(w.error());return w->text_content(range);}return core::fail(core::ErrorCode::closed,"Text surface closed");},
         .text_position=[weak](std::string_view id,double x,double y)->core::Result<std::size_t>{if(auto owner=weak.lock()){auto w=owner->find(id);if(!w)return std::unexpected(w.error());return w->text_position(x,y);}return core::fail(core::ErrorCode::closed,"Text surface closed");},
-        .renderer=impl_->frame_hooks.renderer});
+        .renderer=impl_->frame_hooks.renderer,.presentations=impl_->frame_hooks.presentations});
     impl_->resolved_font_family=surface->resolve_font_family(impl_->appearance.font_family);
     impl_->resolved_compact_font_family=surface->resolve_font_family("Inter");
     const auto inherit_fonts=[&](auto&& self,Impl& target)->void{for(auto& n:target.nodes)if(auto child=n.content?n.content->view:n.popup?n.popup->content_view:nullptr){child->impl_->resolved_font_family=impl_->resolved_font_family;child->impl_->resolved_compact_font_family=impl_->resolved_compact_font_family;self(self,*child->impl_);}};inherit_fonts(inherit_fonts,*impl_);
@@ -1136,6 +1353,55 @@ core::Result<void> WidgetState::retain(std::shared_ptr<void> owner) {
     if (!impl_->building || !owner) return core::fail(core::ErrorCode::invalid_argument,"Scope requires an active factory and nonnull owner");
     impl_->owners.push_back(std::move(owner)); return {};
 }
+core::Result<void> WidgetState::on_publish(runtime::Task task) {
+    if(auto valid=ready();!valid)return valid;
+    if(!impl_->building||!task)return core::fail(core::ErrorCode::invalid_argument,"Publication hook requires a building generation and callback");
+    if(impl_->publication_hooks.size()>=4096)return core::fail(core::ErrorCode::full,"Publication hook capacity exhausted");
+    try{impl_->publication_hooks.push_back(std::move(task));}
+    catch(const std::bad_alloc&){return core::fail(core::ErrorCode::full,"Publication hook allocation failed");}
+    return {};
+}
+bool WidgetState::published_in_tree()const noexcept{
+    const auto* current=this;std::shared_ptr<WidgetState> held;
+    while(current->impl_->embedding_popup!=absent){
+        auto parent=current->impl_->embedding_owner.lock();
+        if(!parent||!parent->impl_->active||current->impl_->embedding_popup>=parent->impl_->nodes.size())return false;
+        const auto& node=parent->impl_->nodes[current->impl_->embedding_popup];
+        const bool content=node.content&&node.content->view.get()==current;
+        const bool popup=node.popup&&node.popup->opened&&node.popup->content_view.get()==current;
+        if(!content&&!popup)return false;held=std::move(parent);current=held.get();
+    }
+    // Directly built state objects are used by headless hosts without a root
+    // factory. Host-owned roots use commit_publication after their mount swap.
+    return current->impl_->active&&(current->impl_->published||!current->impl_->factory_started);
+}
+void WidgetState::deliver_publication()noexcept{
+    if(!impl_->active||impl_->publishing||!published_in_tree())return;
+    impl_->publishing=true;struct Reset final{bool& value;~Reset(){value=false;}}reset{impl_->publishing};
+    auto hooks=std::move(impl_->publication_hooks);
+    for(auto& hook:hooks){
+        if(!impl_->active||!published_in_tree())return;
+        try{auto invoke=impl_->invoke;if(invoke&&hook)invoke(std::move(hook));}catch(...){}
+    }
+    for(std::size_t i=0;impl_->active&&i<impl_->nodes.size();++i){
+        auto& node=impl_->nodes[i];auto child=node.content?node.content->view:node.popup&&node.popup->opened?node.popup->content_view:nullptr;
+        if(child)child->deliver_publication();
+    }
+}
+void WidgetState::commit_publication()noexcept{
+    if(!impl_->active||impl_->owner!=std::this_thread::get_id())return;
+    [[maybe_unused]] const auto owner=weak_from_this().lock();
+    impl_->published=true;deliver_publication();
+}
+core::Result<void> WidgetState::on_retire(runtime::Task task) {
+    if (auto valid = ready(); !valid) return valid;
+    if (!impl_->building || !task)
+        return core::fail(core::ErrorCode::invalid_argument, "Retirement hook requires a building generation and callback");
+    if (impl_->retirement_hooks.size() >= 4096)
+        return core::fail(core::ErrorCode::full, "Retirement hook capacity exhausted");
+    impl_->retirement_hooks.push_back(std::move(task));
+    return {};
+}
 core::Result<Widget> WidgetState::action_surface(Widget parent,std::string_view id,ActionOptions options,runtime::Task task){
     auto p=prepare(parent,id,WidgetKind::action_surface);if(!p)return std::unexpected(p.error());if(!valid_action(options))return core::fail(core::ErrorCode::invalid_argument,"Invalid action surface options");
     auto widget=publish(*p,WidgetKind::action_surface,id);auto& n=impl_->nodes.back();n.text=options.text;n.enabled=options.enabled&&options.interaction_enabled;n.button.tone=ButtonTone::normal;n.button.accessibility_name=options.accessibility_name;n.checked=options.checked;n.action_surface=std::make_unique<ActionOptions>(std::move(options));n.action=std::move(task);return widget;
@@ -1143,7 +1409,12 @@ core::Result<Widget> WidgetState::action_surface(Widget parent,std::string_view 
 core::Result<ActionOptions> WidgetState::action_options(std::size_t i)const{if(auto r=ready();!r)return std::unexpected(r.error());if(i>=impl_->nodes.size()||!impl_->nodes[i].action_surface)return core::fail(core::ErrorCode::invalid_argument,"Widget is not an action surface");auto result=*impl_->nodes[i].action_surface;result.checked=impl_->nodes[i].checked;return result;}
 core::Result<void> WidgetState::action_options(std::size_t i,ActionOptions options){
     if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||!impl_->nodes[i].action_surface||!valid_action(options))return core::fail(core::ErrorCode::invalid_argument,"Invalid action surface options");
-    auto& n=impl_->nodes[i];const bool active=options.enabled;n.checked=options.checked;n.text=options.text;n.button.accessibility_name=options.accessibility_name;*n.action_surface=std::move(options);impl_->invalidate(true,i);impl_->accessibility_changed();return enabled(i,active);
+    auto& n=impl_->nodes[i];const bool active=options.enabled,changed=n.checked!=options.checked;
+    const auto id=changed?n.id:std::string{};n.checked=options.checked;n.text=options.text;n.button.accessibility_name=options.accessibility_name;
+    *n.action_surface=std::move(options);impl_->invalidate(true,i);
+    if(auto result=enabled(i,active);!result)return result;
+    if(impl_->active)impl_->accessibility_changed();
+    if(changed&&impl_->active)impl_->accessibility_value_changed(id);return {};
 }
 core::Result<Widget> WidgetState::content_host(Widget parent,std::string_view id,Size size){
     auto p=prepare(parent,id);if(!p)return std::unexpected(p.error());
@@ -1156,7 +1427,8 @@ core::Result<Widget> WidgetState::content_item(std::size_t i,std::string_view id
     auto child=impl_->nodes[i].content->view;if(!child)return core::fail(core::ErrorCode::closed,"Content host has no activation");
     if(id.empty())return Widget(child,0,impl_->owner);return child->find(id);
 }
-core::Result<void> WidgetState::content(std::size_t i,WidgetFactory factory,std::function<core::Result<void>()> commit){
+core::Result<void> WidgetState::content(std::size_t i,WidgetFactory factory,std::function<core::Result<void>()> commit,
+    std::optional<std::size_t> replacement_allowance,std::string scope_namespace,bool preserve_keyed,bool defer_layout){
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size()||!impl_->nodes[i].content)return core::fail(core::ErrorCode::invalid_argument,"Widget is not a content host");
     auto& host=*impl_->nodes[i].content;
@@ -1172,16 +1444,16 @@ core::Result<void> WidgetState::content(std::size_t i,WidgetFactory factory,std:
         Impl& root;Impl& owner;std::size_t index;bool transition;std::size_t allowance;std::weak_ptr<WidgetState> staged;
         Guard(Impl& r,Impl& o,std::size_t i,std::size_t replacing,bool nested):root(r),owner(o),index(i),transition(r.content_transition),allowance(r.domain->allowance),staged(r.domain->staged){root.content_transition=true;owner.nodes[index].content->constructing=true;if(!nested)root.domain->allowance=replacing;}
         ~Guard(){if(owner.active&&index<owner.nodes.size()&&owner.nodes[index].content)owner.nodes[index].content->constructing=false;root.content_transition=transition;root.domain->allowance=allowance;root.domain->staged=staged;}
-    }guard{*root->impl_,*impl_,i,previous?previous->impl_->active_nodes():0,nested};
+    }guard{*root->impl_,*impl_,i,replacement_allowance.value_or(previous?previous->impl_->active_nodes():0),nested};
     // The owner may close while a factory runs. Do not retain references to its
     // node after calling user code; the guard's host flag is handled below.
     std::shared_ptr<WidgetState> child;
     if(factory){
-        impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
-        child=std::make_shared<WidgetState>(impl_->invoke,impl_->appearance,impl_->frame_hooks);child->impl_->domain=impl_->domain;
+        if(!defer_layout)impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
+        child=std::make_shared<WidgetState>(impl_->invoke,impl_->appearance,impl_->frame_hooks);child->impl_->domain=impl_->domain;child->impl_->frame_hooks.window_geometry={};
         child->impl_->embedding_owner=weak_from_this();child->impl_->embedding_popup=i;child->impl_->fill_viewport=true;
         child->impl_->viewport={impl_->nodes[i].bounds.width,impl_->nodes[i].bounds.height};
-        child->impl_->scope_prefix=impl_->scope_prefix+"@iiscope:"+std::to_string(i)+":"+std::to_string(next_epoch)+"/";
+        child->impl_->scope_prefix=scope_namespace.empty()?impl_->scope_prefix+"@iiscope:"+std::to_string(i)+":"+std::to_string(next_epoch)+"/":std::move(scope_namespace);
         child->impl_->resolved_font_family=impl_->resolved_font_family;child->impl_->resolved_compact_font_family=impl_->resolved_compact_font_family;impl_->domain->staged=child;
         WidgetBuilder builder(child);core::Result<void> built;bool completed=false;auto invoke=impl_->invoke;
         try{invoke([&]{try{built=factory(builder);}catch(...){built=core::fail(core::ErrorCode::failed,"Content factory failed",std::current_exception());}completed=true;});}
@@ -1200,15 +1472,142 @@ core::Result<void> WidgetState::content(std::size_t i,WidgetFactory factory,std:
     }
     if(!impl_->active){if(child)child->close();return core::fail(core::ErrorCode::closed,"Content owner retired before publication");}
     auto& current=*impl_->nodes[i].content;current.view=std::move(child);current.epoch=next_epoch;
+    if(!preserve_keyed)current.keyed.reset();
     if(previous)previous->close();
     if(!impl_->active)return core::fail(core::ErrorCode::closed,"Content owner retired after publication");
+    if(auto published=current.view)published->deliver_publication();
+    if(!impl_->active)return core::fail(core::ErrorCode::closed,"Content owner retired during publication");
     if(!impl_->nodes[i].content->view&&impl_->focused==i)impl_->focused=absent;
     impl_->hovered=absent;impl_->invalidate(true,i);impl_->accessibility_changed();return {};
+}
+core::Result<Widget> WidgetState::keyed_content_item(std::size_t i,std::string_view key,std::string_view id){
+    if(auto r=ready();!r)return std::unexpected(r.error());
+    if(i>=impl_->nodes.size()||!impl_->nodes[i].content)return core::fail(core::ErrorCode::invalid_argument,"Widget is not a content host");
+    const auto& host=*impl_->nodes[i].content;
+    if(!host.keyed||!host.view)return core::fail(core::ErrorCode::closed,"Content host has no keyed activation");
+    const auto found=host.keyed->slots.find(std::string(key));
+    if(found==host.keyed->slots.end())return core::fail(core::ErrorCode::not_found,"Content key was not found");
+    return host.view->content_item(found->second,id);
+}
+core::Result<std::vector<std::string>> WidgetState::keyed_content_keys(std::size_t i){
+    if(auto r=ready();!r)return std::unexpected(r.error());
+    if(i>=impl_->nodes.size()||!impl_->nodes[i].content)return core::fail(core::ErrorCode::invalid_argument,"Widget is not a content host");
+    const auto& host=*impl_->nodes[i].content;
+    return host.keyed?host.keyed->keys:std::vector<std::string>{};
+}
+core::Result<void> WidgetState::keyed_content(std::size_t i,std::vector<KeyedContentItem> items,KeyedContentOptions options){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size()||!impl_->nodes[i].content)return core::fail(core::ErrorCode::invalid_argument,"Widget is not a content host");
+    auto& host=*impl_->nodes[i].content;
+    if(host.constructing)return core::fail(core::ErrorCode::busy,"Keyed content is already constructing");
+    if(items.size()>4096||!valid_stack(options.layout))return core::fail(core::ErrorCode::invalid_argument,"Keyed content requires bounded items and layout");
+    if(options.viewport&&(!geometry(options.viewport->width)||!geometry(options.viewport->height)))
+        return core::fail(core::ErrorCode::invalid_argument,"Invalid keyed viewport extent");
+    if(options.viewport&&(options.horizontal||options.layout!=KeyedContentOptions{}.layout))
+        return core::fail(core::ErrorCode::invalid_argument,"Positioned content cannot combine with linear layout options");
+    auto planned=std::make_unique<Impl::Node::Content::Keyed>();
+    planned->options=options;
+    for(const auto& item:items){
+        if(bool(item.frame)!=bool(options.viewport))return core::fail(core::ErrorCode::invalid_argument,"Positioned content requires one frame per item");
+        if(item.frame){const auto& r=*item.frame;
+            if(!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>1e15||std::abs(r.y)>1e15||!geometry(r.width)||!geometry(r.height))
+                return core::fail(core::ErrorCode::invalid_argument,"Invalid keyed cell frame");
+        }
+        if(item.key.empty()||item.key.size()>1024||!valid_title(item.key)||!planned->slots.emplace(item.key,0).second)
+            return core::fail(core::ErrorCode::invalid_argument,"Content keys must be unique nonempty UTF-8 up to 1024 bytes");
+        planned->keys.push_back(item.key);
+        planned->frames.push_back(item.frame);
+    }
+    if(host.keyed&&host.view&&host.keyed->keys==planned->keys&&host.keyed->options==options&&host.keyed->frames==planned->frames)return {};
+    if(host.keyed&&host.view&&host.keyed->options.viewport&&options.viewport&&host.keyed->keys==planned->keys){
+        if(impl_->domain_transition())return core::fail(core::ErrorCode::busy,"Cannot change keyed geometry during content construction");
+        auto& candidate=*host.view->impl_;
+        candidate.nodes[0].extent=*options.viewport;
+        for(std::size_t n=0;n<items.size();++n){
+            const auto slot=host.keyed->slots.at(items[n].key);auto& node=candidate.nodes[slot];
+            node.fixed_frame=*items[n].frame;node.extent={items[n].frame->width,items[n].frame->height};
+            node.metrics_dirty=true;node.layout_width.reset();
+        }
+        candidate.nodes[0].metrics_dirty=true;candidate.nodes[0].layout_width.reset();candidate.layout_dirty=true;
+        host.keyed->options=options;host.keyed->frames=std::move(planned->frames);
+        impl_->invalidate(true,i);impl_->accessibility_changed();return {};
+    }
+    const auto previous=host.view;
+    struct Transfer final {std::size_t old_slot,new_slot;std::shared_ptr<WidgetState> row;};
+    std::vector<Transfer> transfers;
+    std::vector<std::shared_ptr<WidgetState>> retained(items.size());
+    std::vector<std::size_t> old_slots(items.size(),absent);
+    std::size_t kept_nodes=0;
+    if(previous&&host.keyed)for(std::size_t n=0;n<items.size();++n){
+        const auto found=host.keyed->slots.find(items[n].key);
+        if(found!=host.keyed->slots.end()){
+            auto& row=previous->impl_->nodes[found->second].content->view;
+            if(row){retained[n]=row;old_slots[n]=found->second;kept_nodes+=row->impl_->active_nodes();}
+        }
+    }
+    const auto replacing=previous?previous->impl_->active_nodes()-kept_nodes:0;
+    const auto namespace_root=impl_->scope_prefix+"@iiscope:list:"+std::to_string(i)+"/";
+    const auto next_epoch=host.epoch+1;
+    std::shared_ptr<WidgetState> candidate;
+    const auto hex=[](std::string_view key){
+        constexpr char alphabet[]="0123456789abcdef";std::string result;result.reserve(key.size()*2);
+        for(unsigned char c:key){result+=alphabet[c>>4];result+=alphabet[c&15];}return result;
+    };
+    auto factory=[&](WidgetBuilder& builder)->core::Result<void>{
+        candidate=builder.state_;
+        auto root=options.viewport?builder.absolute_stack({},"@keyed/root",*options.viewport):
+            options.horizontal?builder.hstack({},"@keyed/root",options.layout):builder.vstack({},"@keyed/root",options.layout);
+        if(!root)return std::unexpected(root.error());
+        if(options.viewport){if(auto clipped=root->set_clip_content(true);!clipped)return clipped;}
+        for(std::size_t n=0;n<items.size();++n){
+            const auto encoded=hex(items[n].key);
+            auto slot=builder.content_host(*root,"@keyed/"+encoded,{});
+            if(!slot)return std::unexpected(slot.error());
+            if(items[n].frame){auto& node=candidate->impl_->nodes[slot->index_];node.fixed_frame=*items[n].frame;node.extent={items[n].frame->width,items[n].frame->height};}
+            planned->slots.at(items[n].key)=slot->index_;
+            if(retained[n])transfers.push_back({old_slots[n],slot->index_,retained[n]});
+            else{
+                if(!items[n].factory)return core::fail(core::ErrorCode::invalid_argument,"A new content key requires a factory");
+                const auto prefix=namespace_root+"key:"+encoded+":"+std::to_string(next_epoch)+"/";
+                // A staged row has no published geometry yet. Laying out the
+                // growing candidate for every row makes initial mounting O(n²).
+                // Publication invalidates the complete tree for its first layout.
+                if(auto r=candidate->content(slot->index_,std::move(items[n].factory),{},{},prefix,false,true);!r)return r;
+            }
+        }
+        return {};
+    };
+    auto commit=[&]()->core::Result<void>{
+        // All allocations and user factories have succeeded. Publication below
+        // only moves ownership, so a failed candidate never detaches old rows.
+        for(auto& transfer:transfers){
+            auto& old=*previous->impl_->nodes[transfer.old_slot].content;
+            auto& next=*candidate->impl_->nodes[transfer.new_slot].content;
+            next.view=std::move(old.view);next.epoch=old.epoch;
+            transfer.row->impl_->embedding_owner=candidate;
+            transfer.row->impl_->embedding_popup=transfer.new_slot;
+            if(previous->impl_->focused==transfer.old_slot)candidate->impl_->focused=transfer.new_slot;
+            for(auto node=transfer.new_slot;node!=absent;node=candidate->impl_->nodes[node].parent){
+                candidate->impl_->nodes[node].metrics_dirty=true;
+                candidate->impl_->nodes[node].layout_width.reset();
+            }
+            candidate->impl_->layout_dirty=true;
+        }
+        impl_->nodes[i].content->keyed=std::move(planned);
+        return {};
+    };
+    return content(i,std::move(factory),std::move(commit),replacing,namespace_root,true);
 }
 void WidgetState::close() noexcept {
     if (!impl_->active) return;
     if (impl_->owner!=std::this_thread::get_id()) std::terminate();
+    [[maybe_unused]] const auto retiring_owner = weak_from_this().lock();
     auto input_cancel=impl_->cancel_input_capture();auto invoke=impl_->invoke;impl_->active=false;
+    impl_->font_subscription.reset();
+    impl_->publication_hooks.clear();
+    auto retirement = std::move(impl_->retirement_hooks);
+    for (auto& hook : retirement) try { hook(); } catch (...) {}
+    retirement.clear();
     auto watches=std::move(impl_->interaction_watches);
     for(const auto& watch:watches)if(auto port=watch->port.lock()){try{auto final=watch->delivered.value_or(WidgetInteraction{});final.alive=final.visible=final.enabled=final.hovered=final.pressed=final.focused=final.opened=false;(void)port->send(final);}catch(...){}}
     if(input_cancel)try{invoke(std::move(input_cancel));}catch(...){}
@@ -1313,7 +1712,14 @@ core::Result<WidgetSnapshot> WidgetState::snapshot(std::size_t i) {
     if(n.scroll){result.horizontal_scroll_offset=n.scroll->horizontal_offset;result.content_width=n.scroll->content_width;}
     if(n.content){result.has_content=bool(n.content->view);result.content_generation=n.content->epoch;}
     result.child_count=n.children.size();
-    if(n.action_surface){result.accessibility_description=n.action_surface->accessibility_description;result.action_role=n.action_surface->role;result.custom_content=impl_->custom_action_content(n);result.text_underline=n.action_surface->underline;result.foreground_color=impl_->action_ink(n);result.hovered=impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i);}
+    if(n.kind==WidgetKind::label)result.foreground_color=n.label.color;
+    if(n.action_surface){result.accessibility_description=n.action_surface->accessibility_description;result.action_role=n.action_surface->role;result.custom_content=impl_->custom_action_content(n);result.text_underline=n.action_surface->underline;result.foreground_color=impl_->action_ink(n);result.hovered=impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i);if(n.action_surface->role==ActionRole::tab||n.action_surface->role==ActionRole::menu_item)result.selected=n.checked;}
+    if(n.semantics){
+        result.accessibility_semantics=n.semantics;
+        if(!n.semantics->name.empty())result.accessibility_name=n.semantics->name;
+        if(!n.semantics->description.empty())result.accessibility_description=n.semantics->description;
+        if(n.semantics->range){result.minimum=n.semantics->range->minimum;result.maximum=n.semantics->range->maximum;result.value=n.semantics->range->value;}
+    }
     if(n.kind==WidgetKind::input_field){
         result.password=n.field.password;
         const auto first=std::min(n.anchor,n.cursor),last=std::max(n.anchor,n.cursor);
@@ -1325,13 +1731,14 @@ core::Result<WidgetSnapshot> WidgetState::snapshot(std::size_t i) {
     }
     if(n.text_input||n.kind==WidgetKind::input_field){
         auto input=text_input_state(i);if(!input)return std::unexpected(input.error());
-        result.text_input=true;result.multiline=input->multiline;result.text_length=input->length;result.read_only=input->read_only;
+        result.text_input=true;result.multiline=input->multiline;result.text_length=input->length;result.read_only=input->read_only;result.password=input->password;
         result.text_selection=input->selection;result.marked_range=input->marked;
         result.caret_bounds=input->caret;result.caret_bounds.x+=n.bounds.x;result.caret_bounds.y+=n.bounds.y;
         if(auto popup=impl_->owning_popup(i);popup!=absent)result.caret_bounds=transform_rect(result.caret_bounds,impl_->transform(popup));
     }
     if(n.drawing){result.drawing_panels=n.drawing->panels.size();result.drawing_texts=n.drawing->texts.size();result.drawing_images=n.drawing->images.size();}
     if(auto p=impl_->owning_popup(i);p!=absent){const auto& popup=*impl_->nodes[p].popup;result.reveal_progress=popup.motion.progress;result.transitioning=popup.motion.active||popup.snap_active;result.exiting=!popup.opened&&popup.motion.active;result.enabled&=popup.opened;}
+    result.opacity=n.opacity;result.effective_opacity=impl_->effective_opacity(i);
     result.visual_clip_bounds=result.clip_bounds;if(result.visual_clip_bounds){auto popup=impl_->owning_popup(i);if(popup!=absent)result.visual_clip_bounds=transform_rect(*result.visual_clip_bounds,impl_->transform(popup));}
     if(!impl_->scope_prefix.empty()){
         const auto offset=global_offset();result.bounds.x+=float(offset.width);result.bounds.y+=float(offset.height);result.visual_bounds.x+=float(offset.width);result.visual_bounds.y+=float(offset.height);
@@ -1375,6 +1782,13 @@ core::Result<std::vector<WidgetSnapshot>> WidgetState::snapshots() {
     std::vector<WidgetSnapshot> out; out.reserve(impl_->nodes.size()); for(std::size_t i=0;i<impl_->nodes.size();++i){auto item=snapshot(i);if(!item)return std::unexpected(item.error());out.push_back(std::move(*item));}
     for(const auto& n:impl_->nodes)if(auto child=n.content?n.content->view:n.popup?n.popup->content_view:nullptr){auto children=child->snapshots();if(!children)return std::unexpected(children.error());out.insert(out.end(),std::make_move_iterator(children->begin()),std::make_move_iterator(children->end()));}return out;
 }
+core::Result<CanvasFrame> WidgetState::drawing_snapshot(Size size){
+    if(auto result=ready();!result)return std::unexpected(result.error());
+    if(!std::isfinite(size.width)||!std::isfinite(size.height)||size.width<=0||size.height<=0||size.width>8192||size.height>8192)
+        return core::fail(core::ErrorCode::invalid_argument,"Drawing viewport must be finite and within (0, 8192]");
+    try{return frame(size);}
+    catch(const std::exception& error){return core::fail(core::ErrorCode::failed,error.what(),std::current_exception());}
+}
 core::Result<void> WidgetState::fixed_frame(std::size_t i,Rect r) {
     if(auto result=ready();!result)return result;
     if(i>=impl_->nodes.size() || impl_->nodes[i].parent==absent || impl_->nodes[impl_->nodes[i].parent].kind!=WidgetKind::absolute_stack ||
@@ -1383,6 +1797,7 @@ core::Result<void> WidgetState::fixed_frame(std::size_t i,Rect r) {
 }
 core::Result<void> WidgetState::extent(std::size_t i,Size size) {
     if(auto r=ready();!r)return r;
+    if(i<impl_->nodes.size()&&impl_->nodes[i].scroll){auto options=impl_->nodes[i].scroll->options;options.width=size.width;options.height=size.height;return scroll_options(i,options);}
     if(i>=impl_->nodes.size() || (!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content) || !geometry(size.width) || !geometry(size.height))return core::fail(core::ErrorCode::invalid_argument,"Extent requires a stack with finite nonnegative dimensions");
     auto& n=impl_->nodes[i];if(n.extent==size)return {};n.extent=size;
     if(n.fixed_frame){n.fixed_frame->width=float(size.width);n.fixed_frame->height=float(size.height);}
@@ -1435,6 +1850,21 @@ core::Result<void> WidgetState::scroll_position(std::size_t i,double x,double y)
     if(y!=view.offset||x!=view.horizontal_offset){view.offset=y;view.horizontal_offset=x;impl_->hovered=absent;impl_->invalidate(true);impl_->accessibility_changed();}
     return flush_viewports();
 }
+core::Result<void> WidgetState::virtual_scroll_content(std::size_t i,Size content,double x,double y){
+    if(auto r=ready();!r)return r;
+    const auto logical=[](double value){return std::isfinite(value)&&value>=0&&value<=1e15;};
+    if(i>=impl_->nodes.size()||!impl_->nodes[i].scroll||!logical(content.width)||!logical(content.height)||!std::isfinite(x)||!std::isfinite(y))
+        return core::fail(core::ErrorCode::invalid_argument,"Invalid virtual scroll content");
+    auto& view=*impl_->nodes[i].scroll;
+    if(!view.options.enabled)return core::fail(core::ErrorCode::invalid_argument,"Virtual content requires an enabled scroll viewport");
+    const auto bounds=impl_->nodes[i].bounds;
+    x=std::clamp(x,0.,std::max(0.,content.width-bounds.width));y=std::clamp(y,0.,std::max(0.,content.height-bounds.height));
+    if(view.options.virtual_content_width==content.width&&view.options.virtual_content_height==content.height&&view.horizontal_offset==x&&view.offset==y)return {};
+    view.options.virtual_content_width=content.width;view.options.virtual_content_height=content.height;
+    view.horizontal_offset=x;view.offset=y;
+    impl_->hovered=absent;impl_->invalidate(true,i);impl_->accessibility_changed();
+    return flush_viewports();
+}
 core::Result<void> WidgetState::scroll_handler(std::size_t i,std::function<void(const ScrollViewport&)> handler){
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size()||!impl_->nodes[i].scroll)return core::fail(core::ErrorCode::invalid_argument,"Scroll handler requires a viewport");
@@ -1447,6 +1877,8 @@ core::Result<void> WidgetState::flush_viewports(){
     struct Reset final{bool& value;~Reset(){value=false;}} reset{impl_->notifying_viewports};
     for(unsigned pass=0;pass<8;++pass){
         impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
+        for(auto index:impl_->visual_popups)if(impl_->nodes[index].popup->opened&&impl_->nodes[index].popup->layout_failure)
+            return std::unexpected(*impl_->nodes[index].popup->layout_failure);
         const auto revision=impl_->layout_revision;
         const bool inherited_interaction_change=impl_->interactions_dirty;
         for(std::size_t i=0;i<impl_->nodes.size();++i){
@@ -1465,6 +1897,18 @@ core::Result<void> WidgetState::flush_viewports(){
             continue;
         }
         for(std::size_t i=0;i<impl_->nodes.size();++i){
+            if(impl_->nodes[i].measure_changed&&impl_->logical_visible(i)&&impl_->nodes[i].bounds.width>0){
+                const auto width=double(impl_->nodes[i].bounds.width);
+                const auto natural=impl_->measure_width(i,width);
+                const WidgetMeasurement current{width,{std::min(natural.width,width),natural.height}};
+                if(impl_->nodes[i].delivered_measurement!=current){
+                    auto callback=impl_->nodes[i].measure_changed;impl_->nodes[i].delivered_measurement=current;
+                    bool completed=false;auto invoke=impl_->invoke;
+                    try{invoke([&]{callback(current);completed=true;});}catch(...){return core::fail(core::ErrorCode::failed,"Measurement callback failed",std::current_exception());}
+                    if(!impl_->active)return core::fail(core::ErrorCode::closed,"Measurement callback retired its widget tree");
+                    if(!completed)return core::fail(core::ErrorCode::failed,"Measurement callback did not complete");
+                }
+            }
             if(impl_->nodes[i].layout_changed&&impl_->logical_visible(i)&&impl_->nodes[i].delivered_bounds!=impl_->nodes[i].bounds){
                 const auto bounds=impl_->nodes[i].bounds;auto callback=impl_->nodes[i].layout_changed;impl_->nodes[i].delivered_bounds=bounds;bool completed=false;auto invoke=impl_->invoke;
                 try{invoke([&]{callback(bounds);completed=true;});}catch(...){return core::fail(core::ErrorCode::failed,"Layout callback failed",std::current_exception());}
@@ -1494,6 +1938,12 @@ core::Result<void> WidgetState::layout_handler(std::size_t i,std::function<void(
     if(auto result=ready();!result)return result;if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Layout owner not found");
     impl_->nodes[i].layout_changed=std::move(handler);impl_->nodes[i].delivered_bounds.reset();impl_->invalidate(true,i);return {};
 }
+core::Result<void> WidgetState::measurement_handler(std::size_t i,std::function<void(const WidgetMeasurement&)> handler){
+    if(auto result=ready();!result)return result;
+    if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Measurement owner not found");
+    auto& node=impl_->nodes[i];const bool changed=bool(node.measure_changed)!=bool(handler);node.measure_changed=std::move(handler);
+    if(changed){node.delivered_measurement.reset();impl_->invalidate(true,i);}return {};
+}
 core::Result<void> WidgetState::drawing(std::size_t i,WidgetDrawing value){
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size()||!stack_kind(impl_->nodes[i].kind))return core::fail(core::ErrorCode::invalid_argument,"Retained drawing requires a stack");
@@ -1510,12 +1960,27 @@ core::Result<void> WidgetState::paint_handler(std::size_t i,WidgetPaintHandler c
 core::Result<void> WidgetState::repaint(std::size_t i){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Paint owner not found");impl_->invalidate();return {};}
 core::Result<void> WidgetState::input_handler(std::size_t i,WidgetInputHandler handler){
     if(auto r=ready();!r)return r;
-    if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content))return core::fail(core::ErrorCode::invalid_argument,"Input interception requires a stack or content host");
+    if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content&&!impl_->nodes[i].action_surface))return core::fail(core::ErrorCode::invalid_argument,"Input interception requires a stack, content host or action surface");
     auto canceled=impl_->input_capture==i?impl_->cancel_input_capture():runtime::Task{};
     std::erase(impl_->input_hover_path,i);impl_->nodes[i].input_handler=std::move(handler);impl_->accessibility_changed();
     if(canceled){auto invoke=impl_->invoke;invoke(std::move(canceled));}return {};
 }
 core::Result<void> WidgetState::stack_options(std::size_t i,StackOptions o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||(impl_->nodes[i].kind!=WidgetKind::vertical_stack&&impl_->nodes[i].kind!=WidgetKind::horizontal_stack&&impl_->nodes[i].kind!=WidgetKind::overlay_stack)||!valid_stack(o))return core::fail(core::ErrorCode::invalid_argument,"Stack options require a valid ordinary stack");if(impl_->nodes[i].stack==o)return {};impl_->nodes[i].stack=std::move(o);impl_->invalidate(true,i);return {};}
+core::Result<StackLayoutOptions> WidgetState::stack_layout(std::size_t i) {
+    if (auto r=ready(); !r) return std::unexpected(r.error());
+    if (i>=impl_->nodes.size() || (impl_->nodes[i].kind!=WidgetKind::vertical_stack &&
+        impl_->nodes[i].kind!=WidgetKind::horizontal_stack && impl_->nodes[i].kind!=WidgetKind::overlay_stack))
+        return core::fail(core::ErrorCode::invalid_argument,"Stack layout requires an ordinary stack");
+    const auto& node=impl_->nodes[i]; return StackLayoutOptions{node.stack,node.extent,node.flex};
+}
+core::Result<void> WidgetState::stack_layout(std::size_t i,StackLayoutOptions value) {
+    auto current=stack_layout(i); if (!current) return std::unexpected(current.error());
+    if (!valid_stack_layout(value)) return core::fail(core::ErrorCode::invalid_argument,"Invalid native stack layout");
+    if (*current==value) return {};
+    auto& node=impl_->nodes[i]; node.stack=std::move(value.stack); node.extent=value.extent; node.flex=value.flex;
+    if (node.fixed_frame) { node.fixed_frame->width=float(value.extent.width); node.fixed_frame->height=float(value.extent.height); }
+    impl_->invalidate(true,i); return {};
+}
 core::Result<void> WidgetState::button_style(std::size_t i,ButtonStyle o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||impl_->nodes[i].kind!=WidgetKind::button||impl_->nodes[i].color_button||!valid_style(o))return core::fail(core::ErrorCode::invalid_argument,"Style requires an ordinary button and valid colors");impl_->nodes[i].button.style=std::move(o);impl_->invalidate();return {};}
 core::Result<void> WidgetState::button_icon(std::size_t i,std::shared_ptr<const RasterImage> image,std::string_view name){
     if(auto r=ready();!r)return r;
@@ -1550,13 +2015,64 @@ core::Result<void> WidgetState::escape_action(std::size_t i,runtime::Task action
 }
 core::Result<void> WidgetState::text(std::size_t i,std::string_view value) {
     if (auto r=ready();!r) return r;
-    if (i>=impl_->nodes.size() || !valid_title(value) || value.size()>65536 || (impl_->nodes[i].kind!=WidgetKind::label && impl_->nodes[i].kind!=WidgetKind::button && !impl_->nodes[i].action_surface && !check_kind(impl_->nodes[i].kind) && impl_->nodes[i].kind!=WidgetKind::input_field && impl_->nodes[i].kind!=WidgetKind::tab && impl_->nodes[i].kind!=WidgetKind::combo_box && impl_->nodes[i].kind!=WidgetKind::menu_item)) return core::fail(core::ErrorCode::invalid_argument,"Invalid widget text mutation");
+    if(i>=impl_->nodes.size()||!valid_title(value)||value.size()>65536)return core::fail(core::ErrorCode::invalid_argument,"Invalid widget text mutation");
+    if(auto provider=impl_->nodes[i].text_input;provider&&provider->set_text){
+        auto callback=provider->set_text;
+        try{return callback(value);}catch(...){return core::fail(core::ErrorCode::failed,"Text input mutation failed",std::current_exception());}
+    }
+    if(impl_->nodes[i].kind!=WidgetKind::label && impl_->nodes[i].kind!=WidgetKind::button && !impl_->nodes[i].action_surface && !check_kind(impl_->nodes[i].kind) && impl_->nodes[i].kind!=WidgetKind::input_field && impl_->nodes[i].kind!=WidgetKind::tab && impl_->nodes[i].kind!=WidgetKind::combo_box && impl_->nodes[i].kind!=WidgetKind::menu_item) return core::fail(core::ErrorCode::invalid_argument,"Invalid widget text mutation");
     auto& n=impl_->nodes[i];if(n.kind==WidgetKind::input_field && n.field.maximum_length)value=value.substr(0,scalar_prefix(value,n.field.maximum_length));if(n.text==value)return {};n.text=value;if(n.action_surface)n.action_surface->text=value;n.cursor=n.anchor=n.text.size();impl_->invalidate(true,i);return {};
 }
 core::Result<void> WidgetState::label_options(std::size_t i,LabelOptions o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||impl_->nodes[i].kind!=WidgetKind::label||!valid_label(o))return core::fail(core::ErrorCode::invalid_argument,"Invalid label options");auto& n=impl_->nodes[i];if(n.label==o&&n.text==o.text)return {};n.text=o.text;n.label=std::move(o);impl_->invalidate(true,i);return {};}
+core::Result<void> WidgetState::label_color(std::size_t i,std::optional<WidgetColor> value){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size()||impl_->nodes[i].kind!=WidgetKind::label||(value&&!valid_color(*value)))return core::fail(core::ErrorCode::invalid_argument,"Invalid label color");
+    auto& n=impl_->nodes[i];if(n.label.color==value)return {};n.label.color=value;impl_->invalidate();return {};
+}
 core::Result<void> WidgetState::input_options(std::size_t i,InputOptions o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||impl_->nodes[i].kind!=WidgetKind::input_field||!valid_input(o))return core::fail(core::ErrorCode::invalid_argument,"Invalid input options");if(o.maximum_length)o.text.resize(scalar_prefix(o.text,o.maximum_length));auto& n=impl_->nodes[i];if(n.text!=o.text){n.text=o.text;n.cursor=n.anchor=n.text.size();n.marked.clear();}const bool active=o.enabled;n.field=std::move(o);impl_->invalidate(true,i);return enabled(i,active);}
 core::Result<void> WidgetState::clip_content(std::size_t i,bool value){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].action_surface)||impl_->nodes[i].scroll)return core::fail(core::ErrorCode::invalid_argument,"Clip requires an ordinary container");impl_->nodes[i].clip=value;impl_->hovered=absent;impl_->invalidate();impl_->accessibility_changed();return {};}
+core::Result<void> WidgetState::opacity(std::size_t i,double value){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Widget was not found");
+    if(!std::isfinite(value)||value<0||value>1)return core::fail(core::ErrorCode::invalid_argument,"Widget opacity must be finite and within [0, 1]");
+    auto& node=impl_->nodes[i];if(node.opacity==value)return {};
+    node.opacity=value;impl_->invalidate();return {};
+}
 core::Result<void> WidgetState::accessibility_name(std::size_t i,std::string_view value){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||!valid_title(value)||value.size()>65536||(impl_->nodes[i].kind!=WidgetKind::button&&!impl_->nodes[i].action_surface&&impl_->nodes[i].kind!=WidgetKind::input_field&&!impl_->nodes[i].text_input))return core::fail(core::ErrorCode::invalid_argument,"Accessible name requires an action or editor");auto& n=impl_->nodes[i];if(n.kind==WidgetKind::input_field)n.field.accessibility_name=value;else n.button.accessibility_name=value;if(n.action_surface)n.action_surface->accessibility_name=value;impl_->accessibility_changed();return {};}
+core::Result<void> WidgetState::accessibility_semantics(std::size_t i,std::optional<AccessibilitySemantics> value){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Widget was not found");
+    auto& node=impl_->nodes[i];
+    const bool composition=node.kind==WidgetKind::vertical_stack||node.kind==WidgetKind::horizontal_stack||
+        node.kind==WidgetKind::overlay_stack||node.kind==WidgetKind::absolute_stack||bool(node.action_surface);
+    if(!composition)return core::fail(core::ErrorCode::invalid_argument,"Custom semantics require a composition surface");
+    if(value){
+        if(unsigned(value->role)>unsigned(AccessibilityRole::menu)||value->name.size()>65536||value->description.size()>65536||
+           !valid_title(value->name)||!valid_title(value->description))
+            return core::fail(core::ErrorCode::invalid_argument,"Invalid custom accessibility metadata");
+        if(value->role==AccessibilityRole::slider&&!value->range)
+            return core::fail(core::ErrorCode::invalid_argument,"Custom slider semantics require a range");
+        if(value->role==AccessibilityRole::stepper&&!value->can_increment&&!value->can_decrement)
+            return core::fail(core::ErrorCode::invalid_argument,"Custom stepper must expose an adjustment direction");
+        if(value->range){
+            const auto& r=*value->range;
+            if((value->role!=AccessibilityRole::progress&&value->role!=AccessibilityRole::slider)||!std::isfinite(r.minimum)||!std::isfinite(r.maximum)||
+               !std::isfinite(r.value)||!std::isfinite(r.maximum-r.minimum)||r.minimum>=r.maximum||r.value<r.minimum||r.value>r.maximum)
+                return core::fail(core::ErrorCode::invalid_argument,"Invalid custom accessibility range");
+        }
+    }
+    if(node.semantics==value)return {};
+    const bool structure=!node.semantics||!value||node.semantics->role!=value->role||
+        node.semantics->name!=value->name||node.semantics->description!=value->description||
+        node.semantics->can_increment!=value->can_increment||node.semantics->can_decrement!=value->can_decrement;
+    const bool changed_range=(!node.semantics||!value)?true:node.semantics->range!=value->range;
+    // An accessibility notification may reenter and retire the generation.
+    const auto id=changed_range?node.id:std::string{};
+    node.semantics=std::move(value);
+    if(structure)impl_->accessibility_changed();
+    if(changed_range)impl_->accessibility_value_changed(id);
+    return {};
+}
 core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
     if (auto r=ready();!r) return r;
     if (i>=impl_->nodes.size() || (!interactive(impl_->nodes[i].kind)&&!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content&&impl_->nodes[i].kind!=WidgetKind::image)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no enabled property");
@@ -1574,7 +2090,13 @@ core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
 core::Result<void> WidgetState::checked(std::size_t i,bool value) {
     if (auto r=ready();!r) return r;
     if (i>=impl_->nodes.size() || (!check_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].action_surface)) return core::fail(core::ErrorCode::invalid_argument,"Widget has no checked property");
-    auto& n=impl_->nodes[i]; n.checked=value;
+    auto& n=impl_->nodes[i];
+    if(n.action_surface){
+        if(n.checked==value)return {};
+        const auto id=n.id;n.checked=value;n.action_surface->checked=value;
+        impl_->invalidate();impl_->accessibility_value_changed(id);return {};
+    }
+    n.checked=value;
     if (value && n.kind==WidgetKind::radio_button && !n.group.empty()) for(auto& sibling:impl_->nodes) if(&sibling!=&n && sibling.kind==WidgetKind::radio_button && sibling.group==n.group) sibling.checked=false;
     impl_->invalidate(); return {};
 }
@@ -1653,8 +2175,13 @@ core::Result<void> WidgetState::activate(std::size_t i) {
 }
 core::Result<void> WidgetState::step(std::size_t i,int direction) {
     if(auto r=ready();!r) return r;
-    if(i>=impl_->nodes.size() || impl_->nodes[i].kind!=WidgetKind::stepper || (direction!=1 && direction!=-1))
+    if(i>=impl_->nodes.size() || (direction!=1 && direction!=-1))
         return core::fail(core::ErrorCode::invalid_argument,"Step requires a Stepper and direction +1 or -1");
+    if(impl_->nodes[i].semantics&&impl_->nodes[i].semantics->role==AccessibilityRole::stepper){
+        const auto id=impl_->nodes[i].id;
+        return input({.kind=direction>0?WidgetInputKind::increment:WidgetInputKind::decrement,.target=id});
+    }
+    if(impl_->nodes[i].kind!=WidgetKind::stepper)return core::fail(core::ErrorCode::invalid_argument,"Step requires a Stepper and direction +1 or -1");
     const auto& n=impl_->nodes[i];
     if(!n.enabled || (n.stepper.arrow==StepperArrow::up && direction<0) || (n.stepper.arrow==StepperArrow::down && direction>0)) return {};
     if(!impl_->logical_visible(i) || impl_->blocked(i)) return core::fail(core::ErrorCode::invalid_argument,"Stepper is blocked by a popup");
@@ -1665,7 +2192,15 @@ core::Result<void> WidgetState::step(std::size_t i,int direction) {
 core::Result<void> WidgetState::popup_factory(std::size_t i,WidgetFactory factory,Widget anchor) {
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size()||!impl_->nodes[i].popup||!impl_->nodes[i].popup->popover)return core::fail(core::ErrorCode::invalid_argument,"Activation content requires a Popover");
-    auto& popup=*impl_->nodes[i].popup;if(popup.opened||impl_->domain_transition())return core::fail(core::ErrorCode::busy,"Change the content factory only while closed and idle");
+    auto& popup=*impl_->nodes[i].popup;
+    bool within_staged=false;
+    if(impl_->building){
+        auto staged=impl_->domain->staged.lock();
+        for(auto current=shared_from_this();current;current=current->impl_->embedding_owner.lock())
+            if(current==staged){within_staged=true;break;}
+    }
+    if(popup.opened||(impl_->domain_transition()&&!within_staged))
+        return core::fail(core::ErrorCode::busy,"Change the content factory only while closed and idle, or inside its staged activation");
     const bool anchored=anchor.owner_!=std::thread::id{};
     if(anchored){
         if(anchor.state_.lock().get()!=this||anchor.index_>=impl_->nodes.size()||!impl_->descendant(anchor.index_,i)||anchor.index_==i)return core::fail(core::ErrorCode::invalid_argument,"Body anchor must be a descendant in this popup generation");
@@ -1693,7 +2228,7 @@ core::Result<void> WidgetState::create_popup_content(std::size_t i) {
     auto factory=impl_->nodes[i].popup->content_factory;if(!factory||impl_->nodes[i].popup->content_view)return {};
     auto root=shared_from_this();std::size_t depth=0;while(auto parent=root->impl_->embedding_owner.lock()){root=parent;if(++depth>=8)return core::fail(core::ErrorCode::out_of_range,"Content activation depth limit is eight");}
     const auto active_nodes=root->impl_->active_nodes();if(active_nodes>=4096)return core::fail(core::ErrorCode::out_of_range,"Active widget domain limit is 4096");
-    auto child=std::make_shared<WidgetState>(impl_->invoke,impl_->appearance,impl_->frame_hooks);child->impl_->embedding_owner=weak_from_this();child->impl_->embedding_popup=i;child->impl_->domain=impl_->domain;child->impl_->node_capacity=4096-active_nodes;
+    auto child=std::make_shared<WidgetState>(impl_->invoke,impl_->appearance,impl_->frame_hooks);child->impl_->embedding_owner=weak_from_this();child->impl_->embedding_popup=i;child->impl_->domain=impl_->domain;child->impl_->frame_hooks.window_geometry={};child->impl_->node_capacity=4096-active_nodes;
     child->impl_->scope_prefix=impl_->scope_prefix+"@iiscope:"+std::to_string(i)+":"+std::to_string(impl_->nodes[i].popup->epoch+1)+"/";
     child->impl_->resolved_font_family=impl_->resolved_font_family;child->impl_->resolved_compact_font_family=impl_->resolved_compact_font_family;
     struct Guard final {bool& value;bool previous;explicit Guard(bool& v):value(v),previous(v){value=true;}~Guard(){value=previous;}} guard(root->impl_->content_transition);
@@ -1712,14 +2247,20 @@ bool WidgetState::has_escape_handler() const {
 }
 core::Result<void> WidgetState::route_host_content(const WidgetInput& event,bool& handled){
     handled=false;
-    const bool keyboard=event.kind==WidgetInputKind::key_down||event.kind==WidgetInputKind::key_up||event.kind==WidgetInputKind::text||event.kind==WidgetInputKind::composition;
+    const bool keyboard=event.kind==WidgetInputKind::key_down||event.kind==WidgetInputKind::key_up||event.kind==WidgetInputKind::text||event.kind==WidgetInputKind::composition||event.kind==WidgetInputKind::commit_composition;
     const auto scope=impl_->input_popup();const auto modal=impl_->modal_host();
     if(modal==absent&&(impl_->pressed!=absent||impl_->input_capture!=absent)&&event.kind!=WidgetInputKind::focus_lost&&!keyboard)return {};
     if(modal!=absent){if(auto cancel=impl_->cancel_input_capture()){auto invoke=impl_->invoke;invoke(std::move(cancel));if(!impl_->active)return {};}}
     const auto hosts=impl_->ordered_hosts();
     if(event.kind==WidgetInputKind::focus_lost){for(auto i:hosts)if(i!=impl_->focused)if(auto child=impl_->nodes[i].content->view){auto r=child->input(event);if(!r&&r.error().code!=core::ErrorCode::closed)return r;if(!impl_->active)return {};}return {};}
+    auto captured_host=absent;
+    if(!keyboard&&modal==absent)for(auto it=hosts.rbegin();it!=hosts.rend();++it){
+        const auto i=*it;const auto& host=impl_->nodes[i];
+        if(auto child=host.content->view;child&&host.enabled&&impl_->visible(i)&&!impl_->blocked(i)&&impl_->owning_popup(i)==scope&&child->impl_->captures_input()){captured_host=i;break;}
+    }
     for(auto it=hosts.rbegin();it!=hosts.rend();++it){
-        const auto i=*it;const auto& host=impl_->nodes[i];auto child=host.content->view;
+        const auto i=*it;if(captured_host!=absent&&i!=captured_host)continue;
+        const auto& host=impl_->nodes[i];auto child=host.content->view;
         if(!child||!host.enabled||!impl_->visible(i)||impl_->blocked(i)||impl_->owning_popup(i)!=scope)continue;
         const auto r=host.bounds;const auto point=impl_->logical_point(i,event.x,event.y);
         const bool inside=contains(r,point.width,point.height)&&(!impl_->clip_rect(i)||contains(*impl_->clip_rect(i),point.width,point.height));
@@ -1734,6 +2275,8 @@ core::Result<void> WidgetState::route_host_content(const WidgetInput& event,bool
                 const auto current=child->impl_->focused;const auto direction=event.shift?-1:1;const auto next=child->impl_->next_content(absent,current,direction);
                 if(current!=absent&&(next==absent||(direction>0?next<=current:next>=current))){const auto outside=impl_->next_content(scope,i,direction);if(outside!=i){handled=true;return focus_content(outside,direction);}}
             }
+            auto intercepted=route_input_handler(event);if(!intercepted)return std::unexpected(intercepted.error());
+            if(*intercepted){handled=true;return {};}if(!impl_->active)return {};
         }else if(!capture&&!child_modal&&!in_popup&&(!inside||impl_->hit(event.x,event.y)!=i)){
             if(!child->impl_->popups.empty()&&(event.kind==WidgetInputKind::pointer_down||event.kind==WidgetInputKind::context_request)){auto local=event;local.x=raw_x;local.y=raw_y;auto result=child->input(local);if(!result)return result;if(!impl_->active)return {};}
             if(event.kind==WidgetInputKind::pointer_move&&(child->impl_->hovered!=absent||!child->impl_->input_hover_path.empty())){auto result=child->input({.kind=WidgetInputKind::pointer_leave});if(!result)return result;if(!impl_->active)return {};}
@@ -1772,7 +2315,7 @@ core::Result<void> WidgetState::route_content(const WidgetInput& event,bool& han
     if(impl_->pressed!=absent&&event.kind!=WidgetInputKind::focus_lost&&(event.kind==WidgetInputKind::pointer_move||event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::pointer_leave))return {};
     const auto raw_x=event.x-r.x,raw_y=event.y-r.y;
     const auto point=impl_->logical_point(top,event.x,event.y);double x=point.width-r.x,y=point.height-r.y;
-    const bool keyboard=event.kind==WidgetInputKind::key_down||event.kind==WidgetInputKind::key_up||event.kind==WidgetInputKind::text||event.kind==WidgetInputKind::composition;
+    const bool keyboard=event.kind==WidgetInputKind::key_down||event.kind==WidgetInputKind::key_up||event.kind==WidgetInputKind::text||event.kind==WidgetInputKind::composition||event.kind==WidgetInputKind::commit_composition;
     if(event.kind==WidgetInputKind::focus_lost)return child->input(event);
     if(keyboard){
         const auto owner=impl_->content_focus(top);if(impl_->focused!=absent&&impl_->focused!=owner)return {};
@@ -1809,6 +2352,12 @@ core::Result<void> WidgetState::open_at(std::size_t i,double x,double y) {
         return core::fail(core::ErrorCode::invalid_argument,"Popup owner is hidden");
     auto& p=*impl_->nodes[i].popup;const bool already=p.opened;
     if(p.popover&&p.popover->sheet_layout){const auto& sheet=*p.popover->sheet_layout;const auto body=impl_->ids.find(sheet.viewport_id),grabber=impl_->ids.find(sheet.grabber_id);if(body==impl_->ids.end()||!impl_->nodes[body->second].scroll||!impl_->descendant(body->second,i)||(!sheet.grabber_id.empty()&&(grabber==impl_->ids.end()||!impl_->descendant(grabber->second,i))))return core::fail(core::ErrorCode::invalid_argument,"Sheet viewport/grabber must belong to its retained content");if(!already)impl_->nodes[body->second].scroll->offset=0;}
+    if(p.popover&&p.popover->adaptive_layout){
+        if(p.content_factory)return core::fail(core::ErrorCode::unsupported,"Adaptive popup requires retained content");
+        impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
+        auto candidate=impl_->adaptive_frame(i,impl_->popup_viewport(impl_->viewport));if(!candidate)return std::unexpected(candidate.error());
+        if(!already){const auto viewport=impl_->ids.find(p.popover->adaptive_layout->viewport_id);impl_->nodes[viewport->second].scroll->offset=0;}
+    }
     auto domain=shared_from_this();while(auto parent=domain->impl_->embedding_owner.lock())domain=parent;
     if(!already && domain->impl_->active_popups()>=8) return core::fail(core::ErrorCode::out_of_range,"At most eight widget popups may be open in a domain");
     if(!already&&std::ranges::find(impl_->visual_popups,i)==impl_->visual_popups.end()&&domain->impl_->active_visual_popups()>=16)return core::fail(core::ErrorCode::full,"At most sixteen open or exiting popups per domain");
@@ -1824,8 +2373,10 @@ core::Result<void> WidgetState::open_at(std::size_t i,double x,double y) {
     if(!p.popover&&(selected==absent||!impl_->nodes[selected].enabled||!impl_->logical_visible(selected)))selected=impl_->next_entry(i,absent,1,true);
     auto blur=impl_->change_focus(selected);if(selected!=absent) impl_->reveal(selected);
     if(p.content_view&&p.popover->focus_on_open&&(p.content_anchor==absent||selected==p.content_anchor)){auto view=p.content_view;for(std::size_t j=0;j<view->impl_->nodes.size();++j)if(interactive(view->impl_->nodes[j].kind)&&view->impl_->nodes[j].enabled&&view->impl_->logical_visible(j)){auto r=view->focus(j);if(!r)return r;break;}}
-    impl_->accessibility_changed();
-    auto opened=p.events.opened;auto invoke=impl_->invoke;if(input_cancel)invoke(std::move(input_cancel));if(!impl_->active)return {};if(canceled) invoke(std::move(canceled));if(impl_->active&&blur)invoke(std::move(blur));
+    auto published=!already?p.content_view:nullptr;auto opened=p.events.opened;
+    impl_->accessibility_changed();if(!impl_->active)return {};
+    if(published)published->deliver_publication();if(!impl_->active)return {};
+    auto invoke=impl_->invoke;if(input_cancel)invoke(std::move(input_cancel));if(!impl_->active)return {};if(canceled) invoke(std::move(canceled));if(impl_->active&&blur)invoke(std::move(blur));
     if(impl_->active && !already && impl_->nodes[i].popup->epoch==epoch && opened) invoke(std::move(opened));return {};
 }
 core::Result<void> WidgetState::open_for(std::size_t i,Widget anchor,double x,double y) {
@@ -1883,6 +2434,7 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
             if(std::ranges::find(impl_->input_hover_path,i)!=impl_->input_hover_path.end()||i>=impl_->nodes.size()||!impl_->nodes[i].input_handler)continue;
             auto handler=impl_->nodes[i].input_handler;auto local=event;local.kind=WidgetInputKind::pointer_leave;local.target=impl_->nodes[i].id;
             auto point=impl_->logical_point(i,event.x,event.y);local.x=point.width;local.y=point.height;
+            local.local_position=WidgetPoint{point.width-impl_->nodes[i].bounds.x,point.height-impl_->nodes[i].bounds.y};
             core::Result<bool> result=false;bool completed=false;auto invoke=impl_->invoke;
             try{invoke([&]{result=handler(local);completed=true;});}catch(...){return core::fail(core::ErrorCode::failed,"Widget leave handler failed",std::current_exception());}
             if(!impl_->active||!completed)return true;if(!result)return std::unexpected(result.error());
@@ -1895,7 +2447,11 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
         if(!impl_->nodes[index].input_handler||!impl_->nodes[index].enabled||!impl_->logical_visible(index)||impl_->blocked(index))continue;
         auto handler=impl_->nodes[index].input_handler;auto local=event;auto point=impl_->logical_point(index,event.x,event.y);
         local.x=point.width;local.y=point.height;local.target=target==absent?std::string{}:impl_->nodes[target].id;
-        local.text_input_active=impl_->focused!=absent&&(impl_->nodes[impl_->focused].kind==WidgetKind::input_field||impl_->nodes[impl_->focused].text_input);
+        if(pointed)local.local_position=WidgetPoint{point.width-impl_->nodes[index].bounds.x,point.height-impl_->nodes[index].bounds.y};
+        const auto context=pointed?impl_->point_context(event.x,event.y):impl_->key_context();
+        local.text_input_active=event.text_input_active||context.text;
+        local.native_control_active=event.native_control_active||context.control;
+        local.native_navigation_active=event.native_navigation_active||context.navigation;
         const auto previous_focus=impl_->focused;
         core::Result<bool> result=true;bool completed=false;auto invoke=impl_->invoke;
         try{invoke([&]{result=handler(local);completed=true;});}catch(...){return core::fail(core::ErrorCode::failed,"Widget input handler failed",std::current_exception());}
@@ -1917,6 +2473,8 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming) {
     auto event=incoming;
     if (auto r=ready();!r) return r;
     if (static_cast<unsigned>(event.kind)>static_cast<unsigned>(WidgetInputKind::commit_composition) || static_cast<unsigned>(event.key)>static_cast<unsigned>(WidgetKey::redo) || !std::isfinite(event.x) || !std::isfinite(event.y) || !std::isfinite(event.scroll_y) || !std::isfinite(event.scroll_x) || !valid_title(event.text) || event.text.size()>65536 || unsigned(event.device)>unsigned(PointerDevice::touch) || !std::isfinite(event.pressure) || event.pressure<0 || event.pressure>1 || !std::isfinite(event.tilt_x) || std::abs(event.tilt_x)>90 || !std::isfinite(event.tilt_y) || std::abs(event.tilt_y)>90 || !std::isfinite(event.rotation) || !std::isfinite(event.timestamp) || event.timestamp<0) return core::fail(core::ErrorCode::invalid_argument,"Invalid widget input");
+    if(event.local_position&&(!std::isfinite(event.local_position->x)||!std::isfinite(event.local_position->y)))
+        return core::fail(core::ErrorCode::invalid_argument,"Invalid local widget input position");
     if(event.content&&!valid_clipboard(*event.content))return core::fail(core::ErrorCode::invalid_argument,"Invalid drop payload");
     if(event.kind==WidgetInputKind::commit_composition&&impl_->focused!=absent&&impl_->nodes[impl_->focused].kind==WidgetKind::input_field){auto& n=impl_->nodes[impl_->focused];if(n.marked.empty())return {};event.kind=WidgetInputKind::text;event.text=n.marked;}
     if(!event.target.empty()){
@@ -1928,6 +2486,18 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming) {
         if(event.kind==WidgetInputKind::increment || event.kind==WidgetInputKind::decrement) {
             const auto index=it->second;auto& n=impl_->nodes[index];
             if(n.color){if(!n.enabled || !impl_->logical_visible(index) || impl_->blocked(index))return {};if(n.color->options.field<ColorField::hue_rail)return core::fail(core::ErrorCode::invalid_argument,"Only color rails have an increment action");const bool increase=event.kind==WidgetInputKind::increment;return n.color->key((increase != (n.color->options.field==ColorField::hue_rail))?WidgetKey::up:WidgetKey::down,false);}
+            if(n.semantics&&(n.semantics->role==AccessibilityRole::slider||n.semantics->role==AccessibilityRole::stepper)){
+                if(!impl_->effective_enabled(index)||!impl_->logical_visible(index)||impl_->blocked(index))return {};
+                if((event.kind==WidgetInputKind::increment&&!n.semantics->can_increment)||(event.kind==WidgetInputKind::decrement&&!n.semantics->can_decrement))return {};
+                auto handler=n.input_handler;if(!handler)return core::fail(core::ErrorCode::unsupported,"Custom adjustable surface has no adjustment handler");
+                core::Result<bool> handled=false;bool completed=false;auto invoke=impl_->invoke;
+                try{invoke([&]{handled=handler(event);completed=true;});}
+                catch(...){return core::fail(core::ErrorCode::failed,"Custom adjustment failed",std::current_exception());}
+                if(!impl_->active||!completed)return {};
+                if(!handled)return std::unexpected(handled.error());
+                if(!*handled)return core::fail(core::ErrorCode::unsupported,"Custom surface declined adjustment");
+                return {};
+            }
             return step(index,event.kind==WidgetInputKind::increment?1:-1);
         }
         return event.kind==WidgetInputKind::activate?activate(it->second):focus(it->second);
@@ -1978,7 +2548,11 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming) {
     }
     const auto dismiss_outside=[&](bool context)->core::Result<void> {
         std::vector<std::pair<std::size_t,std::uint64_t>> targets;
-        for(auto i:impl_->popups) if(!impl_->popup_contains(i,event.x,event.y) &&
+        const auto inside=[&](std::size_t i){
+            if(impl_->popup_contains(i,event.x,event.y))return true;
+            return std::ranges::any_of(impl_->popups,[&](auto child){return child!=i&&impl_->descendant(child,i)&&impl_->popup_contains(child,event.x,event.y);});
+        };
+        for(auto i:impl_->popups) if(!inside(i) &&
             (context?impl_->nodes[i].popup->options.dismiss_on_context_request:impl_->nodes[i].popup->options.dismiss_on_outside_press)) targets.emplace_back(i,impl_->nodes[i].popup->epoch);
         for(auto it=targets.rbegin();it!=targets.rend();++it) {
             if(!impl_->active) return {};
@@ -2404,7 +2978,7 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
         CanvasLayer base{.panels=std::move(scene.panels),.texts=std::move(scene.texts),.images=std::move(scene.images),.images_before_text=scene.images_before_text};translate(base);base.clip=clip;base.content_transform=compose(inherited,base.content_transform);
         if(!base.panels.empty()||!base.texts.empty()||!base.images.empty())f.overlays.push_back(std::move(base));
         for(std::size_t j=0;j<scene.overlays.size();++j){auto layer=std::move(scene.overlays[j]);translate(layer);
-            if(j>=popup_start)portals.push_back(std::move(layer));
+            if(j>=popup_start){layer.content_transform.opacity*=inherited.opacity;portals.push_back(std::move(layer));}
             else{if(clip)layer.clip=layer.clip?intersect(*layer.clip,*clip):clip;layer.content_transform=compose(inherited,layer.content_transform);f.overlays.push_back(std::move(layer));}
         }
     };
@@ -2413,15 +2987,20 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
     // starts/restores a hardware scissor without changing text/image sampling.
     auto draw_tree=[&](auto&& self,std::size_t i,std::optional<std::size_t>& batch,ContentTransform transform)->void {
         const auto& n=impl_->nodes[i];if(n.popup||!impl_->visible(i))return;
-        auto use_clip=[&](std::optional<Rect> clip){if(batch&&*batch==f.overlays.size()){f.overlays.push_back({.clip=clip,.content_transform=transform});return;}const auto current=batch?f.overlays[*batch].clip:std::optional<Rect>{};if(current!=clip){batch=f.overlays.size();f.overlays.push_back({.clip=clip,.content_transform=transform});}};
+        transform.opacity*=float(n.opacity);if(transform.opacity<=0)return;
+        auto use_clip=[&](std::optional<Rect> clip){
+            if(batch&&*batch<f.overlays.size()&&f.overlays[*batch].clip==clip&&f.overlays[*batch].content_transform==transform)return;
+            if(!batch&&!clip&&transform.identity())return;
+            batch=f.overlays.size();f.overlays.push_back({.clip=clip,.content_transform=transform});
+        };
         const bool provided=bool(n.paint_handler)||(n.drawing&&(n.drawing->images_before_text||n.drawing->backdrop||n.drawing->shadow));
         if(!provided)use_clip(impl_->clip_rect(i));
         if(provided){
             const auto source=n.paint_source==absent?i:n.paint_source;const auto& owner=impl_->nodes[source];
-            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),impl_->hovered!=absent&&impl_->descendant(impl_->hovered,source),impl_->pressed==source,impl_->focused==source,owner.checked,impl_->nodes[owner.default_content==absent?source:owner.default_content].children.size(),impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1};
+            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),impl_->hovered!=absent&&impl_->descendant(impl_->hovered,source),impl_->pressed==source,impl_->focused==source,owner.checked,impl_->nodes[owner.default_content==absent?source:owner.default_content].children.size(),impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1,impl_->resolved_font_family};
             struct Guard{bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}}guard{impl_->painting};
             core::Result<std::shared_ptr<const WidgetDrawing>> drawing=n.paint_handler?n.paint_handler(state):core::Result<std::shared_ptr<const WidgetDrawing>>{std::make_shared<const WidgetDrawing>(*n.drawing)};if(!drawing){if(drawing.error().cause)std::rethrow_exception(drawing.error().cause);throw std::runtime_error(drawing.error().message);}
-            if(*drawing){const auto& d=**drawing;CanvasFrame check{.viewport={0,0,8192,8192},.overlays={{.panels=d.panels,.texts=d.texts,.images=d.images,.backdrop=d.backdrop,.shadow=d.shadow}}};if(!valid_canvas(check))throw std::runtime_error("Paint provider returned invalid native drawing");
+            if(*drawing){const auto& d=**drawing;CanvasFrame check{.viewport={0,0,8192,8192},.overlays={{.panels=d.panels,.texts=d.texts,.images=d.images,.backdrop=d.backdrop,.shadow=d.shadow}}};if(!valid_canvas(check))throw std::runtime_error("Paint provider returned invalid native drawing for "+n.id+" at "+std::to_string(n.bounds.width)+"x"+std::to_string(n.bounds.height)+" (panels="+std::to_string(d.panels.size())+", texts="+std::to_string(d.texts.size())+", images="+std::to_string(d.images.size())+")");
                 CanvasLayer layer{.panels=d.panels,.texts=d.texts,.images=d.images,.clip=impl_->clip_rect(i),.backdrop=d.backdrop,.shadow=d.shadow,.content_transform=transform,.images_before_text=d.images_before_text};
                 for(auto& p:layer.panels){p.bounds.x+=n.bounds.x;p.bounds.y+=n.bounds.y;}for(auto& t:layer.texts){t.bounds.x+=n.bounds.x;t.bounds.y+=n.bounds.y;if(t.clip){t.clip->x+=n.bounds.x;t.clip->y+=n.bounds.y;}}for(auto& image:layer.images){image.bounds.x+=n.bounds.x;image.bounds.y+=n.bounds.y;}
                 const auto translate=[&](Rect& r){r.x+=n.bounds.x;r.y+=n.bounds.y;};
@@ -2452,15 +3031,17 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
     if(popup_start)*popup_start=f.overlays.size();flush_portals();
     for(auto index:impl_->visual_popups) {
         const auto& n=impl_->nodes[index];const auto& p=*n.popup;if(!impl_->visible(index)||n.bounds.width<=0||n.bounds.height<=0)continue;
+        const auto opacity=float(impl_->local_opacity(index));if(opacity<=0)continue;
         const bool animated=p.popover&&p.popover->transition.has_value();
-        if(p.popover&&p.popover->dim){auto tint=p.popover->backdrop_color;if(animated)tint.alpha*=std::clamp(p.motion.progress,0.,1.);auto& dim=f.overlays.emplace_back();if(animated){const auto c=color(tint);dim.panels.push_back({impl_->popup_viewport(size),c,c,0});}else layer_panel(dim,impl_->popup_viewport(size),tint);}
+        auto transform=animated?impl_->transform(index):ContentTransform{};transform.opacity*=opacity;
+        if(p.popover&&p.popover->dim){auto tint=p.popover->backdrop_color;if(animated)tint.alpha*=std::clamp(p.motion.progress,0.,1.);auto& dim=f.overlays.emplace_back();dim.content_transform.opacity=opacity;if(animated){const auto c=color(tint);dim.panels.push_back({impl_->popup_viewport(size),c,c,0});}else layer_panel(dim,impl_->popup_viewport(size),tint);}
         auto background=p.options.background.value_or(impl_->appearance.window);background.alpha*=p.options.opacity;
         const auto radius=p.popover&&p.popover->cylinder?std::min(n.bounds.width,n.bounds.height)/2:std::min(float(p.options.corner_radius),std::min(n.bounds.width,n.bounds.height)*float(p.popover?p.popover->corner_limit:.5));
         auto& backdrop=f.overlays.emplace_back();
+        backdrop.content_transform.opacity=transform.opacity;
         if(p.popover&&p.popover->shadow){const auto& shadow=*p.popover->shadow;backdrop.shadow=BoxShadow{.bounds={n.bounds.x+float(shadow.offset_x),n.bounds.y+float(shadow.offset_y),n.bounds.width,n.bounds.height},.radius=radius,.blur_radius=float(shadow.blur_radius),.color=color(shadow.color)};}
         if(animated){
-            const auto& o=*p.popover;const auto transform=impl_->transform(index);
-            backdrop.content_transform.opacity=transform.opacity;
+            const auto& o=*p.popover;
             // The authored shadow and glass are unscaled siblings of the card.
             // Glass closes immediately; the retained card alone fades out.
             if(p.opened&&o.blur_radius)backdrop.backdrop=BackdropMaterial{.bounds=n.bounds,.radius=radius,.blur_radius=float(*o.blur_radius),.source=BackdropSource::content};
@@ -2473,10 +3054,16 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start) {
             }else layer_panel(card,n.bounds,background,radius);
         }else if(p.popover&&(!p.popover->opaque_base||p.popover->blur_radius)){const auto& o=*p.popover;backdrop.backdrop=BackdropMaterial{.bounds=n.bounds,.radius=radius,.blur_radius=float(o.blur_radius.value_or(0)),.tint=color(background),.border=color(o.border_color),.border_width=float(o.border_width),.source=o.blur_radius?BackdropSource::content:BackdropSource::previous_layers};}
         else{layer_panel(backdrop,n.bounds,{20.0/255,20.0/255,20.0/255,1},radius);layer_panel(backdrop,n.bounds,background,radius);}
-        const auto content_index=f.overlays.size();f.overlays.emplace_back();if(!p.popover||p.popover->clip_content)f.overlays[content_index].clip=p.content;if(animated)f.overlays[content_index].content_transform=impl_->transform(index);
-        if(p.popover){std::optional<std::size_t> batch=content_index;for(auto child:n.children)if(!impl_->nodes[child].popup)draw_tree(draw_tree,child,batch,animated?impl_->transform(index):ContentTransform{});}
-        else for(auto entry:p.entries)if(impl_->visible(entry)){const auto& node=impl_->nodes[entry];if(node.menu_item)draw_menu_item(f.overlays[content_index],entry);else if(node.divider)draw_divider(f.overlays[content_index],node);}
-        if(p.content_view)append_embedded(p.content_view,impl_->activation_rect(index),animated?impl_->transform(index):ContentTransform{},(!p.popover||p.popover->clip_content)?std::optional{p.content}:std::nullopt);
+        const auto content_index=f.overlays.size();f.overlays.emplace_back();if(!p.popover||p.popover->clip_content)f.overlays[content_index].clip=p.content;f.overlays[content_index].content_transform=transform;
+        if(p.popover){std::optional<std::size_t> batch=content_index;for(auto child:n.children)if(!impl_->nodes[child].popup)draw_tree(draw_tree,child,batch,transform);}
+        else {auto menu_batch=content_index;for(auto entry:p.entries)if(impl_->visible(entry)){
+            const auto& node=impl_->nodes[entry];auto entry_transform=transform;
+            for(auto item=entry;item!=index&&item!=absent;item=impl_->nodes[item].parent)entry_transform.opacity*=float(impl_->nodes[item].opacity);
+            if(entry_transform.opacity<=0)continue;
+            if(f.overlays[menu_batch].content_transform!=entry_transform){menu_batch=f.overlays.size();f.overlays.push_back({.clip=p.content,.content_transform=entry_transform});}
+            if(node.menu_item)draw_menu_item(f.overlays[menu_batch],entry);else if(node.divider)draw_divider(f.overlays[menu_batch],node);
+        }}
+        if(p.content_view)append_embedded(p.content_view,impl_->activation_rect(index),transform,(!p.popover||p.popover->clip_content)?std::optional{p.content}:std::nullopt);
         flush_portals();
     }
     const auto empty=[](const CanvasLayer& layer){return layer.panels.empty()&&layer.texts.empty()&&layer.images.empty()&&!layer.backdrop&&!layer.shadow;};

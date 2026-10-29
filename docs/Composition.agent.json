@@ -1,0 +1,205 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:4ef4739f5c430b85c8334ef76234f9f045dfac0b6cdfaa4c5e91ee9df55de996",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Composition.md",
+    "sha256": "1e30944307672007252e476a6a60eaebb67255c8a322078defd3b984fa8e1d87",
+    "bytes": 3806,
+    "line_count": 58,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Native control composition",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native control composition\n",
+      "level": 1,
+      "title": "Native control composition"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 9,
+      "raw": "`WidgetBuilder::absolute_stack(parent, id, Size)` owns a fixed logical content\nextent. It participates as one measured child in surrounding stack layout. Its\ndirect children use `Widget::set_frame(Rect)` in coordinates relative to that\ncontainer. Nested absolute stacks permit reusable composed controls without OS\nlayout managers. Geometry must be finite, nonnegative and at most 32767 units;\nextent dimensions must be positive. This is explicit authored placement, not a\nconstraint solver. Window resize does not automatically rewrite those frames.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 15,
+      "raw": "`set_extent` updates the measured extent. `set_visible(false)` excludes the\nsubtree from normal layout, painting, targeting, Tab focus and accessibility.\nIt clears active focus/capture and closes owned popups. Handles remain valid in\nthe same generation and can show the subtree again. A replacement or closed mount\nrevokes them. All mutation follows the existing UI owner-thread contract.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 22,
+      "raw": "`WidgetBuilder::image` displays an immutable `RasterImage` with logical dimensions\nand an accessibility name. `set_image` replaces images on image views, button\nbackgrounds or slider tracks. Pointer identity preserves the existing foreground\ncache contract. It does not load files or create an OS image/control object.\nImage layers are composited above panels; image-backed sliders therefore composite\na cached thumb image above their track rather than paint a panel behind it.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 24,
+      "end_line": 28,
+      "raw": "Slider options expose `thumb_diameter`, `track_height` and `range_inset` for real\nauthored control sizes. The inset is also used for pointer-to-value mapping.\nThe default metrics retain the existing slider appearance. A background image\nreplaces its track/fill drawing; range, keyboard, snapping and value callbacks\nremain owned by the same slider implementation.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 37,
+      "raw": "`InputOptions::commit_on_focus_loss` optionally invokes the existing submit action\nwhen focus leaves an editable field. It defaults to false. Focus assignment occurs\nbefore the callback; a callback may redirect focus or unmount the tree, and a\npending pointer action must not activate the previous target afterward. An Enter\nsubmission does not itself move focus. Consumers that commit only edited values\ntrack dirtiness in their owning component; programmatic `set_text` emits no user\nedit. Native focus loss, Tab, explicit focus changes and popup opening use this\ncontract. Tree destruction does not manufacture a final commit.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 43,
+      "raw": "`InputOptions::maximum_length` limits Unicode scalar count when nonzero, without\nsplitting UTF-8. Zero retains only the existing 64 KiB byte limit. Initial text,\nprogrammatic replacement and user insertion respect it. It is not a grapheme\ncluster or UTF-16 code-unit limit. Accessibility names for inputs and sliders are\nexplicit options. Existing IME replacement-range/clipboard limitations remain.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 45,
+      "end_line": 48,
+      "raw": "`set_escape_action` routes Escape to the closest focused ancestor with an action,\nafter existing popup dismissal. The handler belongs to that widget generation;\nit does not create a process-wide keyboard hook. The LVRS ColorPicker uses these\nprimitives to reuse iiGUI fields, sliders, buttons, images and color domains.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 50,
+      "end_line": 52,
+      "raw": "`iiGUI.composition_layout`, `composition_input` and `composition_images` test\ngeometry, hidden focus, restoring a subtree, Unicode length bounds, focus-loss\ncommit and reentrant retirement, image replacement and actual GPU thumb ordering.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 54,
+      "end_line": 58,
+      "raw": "Programmatic `focus()` also accepts stack containers. This removes focus from a\nchild editor and allows its owning component to receive Escape without adding a\nnew Tab stop. Labels and images remain nonfocusable. ColorPicker uses container\nfocus for Apply/Cancel and explicit swatch focus for programmatic/AX activation,\nso an old editor cannot keep displaying a stale value after those actions.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native control composition",
+      "anchor": "native-control-composition",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 7,
+        "text": "layout managers. Geometry must be finite, nonnegative and at most 32767 units;",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000003",
+        "line": 8,
+        "text": "extent dimensions must be positive. This is explicit authored placement, not a",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 33,
+        "text": "pending pointer action must not activate the previous target afterward. An Enter",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -1,4 +1,5 @@
 #include <iiGUI/iiGUI.h>
+#include <LVUI/NativeDocument.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -20,7 +21,7 @@ lvui::Document document(std::string_view source) {
     if (!parsed) throw std::runtime_error(parsed.error().message);
     return std::move(*parsed);
 }
-const ii::gui::Rect& box(const ii::gui::ViewLayout& layout,std::string_view id) {
+const ii::gui::Rect& box(const lvui::native::DocumentLayout& layout,std::string_view id) {
     auto found=std::find_if(layout.elements.begin(),layout.elements.end(),[&](const auto& b) { return b.id==id; });
     if (found==layout.elements.end()) throw std::runtime_error("Missing element ID");
     return found->bounds;
@@ -33,7 +34,7 @@ void layout() {
         <section id="percent" style="width:25%; background:#000"/>
       </div><p id="label">Native 한글</p>
     </main>)");
-    auto result=ii::gui::layout_view(doc,{640,420}); good(result,"Layout succeeds");
+    auto result=lvui::native::layout_document(doc,{640,420}); good(result,"Layout succeeds");
     check(box(*result,"row")==ii::gui::Rect{20,20,600,80},"Column padding and height");
     check(box(*result,"fixed")==ii::gui::Rect{20,20,100,0},"Empty automatic-height box");
     check(box(*result,"flex").x==130 && box(*result,"flex").width==330,"Remaining row space");
@@ -41,26 +42,29 @@ void layout() {
     check(box(*result,"label").y==110 && box(*result,"label").height>=20,"Native text metrics");
     check(result->frame.texts.size()==1 && result->frame.texts[0].font_size==20 &&
         result->frame.texts[0].color.red==1,"Typography inheritance");
-    auto narrower=ii::gui::layout_view(doc,{440,420}); good(narrower,"Responsive layout");
+    auto narrower=lvui::native::layout_document(doc,{440,420}); good(narrower,"Responsive layout");
     check(box(*narrower,"flex").width==180 && box(*narrower,"percent").width==100,"Reflow uses new viewport");
     auto wrapped=document("<view><p id='p'>A long text that wraps naturally across multiple lines.</p></view>");
-    auto wide=ii::gui::layout_view(wrapped,{600,400}), narrow=ii::gui::layout_view(wrapped,{80,400});
+    auto wide=lvui::native::layout_document(wrapped,{600,400}), narrow=lvui::native::layout_document(wrapped,{80,400});
     good(wide,"Wide metrics"); good(narrow,"Narrow metrics");
     check(box(*narrow,"p").height>box(*wide,"p").height,"Native word wrapping changes content height");
-    auto padding=ii::gui::layout_view(document("<view style='padding:8px'><p id='p' style='height:48px; padding:4px; border-radius:90px; background:#abc'>x</p></view>"),{200,100});
+    auto padding=lvui::native::layout_document(document("<view style='padding:8px'><p id='p' style='height:48px; padding:4px; border-radius:90px; background:#abc'>x</p></view>"),{200,100});
     good(padding,"Text border-box");
-    check(box(*padding,"p").height==48 && padding->frame.texts[0].bounds.height==40 &&
-        padding->frame.panels[0].radius==24,"Explicit text height clips and radius clamps");
+    const auto shape=std::find_if(padding->frame.panels.begin(),padding->frame.panels.end(),
+        [&](const auto& panel) { return panel.bounds==box(*padding,"p"); });
+    check(shape!=padding->frame.panels.end() && box(*padding,"p").height==48 &&
+        padding->frame.texts[0].bounds.height==40 && shape->radius==24,
+        "Explicit text height clips and radius clamps");
 }
 void invalid() {
     auto empty=document("<view/>");
     for (auto size:{ii::gui::Size{0,10},{10,-1},{8193,10},{std::numeric_limits<double>::infinity(),1}})
-        check(!ii::gui::layout_view(empty,size),"Invalid viewport rejected");
+        check(!lvui::native::layout_document(empty,size),"Invalid viewport rejected");
     for (auto source:{"<view style='padding:30px'/>","<view style='width:200px'/>",
         "<view style='flex-direction:row; gap:101px'><view/><view/></view>",
         "<view><view style='height:120px'/></view>","<view><p style='width:0px'>text</p></view>",
         "<view style='flex-direction:row'><view style='width:60%'/><view style='width:60%'/></view>"})
-        if (ii::gui::layout_view(document(source),{100,50}))
+        if (lvui::native::layout_document(document(source),{100,50}))
             throw std::runtime_error(std::string("Overflow accepted: ")+source);
     ii::gui::CanvasFrame frame{.viewport={0,0,100,100}};
     frame.texts.push_back({{0,0,100,30},"Valid"});
@@ -114,7 +118,7 @@ void native(ii::gui::Renderer renderer=ii::gui::Renderer::automatic) {
             check(!host.set_view(document("<view style='padding:8192px'/>"),renderer),"Invalid replacement rejected");
             auto preserved=host.capture_canvas(); good(preserved,"Capture previous valid scene");
             check(preserved->rgba==capture->rgba,"Invalid layout preserves pixels");
-            auto layout=ii::gui::layout_view(doc,state->size); good(layout,"Inspect text frame");
+            auto layout=lvui::native::layout_document(doc,state->size); good(layout,"Inspect text frame");
             layout->frame.renderer=renderer;
             layout->frame.texts.clear(); good(host.set_canvas(layout->frame),"Remove text layer");
             auto baseline=host.capture_canvas(); good(baseline,"Capture panels without glyphs");

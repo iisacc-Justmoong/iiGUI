@@ -3,9 +3,9 @@
 ## Dependency and platform boundary
 
 `application -> iiGUI -> iiSDKCore Runtime -> C++23 / native runtime`.
-LVUI views additionally use `iiGUI -> LVUI -> iiSDKCore Contracts`. LVUI owns
-syntax and immutable document values; iiGUI owns layout/native font measurement
-and graphics. Neither LVUI nor Core imports iiGUI or Vulkan. See [LVUI](LVUI.md).
+앱은 LVUI와 iiGUI를 각각 선택해 조합한다. LVUI는 구문·불변 문서·문서
+레이아웃을 소유하고 iiGUI는 범용 글꼴 측정과 그래픽을 제공한다. iiGUI는
+LVUI 타입이나 패키지를 참조하지 않는다. [LVUI 연동](LVUI.md)을 참고한다.
 Core does not reference iiGUI, AppKit or another feature SDK. iiSDKBuilder is
 build-time orchestration, not an application runtime dependency. No GUI or
 storage implementation is added to Core. iiGUI itself creates no files; future
@@ -21,8 +21,8 @@ Windows, or HostLinux.cpp on Linux. NativeCanvas owns a private renderer selecti
 CanvasMetal.mm or CanvasWindows.cpp first, with VulkanCanvas.cpp as the
 shared fallback. Linux uses Vulkan directly and links X11/Pango/Cairo/Vulkan. Other systems are rejected explicitly.
 TextMac.mm, TextWindows.cpp and TextLinux.cpp implement the corresponding
-private canvas text measurement/rasterization boundary. LVUI.cpp converts the
-document to logical boxes and a CanvasFrame; it contains no OS-specific code.
+private canvas text measurement/rasterization boundary. 앱에서 선택한 LVUI 어댑터가
+문서를 논리 박스와 CanvasFrame으로 변환한다.
 HostCommon.h shares value validation and deadline rounding; Dispatch.cpp
 remains the common Core scheduling endpoint.
 

@@ -1,0 +1,482 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:f44ead3253a98c9aef5e5e3ff91c066bc4d2165e6192b2662df767e56824147b",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Graphics.md",
+    "sha256": "640559603044cccb89b5739784e7cb49a0d512341b17151466302d850457b85e",
+    "bytes": 7795,
+    "line_count": 116,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Native GPU canvas contracts (0.3)",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native GPU canvas contracts (0.3)\n",
+      "level": 1,
+      "title": "Native GPU canvas contracts (0.3)"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "The public Graphics.h is standard C++23 and uses no native/Qt types. Host\nowns one optional canvas. Existing text-only applications do not initialize\nMetal, D3D or Vulkan devices. [Renderer selection](Renderers.md)\nuses Metal/Direct3D first, then Vulkan; Linux uses Vulkan directly. Core remains the runtime/scheduling dependency; Builder\norchestrates compilation and is not linked into the GUI application.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "## Rendering and resource use\n",
+      "level": 2,
+      "title": "Rendering and resource use"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 18,
+      "raw": "Each panel is a rectangle with a logical radius and two linear-light sRGB\ncolors. Six unit-square vertices per instance and a 64-byte panel record\nproduce ordered triangles in a single instanced draw. The fragment shader\nevaluates rounded-rectangle signed distance and derivative-based coverage.\nIt interpolates the gradient in linear space and premultiplies by alpha.\nONE/ONE_MINUS_SRC_ALPHA blending occurs into an sRGB attachment, which\ndecodes the destination before blending and encodes the result afterward.\nThe canvas background is opaque, so captures are also opaque.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "table",
+      "start_line": 20,
+      "end_line": 24,
+      "raw": "| Platform | Rendering | Retained attachment / presentation |\n|---|---|---|\n| macOS | Metal native device, compiled MSL vertex/fragment pipeline | Private BGRA8Unorm_sRGB texture; GPU blit to CAMetalLayer, display-synced, two drawables |\n| Windows | D3D11 feature level 11.0, HLSL Shader Model 5 | Typeless RGBA8 texture with sRGB view; GPU copy to two-buffer DXGI flip-sequential swapchain, sync interval 1 |\n| Vulkan (all desktop hosts; Linux default) | Native surface, Vulkan 1.1 SPIR-V pipelines | RGBA8 sRGB image; GPU blit to a native FIFO swapchain; fence and per-image semaphore synchronization |\n",
+      "columns": [
+        "Platform",
+        "Rendering",
+        "Retained attachment / presentation"
+      ],
+      "rows": [
+        [
+          "macOS",
+          "Metal native device, compiled MSL vertex/fragment pipeline",
+          "Private BGRA8Unorm_sRGB texture; GPU blit to CAMetalLayer, display-synced, two drawables"
+        ],
+        [
+          "Windows",
+          "D3D11 feature level 11.0, HLSL Shader Model 5",
+          "Typeless RGBA8 texture with sRGB view; GPU copy to two-buffer DXGI flip-sequential swapchain, sync interval 1"
+        ],
+        [
+          "Vulkan (all desktop hosts; Linux default)",
+          "Native surface, Vulkan 1.1 SPIR-V pipelines",
+          "RGBA8 sRGB image; GPU blit to a native FIFO swapchain; fence and per-image semaphore synchronization"
+        ]
+      ]
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 29,
+      "raw": "Shaders are private driver-compiled GPU programs. The application itself is a\nnative C++ binary; no common application VM, interpreter, Qt plugin or WebView\nis involved. Text uses AppKit/CoreText, DirectWrite/Direct2D or Pango/Cairo.\nLinux does not depend on the GTK widget toolkit.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 40,
+      "raw": "`set_canvas` validates and admits the latest value snapshot. The end of a\nbounded Core dispatch flushes it once. A hundred replacements in one callback\nrender only the final value. Equal snapshots do not re-render or present.\nPipelines/device/attachment persist. Physical size changes reallocate the\nattachment; input updates replace only the small instance data. This API does\nnot promise partial panel damage tracking or a general retained scene graph.\nPanel rendering/presentation has no CPU pixel loop. Canvas text uses native\nglyph rasterization and a pixel-format conversion/upload on changed scenes,\nthen a GPU text-composition pass; see [LVUI](LVUI.md). GPU copy/blit and\nswapchain buffers still consume device bandwidth/storage.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 47,
+      "raw": "An exposed Linux canvas presents its cached attachment. Cocoa/DWM retain the\nlast presented surface. Resize/backing changes request a flush; there is no\nidle animation timer. Occluded Metal windows may temporarily have no drawable;\noffscreen rendering/capture still works and presentation can resume on a later\nnative invalidation or changed scene. Continuous animation is application\nscheduling, not an always-running SDK frame loop.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "## Bounds, policy and errors\n",
+      "level": 2,
+      "title": "Bounds, policy and errors"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "list",
+      "start_line": 51,
+      "end_line": 75,
+      "raw": "- Viewport/panel origins: finite, absolute logical value <=32767. Their width\n  and height: finite, 0 < value <=8192. Viewport device-pixel origins must also\n  fit +/-32767. Physical canvas width/height are ceil(logical*backing_scale),\n  each <=8192; allocation can still fail on a lower-limit device or low memory.\n- At most 4096 ordered panels. Radius is finite, 0..min(width,height)/2.\n  Color components must be finite 0..1, and background alpha must equal 1.\n  Panels clip to the viewport. Colors are SDR sRGB, not ICC/HDR/wide gamut.\n- At most 4096 text runs, each at most 64 KiB of valid UTF-8 with no NUL,\n  at most 1 MiB total. Font size is 8..256 logical units; weight is 400/500/600/700.\n  Runs wrap, clip to their positive content rectangle, and paint after panels.\n  Text uses the same finite geometry/color limits and is included in capture.\n- `prefer_hardware`: prefer the native Metal/Direct3D accelerator, then Vulkan.\n  Vulkan prefers classified hardware and permits software/unknown devices.\n- `require_hardware`: reject software/unknown/virtual Vulkan devices; only\n  integrated/discrete device reports satisfy this policy. Metal identifies its\n  MTLDevice; Windows checks the native driver/adapter hardware flag. Driver\n  reports do not guarantee physical isolation or performance.\n- API selection is separate: automatic, native-only or explicit Vulkan. A\n  native initialization/drawing failure in automatic mode retries through\n  Vulkan and records the actual API and fallback reason. Failure of Vulkan\n  itself uses normal guarded host cleanup. See [Renderers](Renderers.md).\n- Text-only hosting does not require a GPU device. Failed canvas initialization\n  returns `unsupported`; invalid input returns `invalid_argument` and physical\n  coordinate overflow `out_of_range`. Rejected admission preserves the prior\n  canvas. Vulkan device-loss recovery/hot-device migration are outside scope.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Viewport/panel origins: finite, absolute logical value <=32767. Their width",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "At most 4096 ordered panels. Radius is finite, 0..min(width,height)/2.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "At most 4096 text runs, each at most 64 KiB of valid UTF-8 with no NUL,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`prefer_hardware`: prefer the native Metal/Direct3D accelerator, then Vulkan.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "`require_hardware`: reject software/unknown/virtual Vulkan devices; only",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "API selection is separate: automatic, native-only or explicit Vulkan. A",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Text-only hosting does not require a GPU device. Failed canvas initialization",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 77,
+      "end_line": 82,
+      "raw": "Canvas methods require the open host's owning UI thread. A missing canvas has\nGraphicsApi::none, while capture returns not_found. Closing/clearing releases\nnative resources on that thread. clear is idempotent; frame_requests is the\nhost's cumulative admitted request counter. Other device counters reset when\nthe device is recreated/cleared. `graphics_info` inspects current counters and\ndoes not implicitly flush deferred work.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "heading",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "## Capture and measurement\n",
+      "level": 2,
+      "title": "Capture and measurement"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 86,
+      "end_line": 93,
+      "raw": "`capture_canvas` is an explicit synchronous GPU readback after flushing pending\nwork. It returns top-left-origin tightly packed RGBA8 sRGB bytes in memory;\nit may stall the UI and must not be used for normal frame presentation. Metal\nuses a shared staging buffer (256-byte aligned rows), D3D a staging texture,\nand Vulkan an image-to-host buffer copy with explicit visibility/fence synchronization. Tests use captures to verify sRGB 0.5 -> about\n188, alpha compositing, gradient direction and fractional corner coverage.\nThey also check coalescing, stable identical-scene render count, physical\nresize, invalid update preservation, strict policy and teardown.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 94,
+      "end_line": 94,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 95,
+      "end_line": 100,
+      "raw": "GraphicsInfo reports the actual selected API/adapter and physical size.\ncached_texture_bytes counts the retained offscreen color attachment only\n(width*height*4); it excludes swapchain buffers, driver/pipeline/instance data,\ncapture staging storage and text raster/upload storage. A counter or compiled binary is not proof of\ntarget execution or a Qt performance comparison. See Verification.md for\nthe recorded hardware/runtime evidence and deferred platforms.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 101,
+      "end_line": 101,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 102,
+      "end_line": 105,
+      "raw": "[배경 머티리얼·내부 테두리·고정 줄 메트릭](BackdropMaterials.md)은 같은 그래픽 계약을 확장한다.\n효과 작업 공간의 별도 예산은 물리 뷰포트 픽셀당 32바이트를 기준으로 최소 64 MiB,\n최대 256 MiB이다. 현재 한도는 `effect_texture_budget_bytes`로 제공하며\n`cached_texture_bytes`에는 포함하지 않는다. 상세 범위는 [머티리얼 입력](MaterialInputs.md)을 참조한다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 106,
+      "end_line": 106,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 107,
+      "end_line": 113,
+      "raw": "`TextRun::clip` adds an optional paint clip in the coordinate space of `bounds`.\nNative shaping, wrapping and ellipsis still use the original bounds. Core Text,\nDirectWrite and Pango/Cairo apply both rectangles during rasterization; allocation\nremains bounded by the actual canvas. Retained drawing and embedded popup\ntranslation move both rectangles. `render_text` rebases the clip with its bounds.\nClips participate in validation, equality and foreground cache keys. Runtime crop\nchecks are deferred to the final verification batch.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 114,
+      "end_line": 114,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 115,
+      "end_line": 116,
+      "raw": "The Vulkan effect test uses the public `CanvasLayer` type in `CanvasFrame::overlays`.\nCompilation of that test is separate from executing its GPU pixel checks.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native GPU canvas contracts (0.3)",
+      "anchor": "native-gpu-canvas-contracts-03",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Rendering and resource use",
+      "anchor": "rendering-and-resource-use",
+      "start_line": 9
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Bounds, policy and errors",
+      "anchor": "bounds-policy-and-errors",
+      "start_line": 49
+    },
+    {
+      "block_id": "b000023",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Capture and measurement",
+      "anchor": "capture-and-measurement",
+      "start_line": 84
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "owns one optional canvas. Existing text-only applications do not initialize",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 33,
+        "text": "render only the final value. Equal snapshots do not re-render or present.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 52,
+        "text": "and height: finite, 0 < value <=8192. Viewport device-pixel origins must also",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000019",
+        "line": 56,
+        "text": "Color components must be finite 0..1, and background alpha must equal 1.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000019",
+        "line": 67,
+        "text": "reports do not guarantee physical isolation or performance.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000025",
+        "line": 88,
+        "text": "it may stall the UI and must not be used for normal frame presentation. Metal",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 105,
+        "text": "`cached_texture_bytes`에는 포함하지 않는다. 상세 범위는 [머티리얼 입력](MaterialInputs.md)을 참조한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "Renderer selection",
+        "target": "Renderers.md",
+        "kind": "relative",
+        "line": 5
+      },
+      {
+        "block_id": "b000013",
+        "label": "LVUI",
+        "target": "LVUI.md",
+        "kind": "relative",
+        "line": 39
+      },
+      {
+        "block_id": "b000019",
+        "label": "Renderers",
+        "target": "Renderers.md",
+        "kind": "relative",
+        "line": 71
+      },
+      {
+        "block_id": "b000029",
+        "label": "배경 머티리얼·내부 테두리·고정 줄 메트릭",
+        "target": "BackdropMaterials.md",
+        "kind": "relative",
+        "line": 102
+      },
+      {
+        "block_id": "b000029",
+        "label": "머티리얼 입력",
+        "target": "MaterialInputs.md",
+        "kind": "relative",
+        "line": 105
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000009",
+        "columns": [
+          "Platform",
+          "Rendering",
+          "Retained attachment / presentation"
+        ],
+        "rows": [
+          [
+            "macOS",
+            "Metal native device, compiled MSL vertex/fragment pipeline",
+            "Private BGRA8Unorm_sRGB texture; GPU blit to CAMetalLayer, display-synced, two drawables"
+          ],
+          [
+            "Windows",
+            "D3D11 feature level 11.0, HLSL Shader Model 5",
+            "Typeless RGBA8 texture with sRGB view; GPU copy to two-buffer DXGI flip-sequential swapchain, sync interval 1"
+          ],
+          [
+            "Vulkan (all desktop hosts; Linux default)",
+            "Native surface, Vulkan 1.1 SPIR-V pipelines",
+            "RGBA8 sRGB image; GPU blit to a native FIFO swapchain; fence and per-image semaphore synchronization"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

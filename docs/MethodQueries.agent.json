@@ -1,0 +1,261 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:e1f20b30f9b796a92290bd30726ab6afac9886e9e10173eb302aa5784c5a2642",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/MethodQueries.md",
+    "sha256": "8d4834c7ff5070341a507f9f07cf17e9da6b31bd369e0992fb38a1773e3cd0e1",
+    "bytes": 3461,
+    "line_count": 43,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 C++ 메서드 조회의 표시 연결",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 C++ 메서드 조회의 표시 연결\n",
+      "level": 1,
+      "title": "네이티브 C++ 메서드 조회의 표시 연결"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "LVUI의 [객체 메서드 조회](../../LVUI/docs/MethodQueries.md)를 생성 C++와 기존 위젯 트리에\n연결한다. getter 내부의 private Core Observable publication으로 표시 속성을 갱신하며,\n호출 인자를 넘기거나 레이아웃을 다시 만든다는 이유로 파일 작업을 실행하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "`tests/native_method_queries.cpp`는 창 없는 WidgetState에서 직접 백엔드·중첩 객체·별칭·\n타입 지정 함수·구성 입력·괄호·인덱스 및 메서드 반환값의 멤버 표시를 검사한다.\n조건부 private 원본 전환, 실패 후 정상 표시 보존과 복구, 선택 객체의 재진입 교체,\n조건부 재활성화, 입력 문자열·포커스 보존과 문서 revision 비변경도 확인한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 14,
+      "raw": "설치 후 재배치한 소비자의 `Methods.lvui`는 공개 패키지로 생성·컴파일·링크한다.\n실제 OS 창·GPU 표면은 열지 않으며, 해당 실행과 LVRS 앱 검증은 전체 작업의 최종\n일괄 단계에서 확인한다. 창 없는 검사 결과를 다른 플랫폼의 실행 결과로 대신하지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "heading",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "## 공유 라이브러리의 private getter\n",
+      "level": 2,
+      "title": "공유 라이브러리의 private getter"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 21,
+      "raw": "앱과 모델 DLL은 Core의 `iiSDKCore::Observation` 실행부를 공유한다. 헤더마다 분리된\n스레드 지역 수집 슬롯을 두면 숨김 가시성으로 빌드한 모델 내부의 읽기를 앱이 수집하지\n못하므로, 같은 실행부의 범위 함수에 연결한다. 모델 라이브러리에는 iiGUI나 LVUI 또는\n전체 작업자 Runtime 의존성을 추가하지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 28,
+      "raw": "`tests/native_shared_method.cpp`와 LVUI의 `NativeSharedMethod.lvui`는 실제 숨김 공유\n라이브러리를 사용한다. private 값의 갱신이 표시 결과만 바꾸는지, 파일 revision과\n합성 publication 없이 동작하는지, 편집 중인 입력·포커스·위젯 수가 유지되는지 검사한다.\n제거한 뷰가 이후 모델 publication을 받지 않고 백엔드를 한 번만 해제하는지도 검사한다.\n공유 모델은 Core의 설치·재배치 소비자에서도 검사한다. 구체적인 실행 결과는\nLVUI의 [공유 관측 단계 검증 기록](../../LVUI/docs/MethodQueries.md#공유-관측-실행부의-검증)에 기록한다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 32,
+      "raw": "콘텐츠 호스트가 부여한 ID 범위를 보존하여 위젯을 조회하고, 중복되는 이름은 검사 실패로\n처리한다. 설치 소비자 빌드가 실패하면 캡처한 컴파일·링크 출력을 먼저 기록한 뒤 오류를\n반환하므로 임시 디렉터리 정리 후에도 실제 실패 근거를 확인할 수 있다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "## 일반 객체 메서드 참조\n",
+      "level": 2,
+      "title": "일반 객체 메서드 참조"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 36,
+      "end_line": 40,
+      "raw": "LVUI의 [일반 객체 메서드 참조](../../LVUI/docs/ObjectMethodReferences.md)를 실제 위젯 이벤트에\n연결한다. `tests/native_object_method_references.cpp`는 중첩·선택·별칭·후위 식·구성 입력의\n콜백과 반환 함수, 문자열 이벤트, Static·초기 가변 함수 선택을 검사한다. 잘못된 선택의\n마지막 정상 동작과 복구, 입력·포커스·위젯 정체성 보존, 조건부 재활성화, 공유 부모와\n임시 객체·자기 제거의 수명도 창 없는 WidgetState에서 확인한다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 43,
+      "raw": "재배치 소비자의 `MethodReferences.lvui`는 설치된 컴파일러와 공개 패키지로 생성·컴파일·\n링크한다. LVRS 팩터리 실행과 실제 창·GPU·다른 플랫폼 검증은 전체 작업의 최종 단계에 둔다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 C++ 메서드 조회의 표시 연결",
+      "anchor": "네이티브-c-메서드-조회의-표시-연결",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000009",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "공유 라이브러리의 private getter",
+      "anchor": "공유-라이브러리의-private-getter",
+      "start_line": 16
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "일반 객체 메서드 참조",
+      "anchor": "일반-객체-메서드-참조",
+      "start_line": 34
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "호출 인자를 넘기거나 레이아웃을 다시 만든다는 이유로 파일 작업을 실행하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 14,
+        "text": "일괄 단계에서 확인한다. 창 없는 검사 결과를 다른 플랫폼의 실행 결과로 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 21,
+        "text": "전체 작업자 Runtime 의존성을 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "객체 메서드 조회",
+        "target": "../../LVUI/docs/MethodQueries.md",
+        "kind": "relative",
+        "line": 3
+      },
+      {
+        "block_id": "b000013",
+        "label": "공유 관측 단계 검증 기록",
+        "target": "../../LVUI/docs/MethodQueries.md#공유-관측-실행부의-검증",
+        "kind": "relative",
+        "line": 28
+      },
+      {
+        "block_id": "b000019",
+        "label": "일반 객체 메서드 참조",
+        "target": "../../LVUI/docs/ObjectMethodReferences.md",
+        "kind": "relative",
+        "line": 36
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

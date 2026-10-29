@@ -21,7 +21,10 @@ auto result = popup.set_popup_content([](ii::gui::WidgetBuilder& b)
 ```
 
 Factories and static ordinary children are mutually exclusive. Change/clear a
-factory only while its popup is closed and the shared domain is idle. `retain`
+factory while its popup is closed and the shared domain is idle. A closed popup
+being constructed inside the currently staged activation may also set its own
+factory before publication; it cannot open during construction or mutate a
+previously published popup. A rejected candidate leaves the live tree intact. `retain`
 inside the factory owns a C++ object for that content activation. Repeated opens,
 rendering, callbacks, focus changes and model subscriptions do not reconstruct
 the parent LVUI backend or application. No VM, source parser or OS control is
@@ -94,6 +97,25 @@ Input/AX uses inherited frame scale for the body. Tab/Shift-Tab crosses the body
 and static action row in layout order. Capture stays with the body or chrome
 that accepted the press, stale hover is cleared across that boundary, and a
 nested modal menu dismisses before an outside press can reach static actions.
+
+Cancellation belongs to the popup generation that closed. If a closed callback
+reopens the popup, even if it also closes that new opening immediately, the old
+cancellation is suppressed. A current cancellation is delivered after the closed
+notification. This policy applies to generic popups and does not depend on an
+application's component library.
+
+An application can supply `PopoverAdaptiveLayout` for retained popup content.
+The host calls the layout provider first with an empty content measurement to
+select a width, measures the retained content and named scroll viewport at that
+width, and calls it again for the final viewport-relative rectangle. The final
+width must match the first width. The host validates the rectangle and exposes
+provider errors to callers; it rejects a failing layout before opening a popup.
+The provider runs synchronously on the UI owner and must not access or mutate
+the widget domain, including its parent. The host rejects reentrant UI access.
+An optional bottom-slide transition is a hosting capability; placement and input
+policy remain application-owned. Adaptive layout currently requires static
+retained popup content and cannot be combined with explicit bounds or the older
+sheet-layout option.
 General mixed independent-popup policies and all nested transform/IME cases are
 still covered by the native parity ledger rather than claimed complete here.
 

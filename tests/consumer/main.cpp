@@ -1,4 +1,5 @@
 #include <iiGUI/iiGUI.h>
+#include <LVUI/NativeDocument.h>
 #include <iiSDKCore/Runtime/Runtime.h>
 #include <iiSDKCore/Runtime/Operation.h>
 #include <iiSDKCore/Runtime/FrameLoop.h>

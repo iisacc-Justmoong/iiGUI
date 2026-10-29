@@ -1,0 +1,308 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:b246769ec5cb682500dd94f6411572382c7aaa44d8669e81d33a887a6a2ed133",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Retirement.md",
+    "sha256": "1f70135edc6241039f4431b087e2ba88d82d53a73874e2d7f489c318c59c8211",
+    "bytes": 4331,
+    "line_count": 55,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "위젯 세대의 종료 접수 경계",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 위젯 세대의 종료 접수 경계\n",
+      "level": 1,
+      "title": "위젯 세대의 종료 접수 경계"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`WidgetBuilder::on_retire()`는 해당 빌더의 위젯 세대가 닫힐 때 실행할 짧은 동기 콜백을\n등록한다. LVUI 바인딩·스코프의 새 사용을 차단하고 연결을 분리하는 용도이다. 백엔드의\n장시간 작업을 기다리거나 새로운 UI를 구성하는 콜백을 등록하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "종료 순서는 다음과 같다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "list",
+      "start_line": 9,
+      "end_line": 12,
+      "raw": "1. 세대를 닫힌 상태로 바꾸어 UI 핸들의 새 접근을 거부한다.\n2. 등록 순서대로 종료 콜백을 한 번씩 실행한다. 한 콜백이 예외를 던져도 나머지를 실행한다.\n3. 상호작용 수신자에게 종료를 알리고, 자식·팝업·입력·그래픽 자원을 정리한다.\n4. 보관한 소유 객체와 콜백 캡처를 해제한다.\n",
+      "items": [
+        {
+          "marker": "1.",
+          "text": "세대를 닫힌 상태로 바꾸어 UI 핸들의 새 접근을 거부한다.",
+          "checked": null
+        },
+        {
+          "marker": "2.",
+          "text": "등록 순서대로 종료 콜백을 한 번씩 실행한다. 한 콜백이 예외를 던져도 나머지를 실행한다.",
+          "checked": null
+        },
+        {
+          "marker": "3.",
+          "text": "상호작용 수신자에게 종료를 알리고, 자식·팝업·입력·그래픽 자원을 정리한다.",
+          "checked": null
+        },
+        {
+          "marker": "4.",
+          "text": "보관한 소유 객체와 콜백 캡처를 해제한다.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 17,
+      "raw": "구성 중 실패한 후보 세대도 같은 경계를 거친다. 등록은 구성 중에만 가능하고, 빈 콜백과\n4,096개를 초과한 등록은 거부한다. 새 콜백을 받는 빌더는 여전히 소유 UI 스레드에서 사용한다.\n아직 공개되지 않은 `on_publish()` 콜백은 종료 시 실행하지 않고 버린다. 공개 시점과\n중첩 세대의 규칙은 [콘텐츠 호스트](ContentHosts.md)를 따른다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 20,
+      "raw": "이는 비동기 작업이 이미 끝났다는 보장이 아니다. 실제 사용 중인 백엔드는 Core 소유 작업과\n스코프 계약에 따라 퇴역해야 한다. 새 호출 거부·구독 분리와 최종 객체 소멸을 구분한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 24,
+      "raw": "`tests/content_host.cpp`는 교체·실패·중첩·창 종료에서 등록 순서·실패 격리·한 번의 호출과\n소유 객체 파괴 전 실행을 확인한다. 실행은 LVUI/LVRS 전체 네이티브 검증 단계에 묶으며,\n중간 컴파일·링크 성공을 위젯 실행 결과로 보고하지 않는다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 28,
+      "raw": "`iiGUI.widget_retirement`는 창·표면·렌더러 없이 실제 C++ 세대 상태를 구성하여 순서·예외\n격리·재진입·등록 한계·소유 스레드·한 번의 파괴를 실행한다. 이 독립 검사와 실제 창·입력·\n콘텐츠 교체를 수행하는 최종 UI 검증은 구분한다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 33,
+      "raw": "크기를 지정하지 않은 `content_host`의 높이는 현재 자식의 자연 높이를 따른다. 자식이\n없으면 0이고, 자식이 바뀌거나 크기를 갱신하면 부모 측정을 무효화한다. 명시한 양수 크기는\n기존 계약대로 고정한다. 조건부 뷰가 단지 호스트의 초기 높이가 0이라는 이유로 잘리지 않도록\n하는 레이아웃 계약이며, 콘텐츠 표시를 위해 임의의 더미 높이를 넣지 않는다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 38,
+      "raw": "형제 LVUI 빌드가 있으면 `iiGUI.native_conditional`은 실제 AOT 결과를 네이티브 위젯 상태에\n구성한다. 창이나 렌더러를 열지 않고 초기 분기·변경 없는 정체성·교체·생성 실패 롤백·복구·\n지역 객체 파괴·지연 참조 해제를 검사한다. 이 선택 검사는 LVUI 컴파일러와 Native 실행부를\n먼저 빌드한 뒤 사용하며, 외부 설치 SDK나 제품 앱을 바꾸지 않는다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 40,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 44,
+      "raw": "`iiGUI.native_view_inputs`는 전달한 값·콜백·자식 슬롯과 지역 View 정의의 어휘 수신자를\n실제 생성 C++ 위젯에서 검사한다. 스코프를 가리는 지역 백엔드가 있어도 전달된 값과 콜백은\n호출 위치를 유지하며, 세대 종료 후에는 재접수와 소유 객체 보존이 없어야 한다. 창·렌더러를\n여는 LVRS 최종 검증과는 별도의 iiGUI 상태 검사이다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "heading",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "# 타입 매개변수를 가진 생성 구성 검사\n",
+      "level": 1,
+      "title": "타입 매개변수를 가진 생성 구성 검사"
+    },
+    {
+      "id": "b000023",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 51,
+      "raw": "선택적 `iiGUI.native_components` 검사는 LVUI의 생성 C++를 직접 마운트하여 스칼라 입력,\n동일 부모 백엔드 차용·전달, 이름별 View 슬롯과 기본값, 스냅샷을 확인한다. 조건부 자식\n제거 시 부모가 유지되고 자식의 구독·콜백·지역 객체가 퇴역하는지, 다시 표시할 때 새 자식\n활성화가 기존 부모를 빌리는지도 실행한다. 창을 열지 않는 위젯 상태 검사이며 실제 OS 입력과\nGPU 그리기 또는 LVRS 앱 실행 증거로 사용하지 않는다.\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "paragraph",
+      "start_line": 53,
+      "end_line": 54,
+      "raw": "자식 백엔드의 메서드가 실행 도중 자신의 조건부 뷰를 제거하는 경로도 검사한다. 새 접수는\n즉시 닫히되 실행 중 수신자는 반환까지 유지하고, 반환 후 소유 객체를 한 번만 해제한다.\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "blank",
+      "start_line": 55,
+      "end_line": 55,
+      "raw": "\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "위젯 세대의 종료 접수 경계",
+      "anchor": "위젯-세대의-종료-접수-경계",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000022",
+      "parent_id": null,
+      "level": 1,
+      "title": "타입 매개변수를 가진 생성 구성 검사",
+      "anchor": "타입-매개변수를-가진-생성-구성-검사",
+      "start_line": 45
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "장시간 작업을 기다리거나 새로운 UI를 구성하는 콜백을 등록하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 20,
+        "text": "스코프 계약에 따라 퇴역해야 한다. 새 호출 거부·구독 분리와 최종 객체 소멸을 구분한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 24,
+        "text": "중간 컴파일·링크 성공을 위젯 실행 결과로 보고하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000024",
+        "line": 51,
+        "text": "GPU 그리기 또는 LVRS 앱 실행 증거로 사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000009",
+        "label": "콘텐츠 호스트",
+        "target": "ContentHosts.md",
+        "kind": "relative",
+        "line": 17
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

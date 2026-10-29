@@ -8,6 +8,15 @@ core::Result<TextMetrics> measure_text_layout(TextRun text){
     if(!valid_canvas(frame))return core::fail(core::ErrorCode::invalid_argument,"Invalid native text metrics input");
     try{return TextMetrics{detail::measure_text_width(text),detail::measure_text(text)};}catch(...){return core::fail(core::ErrorCode::failed,"Native text measurement failed",std::current_exception());}
 }
+core::Result<TextMetrics> measure_wrapped_text_layout(TextRun text){
+    const auto width=text.bounds.width;
+    if(!std::isfinite(width)||width<=0||width>8192)
+        return core::fail(core::ErrorCode::invalid_argument,"Text wrapping width must be finite and within 0..8192");
+    text.bounds={0,0,width,8192};text.clip.reset();CanvasFrame frame{.viewport={0,0,8192,8192},.texts={text}};
+    if(!valid_canvas(frame))return core::fail(core::ErrorCode::invalid_argument,"Invalid native text metrics input");
+    try{return TextMetrics{detail::measure_text_width(text),detail::measure_text(text)};}
+    catch(...){return core::fail(core::ErrorCode::failed,"Native text measurement failed",std::current_exception());}
+}
 core::Result<TextBitmap> render_text(TextRun text,double scale){
     if(!ii::core::valid_utf8(text.text)||text.text.size()>65536||text.font_family.size()>1024||!ii::core::valid_utf8(text.font_family)||text.font_family.find('\0')!=text.font_family.npos)
         return core::fail(core::ErrorCode::invalid_argument,"Text rasterization requires bounded canonical UTF-8");

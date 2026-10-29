@@ -1,0 +1,1670 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:ef5fec3efb43960dbf1478ca169dd57dfe2f53ba11e5167dff79274ff86e13b0",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "README.md",
+    "sha256": "ae3be149ef993276f3c4b1cfb6ac989355f67e8e7cf88165587b371273a55d97",
+    "bytes": 20446,
+    "line_count": 355,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "iiGUI",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# iiGUI\n",
+      "level": 1,
+      "title": "iiGUI"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "Custom-drawn containers can expose [accessibility semantics](docs/AccessibilitySemantics.md)\nincluding an adjustable slider range without giving iiGUI ownership of the\napplication's component model.\nThe host package does not depend on LVUI. Applications can compose it with\nLVUI's [document adapter](../LVUI/docs/NativeDocument.md) when needed.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "The latest [native authoring verification record](../LVUI/docs/NativeReadinessVerification.md) distinguishes executed checks, installed-package proof, and platform limits from the historical implementation notes below.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 17,
+      "raw": "[Host platform contracts](docs/HostPlatforms.md) cover a direct\nWayland/xdg-shell/Vulkan host, Android OS clipboard/URL services and Choreographer\nframes, and an AOT WebAssembly pthread host with self-rendered WebGL2 widgets.\n`host_capabilities()` exposes the implemented host contract. Core build targets\nand GUI host availability are distinct; embedded support does not imply a window\nsystem. [HelloHosts](examples/HelloHosts) exercises the common C++23/LVUI path.\nNative builds and browser/device execution have separate verification evidence.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 23,
+      "raw": "The minimal [Android LVUI Hello World](examples/HelloAndroid) uses NDK\nNativeActivity, iiSDKCore and self-rendered Vulkan labels. The\n[Android guide](docs/AndroidHello.md) states its supported label subset and the\nseparate build, installation, physical-device and emulator evidence. Emulator\ninstallation requires an explicit `--device-kind emulator --serial emulator-NNNN`.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 28,
+      "raw": "The AOT [Hello World](examples/HelloWorld) uses one LVUI source and one C++23\napplication on macOS, Windows and Linux. Its [desktop verification guide](docs/AOTDesktop.md)\ncovers native cross compilation, binary audits and relocated installed consumers\nwithout launching a GUI or implying device runtime validation.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 31,
+      "raw": "[Inferred LVUI values](docs/InferredValues.md) connect C++-typed values and functions\nto retained widgets, reactive aliases and native replacement without a runtime parser.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 33,
+      "end_line": 37,
+      "raw": "[iPadOS hosts](docs/IPADOS.md) use UIKit scenes, a self-rendered C++ widget\nsurface, shared Metal/CoreText rendering, touch and Pencil input, and an optional\nVulkan surface through MoltenVK. The Congregation device build exercises Metal\nand forced Vulkan independently. Full marked-text input and external drag and\ndrop remain outside this adapter's current support.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 42,
+      "raw": "Native [container layout](docs/ContainerLayout.md) now supports minimum implicit\nmetrics, independent implicit/content insets and construction-time default slots.\nOrdinary container disabling cancels descendant input, and native button option\nreplacement preserves callbacks and identity. Runtime verification is deferred.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 44,
+      "end_line": 47,
+      "raw": "[Retained stack layout](docs/StackLayout.md) validates and applies options,\nextent and flex atomically, with independent overlay axes and owner-domain access.\nLVUI-generated dynamic layouts reuse native measurement and preserve local editing\nstate; constant layouts are folded before the application runs.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 52,
+      "raw": "[Action surfaces](docs/ActionSurfaces.md) add a transparent native child container\nwith text fallback, state foreground colors, keyboard actions and link semantics.\nText underline is shaped by the platform font service. New runtime validation is\ndeferred to the final batch; compilation and static package checks are separate.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 54,
+      "end_line": 57,
+      "raw": "Native [motion](docs/NativeMotion.md) shares Core display frames across app and game\nupdates, with on-demand idle behavior and live reduced-motion preferences. Metal\n[shadows](docs/Shadows.md) and cached foreground scale/opacity composition support\nthe authored LVRS Alert transitions without OS control wrappers.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 59,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 64,
+      "raw": "Native widgets now use iiGUI's own C++ layout, hit testing, focus, input state and\nGPU drawing. Cocoa supplies one input/presentation surface and virtual\naccessibility peers; OS control wrappers are no longer the widget implementation.\nSee [Self-rendered C++ widgets](docs/SelfRenderedWidgets.md) for the current\narchitecture and the LVRS framework migration boundary.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 65,
+      "end_line": 65,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 66,
+      "end_line": 68,
+      "raw": "[Popovers](docs/Popovers.md) retain ordinary C++ widget content in the same GPU\noverlay, with child-first Escape, modal/nonmodal outside presses, anchor placement\nand generation-safe close/reopen behavior.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 73,
+      "raw": "[Activation-owned content](docs/PopupContent.md) can build a fresh C++ view on\neach open and retire it on close while keeping the original native GPU surface.\nGeneration-specific handles, native focus/IME and bounded accessibility caches\nkeep repeated activations independent from the outer application's lifetime.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 74,
+      "end_line": 74,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 75,
+      "end_line": 78,
+      "raw": "[Generic content hosts](docs/ContentHosts.md) construct and atomically replace\nindependent page generations in that same surface, with scoped ownership,\nviewport layout, input routing and a shared node budget. Runtime verification\nof this new path is deferred to the final validation batch.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 79,
+      "end_line": 79,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 80,
+      "end_line": 82,
+      "raw": "[Dialog layout](docs/DialogLayout.md) adds centered popup constraints, width-aware\nstack alignment and flex sizing, authored button/image geometry, and distinct\nclose/cancel events for native dialog compositions such as LVRS Modal.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 84,
+      "end_line": 89,
+      "raw": "[GPU backdrop materials](docs/BackdropMaterials.md) add real Metal Gaussian\nglass from underlying content, retained ROI textures, transparent tint and\nrounded inner borders. Authored fixed line heights, asymmetric stack insets and\nbutton state styles support LVRS Alert composition. Metal/Vulkan strokes are\npixel-tested; D3D11 stroke execution and non-Metal backdrop implementations remain\nunverified or unfinished as documented.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 91,
+      "end_line": 95,
+      "raw": "[Core-owned widget applications](docs/CoreApplication.md) connect native C++ widgets\nto iiSDKCore's app runtime, entrypoint and attachment lifecycle. LVUI emits concrete\nC++ widget classes; LVRS provides appearance data/fonts; iiGUI supplies the OS driver\nand its own C++ widgets using the same Core-owned event loop. Hello World now uses this\npath and Core's final-executable/resource helper.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 97,
+      "end_line": 103,
+      "raw": "The working tree now also implements [compiled self-rendered widgets and LVUI AOT](docs/SelfRenderedWidgets.md):\n`examples/HelloWorld/HelloWorld.lvui` generates C++23 during the build and mounts\niiGUI C++ stacks, labels and buttons on the native desktop GPU surface. Hello World\nuses Core timers/workers, follows resize and closes normally. This AOT route does\nnot embed or parse LVUI source at runtime. The shared desktop sample targets\nmacOS, Windows and Linux; see the separate build and execution evidence in\n[AOT desktop verification](docs/AOTDesktop.md).\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 104,
+      "end_line": 104,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "paragraph",
+      "start_line": 105,
+      "end_line": 105,
+      "raw": "[Windows build and execution](docs/WindowsBuildAndRun.md)\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 106,
+      "end_line": 106,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 107,
+      "end_line": 109,
+      "raw": "Package release: **0.4.1** (2026-10-19). This patch packages the current\nsource snapshot; build, test and installation evidence is recorded in the SDK\npatch-release report. Earlier versioned feature notes remain historical.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 110,
+      "end_line": 110,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 111,
+      "end_line": 116,
+      "raw": "Applications can additionally compose [LVUI 0.1](docs/LVUI.md) with iiGUI.\nLVUI owns parsing and document layout; iiGUI provides text measurement and a GPU canvas.\nThe iiGUI package does not require `LVUI::LVUI`; OS hosts use Vulkan 1.1+ where selected and\nthe Web target uses WebGL2 without a Vulkan SDK. [Native rendering](docs/Renderers.md)\nuses Metal/Direct3D first and Vulkan as the default fallback; Linux uses Vulkan.\nReleased 0.4.1 binaries do not include these additions until rebuilt. The version above is the last package release.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 117,
+      "end_line": 117,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 118,
+      "end_line": 122,
+      "raw": "iiGUI 0.4.1 is a C++23 native desktop GUI host and retained GPU canvas above iiSDKCore 0.16. The same\npublic API and HelloGUI source build on Windows, macOS and Linux. Each backend\nuses its platform window system directly. Qt, SDL, a WebView and a JavaScript engine\nare not used. Standard C/C++ runtime libraries\nand native system libraries remain normal deployment dependencies.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "table",
+      "start_line": 124,
+      "end_line": 128,
+      "raw": "| Target | Private backend | Requirements |\n|---|---|---|\n| Windows | Win32, DirectWrite/Direct2D text, Direct3D 11 flip presentation, wake event/deadline timer | Windows 10 1703+; C++23 compiler/Windows SDK; D3D feature level 11.0 device; Vulkan loader/driver for fallback |\n| macOS | AppKit/CoreText text, Metal/CAMetalLayer, CFRunLoop wake/deadline sources | Xcode/Command Line Tools; logged-in WindowServer; Metal GPU; Vulkan/MoltenVK for fallback |\n| Linux | X11, Pango/Cairo text, Vulkan, eventfd/poll | X11/XWayland desktop, fonts, Vulkan graphics/presentation driver for canvas |\n",
+      "columns": [
+        "Target",
+        "Private backend",
+        "Requirements"
+      ],
+      "rows": [
+        [
+          "Windows",
+          "Win32, DirectWrite/Direct2D text, Direct3D 11 flip presentation, wake event/deadline timer",
+          "Windows 10 1703+; C++23 compiler/Windows SDK; D3D feature level 11.0 device; Vulkan loader/driver for fallback"
+        ],
+        [
+          "macOS",
+          "AppKit/CoreText text, Metal/CAMetalLayer, CFRunLoop wake/deadline sources",
+          "Xcode/Command Line Tools; logged-in WindowServer; Metal GPU; Vulkan/MoltenVK for fallback"
+        ],
+        [
+          "Linux",
+          "X11, Pango/Cairo text, Vulkan, eventfd/poll",
+          "X11/XWayland desktop, fonts, Vulkan graphics/presentation driver for canvas"
+        ]
+      ]
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 129,
+      "end_line": 129,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 130,
+      "end_line": 135,
+      "raw": "Linux currently uses X11. A Wayland desktop needs XWayland; there is no direct\nWayland backend. Linux derives a logical scale from the desktop's Xft.dpi\nresource (96 DPI when absent), including live resource changes. This is one\nX11 desktop scale, not Wayland per-output fractional scaling.\nWindows uses 96-DPI logical units with per-monitor scaling; macOS uses AppKit\npoints. A cross build or binary inspection does not prove desktop execution.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 136,
+      "end_line": 136,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "heading",
+      "start_line": 137,
+      "end_line": 137,
+      "raw": "## Scope\n",
+      "level": 2,
+      "title": "Scope"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 138,
+      "end_line": 138,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "list",
+      "start_line": 139,
+      "end_line": 170,
+      "raw": "- Core HostLoop binds the native wake gate, pins Core dispatch to the UI owner,\n  and delivers native channel readiness to the same thread. Core producer\n  endpoints and direct TaskToken cancellation wake the host automatically.\n  UiExecutor exposes watch/read/write alongside timers and ordinary tasks.\n- Core FrameLoop access through the open Host::event_loop, structural timed\n  TaskScope ownership, and Operation::then_on with an owned weak UI endpoint.\n  Pending tracked-operation waits reject blocking on the connected host thread.\n- One resizable standalone native window with read-only UTF-8 display text.\n  AppKit provides selectable text; Windows/Linux paint a read-only text surface.\n- Core EventLoop admission, priorities, cancellation, bounded queues and callback\n  budgets. UiExecutor wakes an idle host for new work or changed deadlines.\n  There is no permanent frame or polling timer.\n- Core Runtime workers deliver results through a weak UiExecutor. All callbacks\n  and native window mutations execute on the owning UI thread.\n- Native close, close veto, exception-to-Result propagation and a close barrier\n  rejecting late work. Normal shutdown returns through C++ main.\n- Installed target `iiGUI::iiGUI`, a common HelloGUI source and a three-kit\n  iiSDKBuilder manifest. LVUI document users include the LVUI adapter and link\n  LVUI separately; iiGUI-only consumers need no LVUI package.\n- Optional native GPU canvas with instanced rounded gradient panels, analytic\n  antialiasing, linear-light alpha blending and sRGB attachments. Updates\n  coalesce at the end of a Core dispatch; identical scenes reuse GPU storage.\n  Pipelines/devices persist; no GPU allocation occurs for a text-only host.\n- Adapter/API, verified hardware availability, device-pixel size, attachment\n  bytes and render/presentation counters. A strict hardware policy rejects an\n  unverified/software device. Explicit in-memory capture supports pixel tests.\n- Native Unicode shaping and font fallback: AppKit/CoreText, DirectWrite, and\n  Pango/Cairo. Linux no longer wraps text by repeatedly measuring UTF-8 prefixes.\n- An optional application-side LVUI adapter owns document parsing and bounded\n  row/column layout. `Host::set_view` accepts an app-supplied view extension;\n  `lvui::native::layout_document` exposes logical ID bounds. HelloLVUI embeds\n  a real `.lvui` source at build time.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Core HostLoop binds the native wake gate, pins Core dispatch to the UI owner,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Core FrameLoop access through the open Host::event_loop, structural timed",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "One resizable standalone native window with read-only UTF-8 display text.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Core EventLoop admission, priorities, cancellation, bounded queues and callback",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Core Runtime workers deliver results through a weak UiExecutor. All callbacks",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Native close, close veto, exception-to-Result propagation and a close barrier",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Installed target `iiGUI::iiGUI`, a common HelloGUI source and a three-kit",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Optional native GPU canvas with instanced rounded gradient panels, analytic",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Adapter/API, verified hardware availability, device-pixel size, attachment",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Native Unicode shaping and font fallback: AppKit/CoreText, DirectWrite, and",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "An optional application-side LVUI adapter owns document parsing and bounded",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 171,
+      "end_line": 171,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 172,
+      "end_line": 176,
+      "raw": "Mobile/web hosts, direct Wayland, editable text/IME, general input, a widget\nframework, custom-control accessibility, arbitrary vector/image drawing,\n3D/compute rendering, HDR and ICC-managed content are outside this\nrelease. Unsupported targets fail configuration. No GUI implementation or\nreverse iiGUI dependency is added to iiSDKCore.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 177,
+      "end_line": 177,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "heading",
+      "start_line": 178,
+      "end_line": 178,
+      "raw": "## Build and test\n",
+      "level": 2,
+      "title": "Build and test"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 179,
+      "end_line": 179,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 180,
+      "end_line": 186,
+      "raw": "All hosts require CMake 3.31+, Ninja, a C++23 compiler with std::expected,\niiSDKCore Runtime, LVUI 0.1, Vulkan 1.1+ and Python 3.9+ for build-time checks. Python is not an\napplication dependency. On Debian-like systems the native development packages\nare `libx11-dev`, `libpango1.0-dev`, `libcairo2-dev`, `libvulkan-dev`\nand `pkg-config`, plus fonts such as `fonts-dejavu-core` and suitable CJK,\nArabic, Indic and emoji fonts. No GTK widget toolkit is used. Install CMake 3.31+\nseparately if the distribution ships an older version.\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 187,
+      "end_line": 187,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "fenced_code",
+      "start_line": 188,
+      "end_line": 196,
+      "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \\\n  -DCMAKE_PREFIX_PATH=/path/to/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\ncmake --install build --prefix /path/to/iiGUI/build/install\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \\\n  -DCMAKE_PREFIX_PATH=/path/to/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\ncmake --install build --prefix /path/to/iiGUI/build/install\n",
+      "closed": true
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 197,
+      "end_line": 197,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 198,
+      "end_line": 201,
+      "raw": "Tests open native windows and run serially. They require an interactive target\ndesktop, including DISPLAY on Linux. Default installation is\n`~/.local/SDK/iiGUI`; verification uses isolated prefixes under build/ and does\nnot replace global SDK packages.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 202,
+      "end_line": 202,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "heading",
+      "start_line": 203,
+      "end_line": 203,
+      "raw": "## HelloGUI through iiSDKBuilder\n",
+      "level": 2,
+      "title": "HelloGUI through iiSDKBuilder"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 204,
+      "end_line": 204,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "fenced_code",
+      "start_line": 205,
+      "end_line": 207,
+      "raw": "```sh\niisdk-builder build --manifest examples/HelloGUI/iiSDKBuilder.json --platform host\n```\n",
+      "language": "sh",
+      "code": "iisdk-builder build --manifest examples/HelloGUI/iiSDKBuilder.json --platform host\n",
+      "closed": true
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 208,
+      "end_line": 208,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "paragraph",
+      "start_line": 209,
+      "end_line": 214,
+      "raw": "The manifest contains Windows, macOS and Linux kits. `--platform host` selects\nthe native host. Without it all three are requested; foreign desktop kits need\nexplicit toolchains. Core and iiGUI are built before the common HelloGUI source.\nBuilder uses FileProvider for its own manifests and logs; HelloGUI links Core,\niiGUI, Vulkan and native system libraries. LVUI-based examples add LVUI explicitly.\nSee [renderer selection and deployment](docs/Renderers.md) for Vulkan SDK paths.\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 215,
+      "end_line": 215,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "paragraph",
+      "start_line": 216,
+      "end_line": 222,
+      "raw": "HelloGUI displays a 250 ms Core timer, a worker's computed result of 42, content\nsize, resize events, multilingual text and a GPU gradient scene. The C++23\nmain.cpp uses tracked Operation completion, TaskScope timed ownership and\nFrameLoop prepare_present with no platform conditionals. Close\nthe window to finish; Command-Q on macOS and Alt-F4 on Windows also request the\nsame close-veto path. `HelloGUI --self-test` resizes to 840×540 logical units\nand checks timer, worker, resize, native GPU readback and normal close before returning 0.\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 223,
+      "end_line": 223,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "heading",
+      "start_line": 224,
+      "end_line": 224,
+      "raw": "## Reproducible installed-consumer verification\n",
+      "level": 2,
+      "title": "Reproducible installed-consumer verification"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 225,
+      "end_line": 225,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "paragraph",
+      "start_line": 226,
+      "end_line": 226,
+      "raw": "From iiGUI, run the verifier with an installed Builder CLI:\n"
+    },
+    {
+      "id": "b000078",
+      "kind": "blank",
+      "start_line": 227,
+      "end_line": 227,
+      "raw": "\n"
+    },
+    {
+      "id": "b000079",
+      "kind": "fenced_code",
+      "start_line": 228,
+      "end_line": 230,
+      "raw": "```sh\npython3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder\n```\n",
+      "language": "sh",
+      "code": "python3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder\n",
+      "closed": true
+    },
+    {
+      "id": "b000080",
+      "kind": "blank",
+      "start_line": 231,
+      "end_line": 231,
+      "raw": "\n"
+    },
+    {
+      "id": "b000081",
+      "kind": "paragraph",
+      "start_line": 232,
+      "end_line": 232,
+      "raw": "On Windows use an initialized compiler environment with CMake/Ninja/Python:\n"
+    },
+    {
+      "id": "b000082",
+      "kind": "blank",
+      "start_line": 233,
+      "end_line": 233,
+      "raw": "\n"
+    },
+    {
+      "id": "b000083",
+      "kind": "fenced_code",
+      "start_line": 234,
+      "end_line": 236,
+      "raw": "```powershell\npython -B tools/verify_desktop.py --builder C:/path/to/iisdk-builder.exe\n```\n",
+      "language": "powershell",
+      "code": "python -B tools/verify_desktop.py --builder C:/path/to/iisdk-builder.exe\n",
+      "closed": true
+    },
+    {
+      "id": "b000084",
+      "kind": "blank",
+      "start_line": 237,
+      "end_line": 237,
+      "raw": "\n"
+    },
+    {
+      "id": "b000085",
+      "kind": "paragraph",
+      "start_line": 238,
+      "end_line": 242,
+      "raw": "The verifier builds through Builder, runs the host and HelloGUI tests, installs\nCore/LVUI/iiGUI, moves their prefix and builds/runs a copied consumer against\nthose installed SDK packages plus the target's Vulkan/native system dependencies.\nLogs, JUnit XML and verification.json are written to a fresh\nrun directory under build/. Repeated runs preserve older reports and prefixes.\n"
+    },
+    {
+      "id": "b000086",
+      "kind": "blank",
+      "start_line": 243,
+      "end_line": 243,
+      "raw": "\n"
+    },
+    {
+      "id": "b000087",
+      "kind": "paragraph",
+      "start_line": 244,
+      "end_line": 245,
+      "raw": "`--compile-only` deliberately omits target execution. A foreign target requires\nthat flag plus an explicit toolchain:\n"
+    },
+    {
+      "id": "b000088",
+      "kind": "blank",
+      "start_line": 246,
+      "end_line": 246,
+      "raw": "\n"
+    },
+    {
+      "id": "b000089",
+      "kind": "fenced_code",
+      "start_line": 247,
+      "end_line": 250,
+      "raw": "```sh\npython3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder \\\n  --platform linux --toolchain /path/to/linux-toolchain.cmake --compile-only\n```\n",
+      "language": "sh",
+      "code": "python3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder \\\n  --platform linux --toolchain /path/to/linux-toolchain.cmake --compile-only\n",
+      "closed": true
+    },
+    {
+      "id": "b000090",
+      "kind": "blank",
+      "start_line": 251,
+      "end_line": 251,
+      "raw": "\n"
+    },
+    {
+      "id": "b000091",
+      "kind": "paragraph",
+      "start_line": 252,
+      "end_line": 260,
+      "raw": "The report then states `built_execution_deferred`; native runtime tests are\nnever marked passed. A cross toolchain must find target libraries and permit\nthe installed SDK prefix outside its sysroot, for example with\n`CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH`. Library/include root modes should\nstill select target libraries. Child builds clear inherited CPATH,\nCPLUS_INCLUDE_PATH and LIBRARY_PATH to prevent host SDK contamination. A\ntoolchain build also clears inherited PKG_CONFIG_PATH; its toolchain must set\ntarget PKG_CONFIG_SYSROOT_DIR/PKG_CONFIG_LIBDIR.\nAdditional kit cache entries use `--cache KEY=VALUE`.\n"
+    },
+    {
+      "id": "b000092",
+      "kind": "blank",
+      "start_line": 261,
+      "end_line": 261,
+      "raw": "\n"
+    },
+    {
+      "id": "b000093",
+      "kind": "paragraph",
+      "start_line": 262,
+      "end_line": 262,
+      "raw": "For a separate package check:\n"
+    },
+    {
+      "id": "b000094",
+      "kind": "blank",
+      "start_line": 263,
+      "end_line": 263,
+      "raw": "\n"
+    },
+    {
+      "id": "b000095",
+      "kind": "fenced_code",
+      "start_line": 264,
+      "end_line": 269,
+      "raw": "```sh\ncmake -DSOURCE=/path/to/iiGUI -DBUILD=/path/to/iiGUI/build/package-check \\\n  -DCORE_BUILD=/path/to/Core/build -DGUI_BUILD=/path/to/iiGUI/build \\\n  -DLVUI_BUILD=/path/to/LVUI/build \\\n  -P tests/package.cmake\n```\n",
+      "language": "sh",
+      "code": "cmake -DSOURCE=/path/to/iiGUI -DBUILD=/path/to/iiGUI/build/package-check \\\n  -DCORE_BUILD=/path/to/Core/build -DGUI_BUILD=/path/to/iiGUI/build \\\n  -DLVUI_BUILD=/path/to/LVUI/build \\\n  -P tests/package.cmake\n",
+      "closed": true
+    },
+    {
+      "id": "b000096",
+      "kind": "blank",
+      "start_line": 270,
+      "end_line": 270,
+      "raw": "\n"
+    },
+    {
+      "id": "b000097",
+      "kind": "paragraph",
+      "start_line": 271,
+      "end_line": 275,
+      "raw": "For cross consumption add `-DTOOLCHAIN=/path/to/toolchain.cmake` and\n`-DSKIP_EXECUTION=ON`. Existing relocated prefixes are preserved. See\n[architecture](docs/Architecture.md), [usage](docs/Usage.md) and\n[verification](docs/Verification.md), [GPU contracts](docs/Graphics.md) and\n[Qt GUI comparison](docs/QtGuiComparison.md) for contracts and evidence boundaries.\n"
+    },
+    {
+      "id": "b000098",
+      "kind": "blank",
+      "start_line": 276,
+      "end_line": 276,
+      "raw": "\n"
+    },
+    {
+      "id": "b000099",
+      "kind": "heading",
+      "start_line": 277,
+      "end_line": 277,
+      "raw": "## License\n",
+      "level": 2,
+      "title": "License"
+    },
+    {
+      "id": "b000100",
+      "kind": "blank",
+      "start_line": 278,
+      "end_line": 278,
+      "raw": "\n"
+    },
+    {
+      "id": "b000101",
+      "kind": "paragraph",
+      "start_line": 279,
+      "end_line": 279,
+      "raw": "SPDX-License-Identifier: MIT\n"
+    },
+    {
+      "id": "b000102",
+      "kind": "blank",
+      "start_line": 280,
+      "end_line": 280,
+      "raw": "\n"
+    },
+    {
+      "id": "b000103",
+      "kind": "paragraph",
+      "start_line": 281,
+      "end_line": 283,
+      "raw": "The original code and documentation in this repository are licensed under the\n[MIT License](LICENSE). Third-party code, libraries, fonts, tools, and model\nweights retain their respective licenses.\n"
+    },
+    {
+      "id": "b000104",
+      "kind": "blank",
+      "start_line": 284,
+      "end_line": 284,
+      "raw": "\n"
+    },
+    {
+      "id": "b000105",
+      "kind": "heading",
+      "start_line": 285,
+      "end_line": 285,
+      "raw": "## Source header layout\n",
+      "level": 2,
+      "title": "Source header layout"
+    },
+    {
+      "id": "b000106",
+      "kind": "blank",
+      "start_line": 286,
+      "end_line": 286,
+      "raw": "\n"
+    },
+    {
+      "id": "b000107",
+      "kind": "paragraph",
+      "start_line": 287,
+      "end_line": 291,
+      "raw": "Public headers and implementations live together in `src/iiGUI/`.\nThere is no separate authored `include/` tree. Existing public `#include` names\nand exported CMake targets are unchanged; installation still places only public\nheaders in the package include directory. Generated export headers belong to\n`build/`, not to the authored source tree.\n"
+    },
+    {
+      "id": "b000108",
+      "kind": "blank",
+      "start_line": 292,
+      "end_line": 292,
+      "raw": "\n"
+    },
+    {
+      "id": "b000109",
+      "kind": "paragraph",
+      "start_line": 293,
+      "end_line": 295,
+      "raw": "Validate this layout from the SDK workspace with\n`python3 -B tests/test_source_header_layout.py`. Reconfigure, build, run CTest,\nand verify a staged installed consumer after changing source/header paths.\n"
+    },
+    {
+      "id": "b000110",
+      "kind": "blank",
+      "start_line": 296,
+      "end_line": 296,
+      "raw": "\n"
+    },
+    {
+      "id": "b000111",
+      "kind": "paragraph",
+      "start_line": 297,
+      "end_line": 299,
+      "raw": "Composed native buttons support asymmetric content insets, explicit indicator size,\ncontent spacing and optional width. See [container layout](docs/ContainerLayout.md);\nnew layout test executables are compiled with runtime execution deferred.\n"
+    },
+    {
+      "id": "b000112",
+      "kind": "blank",
+      "start_line": 300,
+      "end_line": 300,
+      "raw": "\n"
+    },
+    {
+      "id": "b000113",
+      "kind": "paragraph",
+      "start_line": 301,
+      "end_line": 303,
+      "raw": "Native image composition supports source crops, rounded masks, borders, scrims,\nexplicit foreground order and tightly allocated foreground textures. Pure retained\npaint providers expose native action state; see [image composition](docs/ImageComposition.md).\n"
+    },
+    {
+      "id": "b000114",
+      "kind": "blank",
+      "start_line": 304,
+      "end_line": 304,
+      "raw": "\n"
+    },
+    {
+      "id": "b000115",
+      "kind": "paragraph",
+      "start_line": 305,
+      "end_line": 305,
+      "raw": "See [native material inputs](docs/MaterialInputs.md) for immutable effect masks, preblur inputs and owned on-demand widget frame callbacks.\n"
+    },
+    {
+      "id": "b000116",
+      "kind": "blank",
+      "start_line": 306,
+      "end_line": 306,
+      "raw": "\n"
+    },
+    {
+      "id": "b000117",
+      "kind": "paragraph",
+      "start_line": 307,
+      "end_line": 307,
+      "raw": "[TextIndex](docs/TextBoundary.md) supplies an immutable, window-free UTF-8/UTF-16 map and extended grapheme/word movement with sparse ASCII storage. Unicode sources and license hashes are pinned in the package; execution checks remain deferred.\n"
+    },
+    {
+      "id": "b000118",
+      "kind": "blank",
+      "start_line": 308,
+      "end_line": 308,
+      "raw": "\n"
+    },
+    {
+      "id": "b000119",
+      "kind": "paragraph",
+      "start_line": 309,
+      "end_line": 311,
+      "raw": "[TextLine](docs/TextLine.md) shapes an unwrapped paragraph with native font services,\nreturns UTF-16 caret/hit positions and visual selection spans, and rasterizes only\nthe requested horizontal viewport. It constructs no OS text control.\n"
+    },
+    {
+      "id": "b000120",
+      "kind": "blank",
+      "start_line": 312,
+      "end_line": 312,
+      "raw": "\n"
+    },
+    {
+      "id": "b000121",
+      "kind": "paragraph",
+      "start_line": 313,
+      "end_line": 315,
+      "raw": "[TextRasterCache](docs/TextRasterCache.md) keeps native RGB and color-font palette\npixels intact, bounds viewport images with an LRU, and reuses the same image when\nonly opacity changes. Color and opacity checks are compiled; execution is deferred.\n"
+    },
+    {
+      "id": "b000122",
+      "kind": "blank",
+      "start_line": 316,
+      "end_line": 316,
+      "raw": "\n"
+    },
+    {
+      "id": "b000123",
+      "kind": "paragraph",
+      "start_line": 317,
+      "end_line": 319,
+      "raw": "[Custom text input providers](docs/TextInputProvider.md) expose bounded document\nranges and caret geometry to native IME services without whole-document snapshot\ncopies. Widgets share the host's Core event loop for owned timed work.\n"
+    },
+    {
+      "id": "b000124",
+      "kind": "blank",
+      "start_line": 320,
+      "end_line": 320,
+      "raw": "\n"
+    },
+    {
+      "id": "b000125",
+      "kind": "paragraph",
+      "start_line": 321,
+      "end_line": 324,
+      "raw": "[Widget interaction observers](docs/WidgetInteraction.md) keep weak, independent\nsubscriptions to geometry, clipping and hover/press/focus metadata. Explicit\npopup frames and input regions support a painted bubble tail while preserving\nthe origin's focus, click and pointer capture. Runtime checks remain deferred.\n"
+    },
+    {
+      "id": "b000126",
+      "kind": "blank",
+      "start_line": 325,
+      "end_line": 325,
+      "raw": "\n"
+    },
+    {
+      "id": "b000127",
+      "kind": "paragraph",
+      "start_line": 326,
+      "end_line": 326,
+      "raw": "Related implementation contracts: [Retained popup effects](docs/RetainedPopupEffects.md).\n"
+    },
+    {
+      "id": "b000128",
+      "kind": "blank",
+      "start_line": 327,
+      "end_line": 327,
+      "raw": "\n"
+    },
+    {
+      "id": "b000129",
+      "kind": "paragraph",
+      "start_line": 328,
+      "end_line": 330,
+      "raw": "[Retained Window properties](docs/WindowProperties.md) update native geometry and\nbase appearance through an owner-thread weak endpoint, stage candidate settings,\npreserve user resizing and local edits, and isolate embedded content from window ownership.\n"
+    },
+    {
+      "id": "b000130",
+      "kind": "blank",
+      "start_line": 331,
+      "end_line": 331,
+      "raw": "\n"
+    },
+    {
+      "id": "b000131",
+      "kind": "paragraph",
+      "start_line": 332,
+      "end_line": 336,
+      "raw": "Generated readonly C++ projections are covered by `iiGUI.native_readonly.*`,\nincluding selection changes, native references, record state, retirement and preserved input.\nGenerated typed C++ View inputs are covered by `iiGUI.native_object_inputs.*`,\nincluding shared computations, object replacement, null recovery, failed candidate\npreservation, keyed rows, and editing state. See [native input contracts](docs/ObjectInputs.md).\n"
+    },
+    {
+      "id": "b000132",
+      "kind": "blank",
+      "start_line": 337,
+      "end_line": 337,
+      "raw": "\n"
+    },
+    {
+      "id": "b000133",
+      "kind": "paragraph",
+      "start_line": 338,
+      "end_line": 341,
+      "raw": "Generated C++ getter dependencies are covered by `iiGUI.native_method_queries.*`,\nincluding private observable state, nested and indexed receivers, conditional\ndependency changes, failure recovery and reentrant selection replacement.\nSee [native method query contracts](docs/MethodQueries.md).\n"
+    },
+    {
+      "id": "b000134",
+      "kind": "blank",
+      "start_line": 342,
+      "end_line": 342,
+      "raw": "\n"
+    },
+    {
+      "id": "b000135",
+      "kind": "paragraph",
+      "start_line": 343,
+      "end_line": 346,
+      "raw": "Native C++ visual providers can be composed with [NativeView](docs/NativeView.md).\nSource identity retains edits and focus; candidate failures preserve the previous\nview, and parent retirement closes weak endpoints. Existing native drawing,\ninput capture and frame data APIs remain the rendering path.\n"
+    },
+    {
+      "id": "b000136",
+      "kind": "blank",
+      "start_line": 347,
+      "end_line": 347,
+      "raw": "\n"
+    },
+    {
+      "id": "b000137",
+      "kind": "html",
+      "start_line": 348,
+      "end_line": 348,
+      "raw": "<!-- workspace-docs:readme:start -->\n"
+    },
+    {
+      "id": "b000138",
+      "kind": "heading",
+      "start_line": 349,
+      "end_line": 349,
+      "raw": "## Documentation entry points\n",
+      "level": 2,
+      "title": "Documentation entry points"
+    },
+    {
+      "id": "b000139",
+      "kind": "blank",
+      "start_line": 350,
+      "end_line": 350,
+      "raw": "\n"
+    },
+    {
+      "id": "b000140",
+      "kind": "list",
+      "start_line": 351,
+      "end_line": 354,
+      "raw": "- Human overview: this English `README.md`.\n- Agent instructions: [AGENT.md](AGENT.md).\n- Human documentation: [documentation index](docs/README.md).\n- Structured agent documentation: [agent index](docs/agent-index.json).\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "Human overview: this English `README.md`.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Agent instructions: [AGENT.md](AGENT.md).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Human documentation: [documentation index](docs/README.md).",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Structured agent documentation: [agent index](docs/agent-index.json).",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000141",
+      "kind": "html",
+      "start_line": 355,
+      "end_line": 355,
+      "raw": "<!-- workspace-docs:readme:end -->\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "iiGUI",
+      "anchor": "iigui",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000053",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Scope",
+      "anchor": "scope",
+      "start_line": 137
+    },
+    {
+      "block_id": "b000059",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Build and test",
+      "anchor": "build-and-test",
+      "start_line": 178
+    },
+    {
+      "block_id": "b000067",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "HelloGUI through iiSDKBuilder",
+      "anchor": "hellogui-through-iisdkbuilder",
+      "start_line": 203
+    },
+    {
+      "block_id": "b000075",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Reproducible installed-consumer verification",
+      "anchor": "reproducible-installed-consumer-verification",
+      "start_line": 224
+    },
+    {
+      "block_id": "b000099",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "License",
+      "anchor": "license",
+      "start_line": 277
+    },
+    {
+      "block_id": "b000105",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Source header layout",
+      "anchor": "source-header-layout",
+      "start_line": 285
+    },
+    {
+      "block_id": "b000138",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Documentation entry points",
+      "anchor": "documentation-entry-points",
+      "start_line": 349
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000045",
+        "line": 116,
+        "text": "Released 0.4.1 binaries do not include these additions until rebuilt. The version above is the last package release.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000091",
+        "line": 253,
+        "text": "never marked passed. A cross toolchain must find target libraries and permit",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000091",
+        "line": 255,
+        "text": "`CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH`. Library/include root modes should",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000091",
+        "line": 258,
+        "text": "toolchain build also clears inherited PKG_CONFIG_PATH; its toolchain must set",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000063",
+        "language": "sh",
+        "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \\\n  -DCMAKE_PREFIX_PATH=/path/to/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\ncmake --install build --prefix /path/to/iiGUI/build/install\n"
+      },
+      {
+        "block_id": "b000069",
+        "language": "sh",
+        "code": "iisdk-builder build --manifest examples/HelloGUI/iiSDKBuilder.json --platform host\n"
+      },
+      {
+        "block_id": "b000079",
+        "language": "sh",
+        "code": "python3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder\n"
+      },
+      {
+        "block_id": "b000083",
+        "language": "powershell",
+        "code": "python -B tools/verify_desktop.py --builder C:/path/to/iisdk-builder.exe\n"
+      },
+      {
+        "block_id": "b000089",
+        "language": "sh",
+        "code": "python3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder \\\n  --platform linux --toolchain /path/to/linux-toolchain.cmake --compile-only\n"
+      },
+      {
+        "block_id": "b000095",
+        "language": "sh",
+        "code": "cmake -DSOURCE=/path/to/iiGUI -DBUILD=/path/to/iiGUI/build/package-check \\\n  -DCORE_BUILD=/path/to/Core/build -DGUI_BUILD=/path/to/iiGUI/build \\\n  -DLVUI_BUILD=/path/to/LVUI/build \\\n  -P tests/package.cmake\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "accessibility semantics",
+        "target": "docs/AccessibilitySemantics.md",
+        "kind": "relative",
+        "line": 3
+      },
+      {
+        "block_id": "b000003",
+        "label": "document adapter",
+        "target": "../LVUI/docs/NativeDocument.md",
+        "kind": "relative",
+        "line": 7
+      },
+      {
+        "block_id": "b000005",
+        "label": "native authoring verification record",
+        "target": "../LVUI/docs/NativeReadinessVerification.md",
+        "kind": "relative",
+        "line": 9
+      },
+      {
+        "block_id": "b000007",
+        "label": "Host platform contracts",
+        "target": "docs/HostPlatforms.md",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000007",
+        "label": "HelloHosts",
+        "target": "examples/HelloHosts",
+        "kind": "relative",
+        "line": 16
+      },
+      {
+        "block_id": "b000009",
+        "label": "Android LVUI Hello World",
+        "target": "examples/HelloAndroid",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000009",
+        "label": "Android guide",
+        "target": "docs/AndroidHello.md",
+        "kind": "relative",
+        "line": 21
+      },
+      {
+        "block_id": "b000011",
+        "label": "Hello World",
+        "target": "examples/HelloWorld",
+        "kind": "relative",
+        "line": 25
+      },
+      {
+        "block_id": "b000011",
+        "label": "desktop verification guide",
+        "target": "docs/AOTDesktop.md",
+        "kind": "relative",
+        "line": 26
+      },
+      {
+        "block_id": "b000013",
+        "label": "Inferred LVUI values",
+        "target": "docs/InferredValues.md",
+        "kind": "relative",
+        "line": 30
+      },
+      {
+        "block_id": "b000015",
+        "label": "iPadOS hosts",
+        "target": "docs/IPADOS.md",
+        "kind": "relative",
+        "line": 33
+      },
+      {
+        "block_id": "b000017",
+        "label": "container layout",
+        "target": "docs/ContainerLayout.md",
+        "kind": "relative",
+        "line": 39
+      },
+      {
+        "block_id": "b000019",
+        "label": "Retained stack layout",
+        "target": "docs/StackLayout.md",
+        "kind": "relative",
+        "line": 44
+      },
+      {
+        "block_id": "b000021",
+        "label": "Action surfaces",
+        "target": "docs/ActionSurfaces.md",
+        "kind": "relative",
+        "line": 49
+      },
+      {
+        "block_id": "b000023",
+        "label": "motion",
+        "target": "docs/NativeMotion.md",
+        "kind": "relative",
+        "line": 54
+      },
+      {
+        "block_id": "b000023",
+        "label": "shadows",
+        "target": "docs/Shadows.md",
+        "kind": "relative",
+        "line": 56
+      },
+      {
+        "block_id": "b000025",
+        "label": "Self-rendered C++ widgets",
+        "target": "docs/SelfRenderedWidgets.md",
+        "kind": "relative",
+        "line": 63
+      },
+      {
+        "block_id": "b000027",
+        "label": "Popovers",
+        "target": "docs/Popovers.md",
+        "kind": "relative",
+        "line": 66
+      },
+      {
+        "block_id": "b000029",
+        "label": "Activation-owned content",
+        "target": "docs/PopupContent.md",
+        "kind": "relative",
+        "line": 70
+      },
+      {
+        "block_id": "b000031",
+        "label": "Generic content hosts",
+        "target": "docs/ContentHosts.md",
+        "kind": "relative",
+        "line": 75
+      },
+      {
+        "block_id": "b000033",
+        "label": "Dialog layout",
+        "target": "docs/DialogLayout.md",
+        "kind": "relative",
+        "line": 80
+      },
+      {
+        "block_id": "b000035",
+        "label": "GPU backdrop materials",
+        "target": "docs/BackdropMaterials.md",
+        "kind": "relative",
+        "line": 84
+      },
+      {
+        "block_id": "b000037",
+        "label": "Core-owned widget applications",
+        "target": "docs/CoreApplication.md",
+        "kind": "relative",
+        "line": 91
+      },
+      {
+        "block_id": "b000039",
+        "label": "compiled self-rendered widgets and LVUI AOT",
+        "target": "docs/SelfRenderedWidgets.md",
+        "kind": "relative",
+        "line": 97
+      },
+      {
+        "block_id": "b000039",
+        "label": "AOT desktop verification",
+        "target": "docs/AOTDesktop.md",
+        "kind": "relative",
+        "line": 103
+      },
+      {
+        "block_id": "b000041",
+        "label": "Windows build and execution",
+        "target": "docs/WindowsBuildAndRun.md",
+        "kind": "relative",
+        "line": 105
+      },
+      {
+        "block_id": "b000045",
+        "label": "LVUI 0.1",
+        "target": "docs/LVUI.md",
+        "kind": "relative",
+        "line": 111
+      },
+      {
+        "block_id": "b000045",
+        "label": "Native rendering",
+        "target": "docs/Renderers.md",
+        "kind": "relative",
+        "line": 114
+      },
+      {
+        "block_id": "b000071",
+        "label": "renderer selection and deployment",
+        "target": "docs/Renderers.md",
+        "kind": "relative",
+        "line": 214
+      },
+      {
+        "block_id": "b000097",
+        "label": "architecture",
+        "target": "docs/Architecture.md",
+        "kind": "relative",
+        "line": 273
+      },
+      {
+        "block_id": "b000097",
+        "label": "usage",
+        "target": "docs/Usage.md",
+        "kind": "relative",
+        "line": 273
+      },
+      {
+        "block_id": "b000097",
+        "label": "verification",
+        "target": "docs/Verification.md",
+        "kind": "relative",
+        "line": 274
+      },
+      {
+        "block_id": "b000097",
+        "label": "GPU contracts",
+        "target": "docs/Graphics.md",
+        "kind": "relative",
+        "line": 274
+      },
+      {
+        "block_id": "b000097",
+        "label": "Qt GUI comparison",
+        "target": "docs/QtGuiComparison.md",
+        "kind": "relative",
+        "line": 275
+      },
+      {
+        "block_id": "b000103",
+        "label": "MIT License",
+        "target": "LICENSE",
+        "kind": "relative",
+        "line": 282
+      },
+      {
+        "block_id": "b000111",
+        "label": "container layout",
+        "target": "docs/ContainerLayout.md",
+        "kind": "relative",
+        "line": 298
+      },
+      {
+        "block_id": "b000113",
+        "label": "image composition",
+        "target": "docs/ImageComposition.md",
+        "kind": "relative",
+        "line": 303
+      },
+      {
+        "block_id": "b000115",
+        "label": "native material inputs",
+        "target": "docs/MaterialInputs.md",
+        "kind": "relative",
+        "line": 305
+      },
+      {
+        "block_id": "b000117",
+        "label": "TextIndex",
+        "target": "docs/TextBoundary.md",
+        "kind": "relative",
+        "line": 307
+      },
+      {
+        "block_id": "b000119",
+        "label": "TextLine",
+        "target": "docs/TextLine.md",
+        "kind": "relative",
+        "line": 309
+      },
+      {
+        "block_id": "b000121",
+        "label": "TextRasterCache",
+        "target": "docs/TextRasterCache.md",
+        "kind": "relative",
+        "line": 313
+      },
+      {
+        "block_id": "b000123",
+        "label": "Custom text input providers",
+        "target": "docs/TextInputProvider.md",
+        "kind": "relative",
+        "line": 317
+      },
+      {
+        "block_id": "b000125",
+        "label": "Widget interaction observers",
+        "target": "docs/WidgetInteraction.md",
+        "kind": "relative",
+        "line": 321
+      },
+      {
+        "block_id": "b000127",
+        "label": "Retained popup effects",
+        "target": "docs/RetainedPopupEffects.md",
+        "kind": "relative",
+        "line": 326
+      },
+      {
+        "block_id": "b000129",
+        "label": "Retained Window properties",
+        "target": "docs/WindowProperties.md",
+        "kind": "relative",
+        "line": 328
+      },
+      {
+        "block_id": "b000131",
+        "label": "native input contracts",
+        "target": "docs/ObjectInputs.md",
+        "kind": "relative",
+        "line": 336
+      },
+      {
+        "block_id": "b000133",
+        "label": "native method query contracts",
+        "target": "docs/MethodQueries.md",
+        "kind": "relative",
+        "line": 341
+      },
+      {
+        "block_id": "b000135",
+        "label": "NativeView",
+        "target": "docs/NativeView.md",
+        "kind": "relative",
+        "line": 343
+      },
+      {
+        "block_id": "b000140",
+        "label": "AGENT.md",
+        "target": "AGENT.md",
+        "kind": "relative",
+        "line": 352
+      },
+      {
+        "block_id": "b000140",
+        "label": "documentation index",
+        "target": "docs/README.md",
+        "kind": "relative",
+        "line": 353
+      },
+      {
+        "block_id": "b000140",
+        "label": "agent index",
+        "target": "docs/agent-index.json",
+        "kind": "relative",
+        "line": 354
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000049",
+        "columns": [
+          "Target",
+          "Private backend",
+          "Requirements"
+        ],
+        "rows": [
+          [
+            "Windows",
+            "Win32, DirectWrite/Direct2D text, Direct3D 11 flip presentation, wake event/deadline timer",
+            "Windows 10 1703+; C++23 compiler/Windows SDK; D3D feature level 11.0 device; Vulkan loader/driver for fallback"
+          ],
+          [
+            "macOS",
+            "AppKit/CoreText text, Metal/CAMetalLayer, CFRunLoop wake/deadline sources",
+            "Xcode/Command Line Tools; logged-in WindowServer; Metal GPU; Vulkan/MoltenVK for fallback"
+          ],
+          [
+            "Linux",
+            "X11, Pango/Cairo text, Vulkan, eventfd/poll",
+            "X11/XWayland desktop, fonts, Vulkan graphics/presentation driver for canvas"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

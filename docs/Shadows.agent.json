@@ -1,0 +1,156 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:5a4905f13e247eee7e350c231ef299f570eeb92f9513903dc289c949d2529184",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Shadows.md",
+    "sha256": "36a5e1deef129f3fcc8ebe3fac81ba91ddc1c7c246820e2f77bbd85bdb958eb1",
+    "bytes": 2589,
+    "line_count": 42,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Native GPU box shadows",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native GPU box shadows\n",
+      "level": 1,
+      "title": "Native GPU box shadows"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "`CanvasLayer::shadow` accepts a `BoxShadow` with logical bounds, corner radius,\nGaussian blur radius and linear-light sRGB color. It draws before that layer's\nbackdrop, panels and foreground. The bounds describe the shadow shape itself;\nan owner applies an offset by moving those bounds. Ordinary layer clipping and\nthe viewport clip the result, including its transparent blur padding.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 15,
+      "raw": "The native Metal path draws a white rounded coverage mask into a private R8\ntexture, blurs it into R16Float through the system MPS Gaussian kernel, and\ncomposes the colored alpha on the GPU. The padded quad covers only the shadow's\nregion. Rendered shadows do not require CPU pixel generation or readback.\nThe kernel sigma is blur_radius/3. Zero blur keeps the sharp antialiased mask.\nPositive blur is bounded to 64 logical units; padded physical dimensions must\nremain within 8192 pixels per axis.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 24,
+      "raw": "Mask and blur textures persist. Width, height, corner radius, blur radius and\nbacking scale determine the mask key. Moving a shape, changing its color or\nchanging the scene behind it reuses the same mask. A geometry change redraws\nand reblurs it; removing the shadow releases its retained working textures.\nThe working mask uses one byte per pixel and an optional two-byte blur target.\nThe combined retained shadow and backdrop working-texture budget is 64 MiB.\nDriver resources, ordinary attachments, foreground textures and in-flight\ncommand resources remain outside this accounting.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 31,
+      "raw": "`GraphicsInfo::shadow_supported` is explicit capability information.\n`shadow_masks`, `shadow_blurs` and `shadow_texture_bytes` report encoded passes\nand retained storage, not elapsed GPU time or physical scanout. Pipeline states\nare created only when a shadow is first requested and then reused. Vulkan and\nD3D11 shadows remain unimplemented; a request fails explicitly without dropping\nthe effect or changing it into an opaque rectangle.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 33,
+      "end_line": 37,
+      "raw": "`PopoverOptions::shadow` supplies an optional `PopoverShadow` with offset,\nblur radius and color. It is absent by default. Widget composition emits its\nshadow after dimming and before the card surface, so LVRS Alert can use the\nauthored downward 16-unit offset, 32-unit blur and 28% black color. Popup lifetime\nand input policies remain owned by the same C++ tree.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 42,
+      "raw": "`tests/shadows.cpp` checks validation, actual soft pixels, linear tint,\ngeometry-keyed reuse, release, budget exhaustion before mask allocation and an\nunsupported backend. The Alert test additionally checks its actual downward\nshadow and removal through `Alert::set_shadow_enabled`.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native GPU box shadows",
+      "anchor": "native-gpu-box-shadows",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 12,
+        "text": "region. Rendered shadows do not require CPU pixel generation or readback.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 14,
+        "text": "Positive blur is bounded to 64 logical units; padded physical dimensions must",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

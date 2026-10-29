@@ -1,6 +1,6 @@
 # 데스크톱 플랫폼 경계
 
-iiGUI의 위젯 트리는 브라우저나 WebView 없이 Cocoa, Win32, X11 창에 부착된다. 공통 WidgetState가 배치, 포커스, 편집, 캡처와 렌더 장면을 소유하고 플랫폼 어댑터가 운영체제 이벤트를 표준 값으로 변환한다.
+iiGUI의 위젯 트리는 Cocoa, Win32, X11, 직접 Wayland, Android, UIKit, Web canvas에 부착된다. OS 호스트에는 브라우저나 WebView를 넣지 않는다. Web은 별도의 AOT WASM 대상이며 DOM 위젯을 사용하지 않는다. 공통 WidgetState가 배치, 포커스, 편집, 캡처와 렌더 장면을 소유하고 플랫폼 어댑터가 운영체제 이벤트를 표준 값으로 변환한다. 지원 범위와 제한은 [HostPlatforms.md](HostPlatforms.md)를 따른다.
 
 macOS는 AppKit/Metal, Windows는 Win32/D3D11과 IMM32, Linux는 X11/XInput2/XIM과 Vulkan을 사용한다. 기본 네이티브 가속기가 실패하면 Vulkan으로 전환한다. Windows의 IME·클립보드·파일 드롭과 Linux의 XInput2 압력·기울기, XIM, XDND 및 INCR 클립보드 전송을 소스에 구현했다. Linux 파일 선택은 XDG Desktop Portal, 외부 URL은 GIO, 앱 메뉴는 GMenuModel/GActionGroup의 D-Bus 내보내기를 사용한다. Linux의 직접 Wayland 경로는 포함하지 않는다.
 

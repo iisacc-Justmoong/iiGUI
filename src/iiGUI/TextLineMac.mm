@@ -1,7 +1,18 @@
+#import <TargetConditionals.h>
+#if TARGET_OS_IOS
+#import <UIKit/UIKit.h>
+#define NSFont UIFont
+#define NSFontWeightBold UIFontWeightBold
+#define NSFontWeightSemibold UIFontWeightSemibold
+#define NSFontWeightMedium UIFontWeightMedium
+#define NSFontWeightRegular UIFontWeightRegular
+#else
 #import <AppKit/AppKit.h>
+#endif
 #import <CoreText/CoreText.h>
 #include "TextLineNative.h"
 #include "NativeText.h"
+#include "FontDatabase.h"
 
 namespace ii::gui::detail {
 namespace {
@@ -21,6 +32,7 @@ public:
                 font = [NSFont fontWithName:[NSString stringWithFormat:@"%@-%@", family, face] size:style.font_size];
                 if (!font) font = [NSFont fontWithName:family size:style.font_size];
             }
+            if(!font){const auto fallback=FontDatabase::application()->resolve_family(style.font_family);auto name=[[NSString alloc] initWithBytes:fallback.data() length:fallback.size() encoding:NSUTF8StringEncoding];auto face=style.font_weight>=700?@"Bold":style.font_weight>=600?@"SemiBold":style.font_weight>=500?@"Medium":@"Regular";font=[NSFont fontWithName:[NSString stringWithFormat:@"%@-%@",name,face] size:style.font_size];if(!font)font=[NSFont fontWithName:name size:style.font_size];}
             if (!font) font = [NSFont systemFontOfSize:style.font_size weight:weight];
             auto paragraph = [NSMutableParagraphStyle new]; paragraph.lineBreakMode = NSLineBreakByClipping;
             paragraph.tabStops = @[]; paragraph.defaultTabInterval = style.tab_stop_distance;

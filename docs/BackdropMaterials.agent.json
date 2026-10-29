@@ -1,0 +1,268 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7a64ea5fa9d6b92a5fe7b5d92d2d9c080e907c49bf3df4734c111e40cc5adcb8",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/BackdropMaterials.md",
+    "sha256": "5e6fcfaa2ca2819b8eaa0378588cc9c063022f00665c5bdc5586aac08c3b9d43",
+    "bytes": 4917,
+    "line_count": 79,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Native GPU backdrop materials and authored widget metrics",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native GPU backdrop materials and authored widget metrics\n",
+      "level": 1,
+      "title": "Native GPU backdrop materials and authored widget metrics"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "`CanvasLayer::backdrop` applies a `BackdropMaterial` before the layer's panels,\ntext and images. Its rounded bounds, tint and optional inner border are logical\ncanvas coordinates; `Color` components remain linear-light sRGB. It uses the\nsame native surface as ordinary C++ widgets and creates no OS popup or control.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 13,
+      "raw": "`BackdropSource::content` captures the base canvas before any overlay. This lets\na dialog blur application content without feeding its own dim layer, text or\nprevious popup pixels back into the blur. `previous_layers` captures the image\nimmediately before that layer. A zero blur radius retains a sharp image with\ntranslucent tint; it is not an opaque replacement color. Radius values are\nfinite 0..64 logical units and correspond to a Gaussian sigma of radius/3.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "heading",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "## Metal implementation and reuse\n",
+      "level": 2,
+      "title": "Metal implementation and reuse"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 21,
+      "raw": "The native Metal backend copies only the material region expanded by the blur\nradius and clipped to the attachment. BGRA8 sRGB input is sampled into an\nRGBA16Float linear blur destination by the system Metal Performance Shaders\nGaussian kernel. Rounded masking, tint and border are then composed on the GPU.\nThe normal rendering path has no CPU backdrop pixel readback.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 28,
+      "raw": "Textures and kernels persist. A content material reuses its source and blur when\nonly overlay text, buttons or colors change. Changes to the base background,\npanels, text, images, viewport or capture region invalidate the source; a sigma\nchange invalidates the blur. `previous_layers` recopies when a changed scene is\nrendered because the accumulated image can have changed. Identical scenes still\nskip rendering through the ordinary retained-canvas contract.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 37,
+      "raw": "The sum of backdrop and [box-shadow](Shadows.md) working textures is bounded to\n64 MiB. A sharp backdrop crop uses\n4 bytes/pixel; a blurred crop uses 4-byte source plus 8-byte destination pixels.\nRemoved materials release these textures. This budget excludes the ordinary\nattachment, swapchain, native driver and foreground caches.\n`GraphicsInfo::backdrop_supported` reports support. `backdrop_copies`,\n`backdrop_blurs` and `backdrop_texture_bytes` expose encoded pass counts and\nretained working storage, not a GPU timing or physical display measurement.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 43,
+      "raw": "This implementation currently supports the native Metal backend. Vulkan and\nDirect3D11 reject a requested backdrop material explicitly. `set_canvas` admits\na value snapshot; deferred flush or capture observes renderer failure. Automatic\nfallback never silently discards the material. These backend gaps remain part\nof the cross-platform work.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "## Stroke, text and layout contracts\n",
+      "level": 2,
+      "title": "Stroke, text and layout contracts"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 55,
+      "raw": "`Panel::stroke_width == 0` fills its rounded rectangle. Positive values draw\nonly the inner ring with analytic antialiasing and linear-light alpha blending.\nMetal, D3D11 and Vulkan shaders carry the same field in the existing 64-byte\npanel record. The current macOS tests execute both Metal and Vulkan strokes;\nthe D3D11 implementation has not been run on this host.\nFocused C++ buttons use the same resolved corner radius and a 1.5-unit inner\nstroke, matching the authored LVRS FocusRing geometry without square corner\npixels. Full input-modality visibility, inherited focus customization and\nfocus motion remain part of the LVRS migration.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 57,
+      "end_line": 63,
+      "raw": "`TextRun::line_height` and `LabelOptions::line_height` select a fixed logical line\nheight when positive; zero preserves native font metrics. Label alignment,\noptional color and 400/500/600/700 weight are explicit values. macOS measures\nnative layout fragments at the chosen width; Windows uses DirectWrite uniform\nline spacing; Linux uses Pango absolute line height and requires Pango 1.50+ for\nthis option. Windows/Linux execution remains unverified here. The limit is\n8192 logical units, and ordinary text-size and UTF-8 limits still apply.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 65,
+      "end_line": 74,
+      "raw": "`StackOptions::insets` optionally supplies distinct left/top/right/bottom edges;\notherwise `padding` keeps its original meaning. `ButtonStyle` supplies optional\nstate fills, text colors, border and line height. `PopoverOptions::fit_to_viewport`\nallows a centered dialog to shrink below its minimum width, while the default\nkeeps the earlier minimum-width behavior. `opaque_base`, optional `blur_radius`,\nborder and corner limit let an owner select a material without changing popup\ninput, focus or lifetime rules. `ImageOptions::preserve_aspect` centers an image inside its padded area without\nstretching; its default false preserves earlier image-view behavior.\nRuntime setters invalidate the affected widget\nlayout or drawing; they do not rebuild its owning view.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 76,
+      "end_line": 79,
+      "raw": "`tests/backdrop.cpp` verifies real blurred pixels, overlay exclusion, rounded\nmasking, linear tint, reuse, release and explicit unsupported-backend errors.\n`tests/alert_primitives.cpp` verifies fixed line metrics, asymmetric layout,\ntransparent outlined button states, event order and Metal/Vulkan stroke pixels.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native GPU backdrop materials and authored widget metrics",
+      "anchor": "native-gpu-backdrop-materials-and-authored-widget-metrics",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000007",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Metal implementation and reuse",
+      "anchor": "metal-implementation-and-reuse",
+      "start_line": 15
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Stroke, text and layout contracts",
+      "anchor": "stroke-text-and-layout-contracts",
+      "start_line": 45
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000015",
+        "line": 42,
+        "text": "fallback never silently discards the material. These backend gaps remain part",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 74,
+        "text": "layout or drawing; they do not rebuild its owning view.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000013",
+        "label": "box-shadow",
+        "target": "Shadows.md",
+        "kind": "relative",
+        "line": 30
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -47,12 +47,16 @@ ii::core::Result<void> ii::runtime::configure_application(Application& app) {
             check(take(state->host->snapshot()).visible,"Native window is not visible");
             for (const auto& item:take(mounted.snapshot())) {
                 check(item.attached && item.styled && item.size.width>0 && item.size.height>0,"LVRS native widget is not displayed");
-                std::cout<<"COCOA_WIDGET id="<<item.id<<" class="<<item.native_class
+                std::cout<<"NATIVE_WIDGET id="<<item.id<<" class="<<item.native_class
                     <<" width="<<item.size.width<<" height="<<item.size.height<<" font="<<item.font_family<<'\n';
             }
             auto greeting=take(state->greeting.snapshot());
             check(greeting.native_class=="iiGUI.Label" && greeting.renderer=="iiGUI" && greeting.font_family=="Pretendard","Self-rendered LVRS typography not attached to final app");
-            check(take(state->host->graphics_info()).api==gui::GraphicsApi::metal,"Self-rendered widgets did not use Metal");
+            const auto graphics=take(state->host->graphics_info());
+            check(graphics.api==gui::GraphicsApi::metal || graphics.api==gui::GraphicsApi::direct3d11 ||
+                  graphics.api==gui::GraphicsApi::vulkan,"Self-rendered widgets did not use a native accelerator");
+            std::cout<<"NATIVE_GRAPHICS host="<<HELLO_WORLD_NATIVE_HOST<<" api="<<unsigned(graphics.api)
+                     <<" hardware="<<graphics.hardware<<" adapter="<<graphics.adapter<<'\n';
             submitted(ui.every(250ms,[state] {
                 good(state->timer.set_text("Timer: "+std::to_string(++state->ticks)));
                 if (state->self_test && state->ticks>=2 && state->background) {
@@ -61,7 +65,7 @@ ii::core::Result<void> ii::runtime::configure_application(Application& app) {
                     auto greet=take(state->view->widgets().find("greet"));
                     good(greet.activate()); good(greet.activate());
                     check(HelloBackend::created==1 && HelloBackend::greetings==2 && HelloBackend::destroyed==0,"Backend recreated between actions");
-                    check(take(state->greeting.snapshot()).text=="Hello World · Cocoa!","Native action did not update text");
+                    check(take(state->greeting.snapshot()).text=="Hello World · LVUI!","Native action did not update text");
                     good(take(state->view->widgets().find("close")).activate());
                 }
             }));
@@ -89,14 +93,14 @@ ii::core::Result<void> ii::runtime::configure_application(Application& app) {
         check(HelloBackend::created==1 && HelloBackend::destroyed==1,"Core attachment did not retire one backend");
         if (state->self_test) {
             check(state->ticks>=2 && state->background && state->resized && state->closed && state->clicked,"Lifecycle milestone missing");
-            std::cout<<"HELLO_WORLD_AOT_OK native=Cocoa runtime=iiSDKCore widget=C++23 theme=LVRS timer=true background=42 resize=true actions=2 closed=true scopes=1/1 core_entry=true\n";
+            std::cout<<"HELLO_WORLD_AOT_OK native="<<HELLO_WORLD_NATIVE_HOST<<" runtime=iiSDKCore widget=C++23 theme=LVRS timer=true background=42 resize=true actions=2 closed=true scopes=1/1 core_entry=true\n";
         }
         return {};
     }});
     if (!verification) return verification;
     return app.attach(gui::view_attachment("main-view",state->host,state->view,
         std::function<void(View::Scope&)>{[state,&app](View::Scope& scope) {
-            scope.backend_0.on_greet=[state] { good(state->greeting.set_text("Hello World · Cocoa!")); };
+            scope.backend_0.on_greet=[state] { good(state->greeting.set_text("Hello World · LVUI!")); };
             scope.backend_0.on_close=[state,&app] { state->clicked=true; good(app.quit()); };
         }}));
 }

@@ -2,6 +2,10 @@
 #include <cmath>
 
 namespace ii::gui {
+std::span<const TextStyleToken> lvrs_text_tokens()noexcept{
+    static constexpr std::array tokens{TextStyleToken{26,700,"Bold"},TextStyleToken{22,700,"Bold"},TextStyleToken{17,600,"SemiBold"},TextStyleToken{15,600,"SemiBold"},TextStyleToken{13,500,"Medium"},TextStyleToken{12,600,"SemiBold"},TextStyleToken{11,400,"Regular"}};
+    return tokens;
+}
 WidgetAppearance lvrs_appearance() {
     WidgetAppearance value;
     value.styled=true;

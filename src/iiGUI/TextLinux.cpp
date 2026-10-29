@@ -1,4 +1,5 @@
 #include "NativeText.h"
+#include "FontDatabase.h"
 #include <pango/pangocairo.h>
 #include <memory>
 
@@ -10,7 +11,8 @@ using Layout=std::unique_ptr<PangoLayout,decltype(&g_object_unref)>;
 Layout layout(cairo_t* drawing,const TextRun& run) {
     Layout result(pango_cairo_create_layout(drawing),g_object_unref);
     auto font=pango_font_description_new();
-    pango_font_description_set_family(font,run.font_family.empty()?"sans":run.font_family.c_str());
+    const auto family=run.font_family.empty()?FontDatabase::application()->resolve_family(""):run.font_family;
+    pango_font_description_set_family(font,family.c_str());
     pango_font_description_set_absolute_size(font,run.font_size*PANGO_SCALE);
     pango_font_description_set_weight(font,static_cast<PangoWeight>(run.font_weight));
     pango_layout_set_font_description(result.get(),font); pango_font_description_free(font);

@@ -1,0 +1,185 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7b61abfd3f4ea360bb04fec7c8d29eb67be086e7e38e37a078ccee701be9761c",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/CallableFields.md",
+    "sha256": "b76eb1932742cf47e704f32bbdd032b75451d31552dd129aa916a743771727ab",
+    "bytes": 2213,
+    "line_count": 27,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "LVUI callable 필드의 네이티브 위젯 연결",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# LVUI callable 필드의 네이티브 위젯 연결\n",
+      "level": 1,
+      "title": "LVUI callable 필드의 네이티브 위젯 연결"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 4,
+      "raw": "`get()`·`revision()`을 제공하지만 자체 관측 통지가 없는 필드도 검사한다. 모델의 명령이\n함수를 교체한 뒤 생성 스코프의 변경 발행을 통해 동일한 버튼이 새 함수를 사용해야 한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 6,
+      "end_line": 7,
+      "raw": "`tests/native_callable_fields.cpp`는 LVUI가 생성한 C++ 팩토리를 창 없는 `WidgetState`에\n연결한다. 실제 OS 창이나 GPU 표면을 만들지 않으며 LVRS 앱 실행을 대신하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 13,
+      "raw": "검사 대상은 관측 가능한 함수 필드와 공유 핸들, typed 함수 입력·기본값·문자열 이벤트,\nStatic·가변 함수의 초기 선택, 비복사 함수 객체의 차용, 임시 부모와 선택된 중첩 객체이다.\n필드 게시 후 동일한 위젯 ID·입력 내용·포커스가 유지되고 파일 리비전이 바뀌지 않아야 한다.\nnull·빈 함수의 재게시 실패는 이전 연결·표시를 유지하고 이후 정상 게시로 복구한다.\n실행 중 교체·재진입·자기 화면 제거는 원래 함수와 수신자를 반환까지 보존해야 한다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 17,
+      "raw": "설치·경로 이동 소비자는 실제 설치한 LVUI 생성기로 함수 필드의 typed 표시와 버튼\n팩토리를 생성하고 컴파일·링크한다. 생성 위젯의 실행 검사는 위의 창 없는 대상에서\n별도로 수행한다. 일반 C++ 차용 필드의 외부 교체·파괴는 소유 API의 책임이다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 21,
+      "raw": "언어·소유권 계약은 [LVUI callable 필드](../../LVUI/docs/CallableFields.md), 전체 완료\n경계는 [완료 감사](../../LVUI/docs/Completion.md)를 따른다. 실제 측정 결과와 제한은\n각 검사 이후의 LVUI 검증 기록으로 연결한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 27,
+      "raw": "2026-10-26 macOS arm64에서 기존 창 없는 동작과 생성 C++ 검사 197개를 일반·ASan·UBSan\n빌드에서 각각 통과했다. 새 필드 동작은 각 11개이며, 전체 수와 합산하지 않는다.\n설치·경로 이동 소비자의 함수 필드 팩토리도 컴파일·링크했다. 실행 파일의 Qt 동적 의존성과\nLVUI 파서·컴파일러 실행 심볼은 없다. 원시 증거는 LVUI의\n`build/lvui-completion/callable-fields-verification-20261026.json`에 기록한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "LVUI callable 필드의 네이티브 위젯 연결",
+      "anchor": "lvui-callable-필드의-네이티브-위젯-연결",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "함수를 교체한 뒤 생성 스코프의 변경 발행을 통해 동일한 버튼이 새 함수를 사용해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 7,
+        "text": "연결한다. 실제 OS 창이나 GPU 표면을 만들지 않으며 LVRS 앱 실행을 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 13,
+        "text": "실행 중 교체·재진입·자기 화면 제거는 원래 함수와 수신자를 반환까지 보존해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 24,
+        "text": "빌드에서 각각 통과했다. 새 필드 동작은 각 11개이며, 전체 수와 합산하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000011",
+        "label": "LVUI callable 필드",
+        "target": "../../LVUI/docs/CallableFields.md",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000011",
+        "label": "완료 감사",
+        "target": "../../LVUI/docs/Completion.md",
+        "kind": "relative",
+        "line": 20
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

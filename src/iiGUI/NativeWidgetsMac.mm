@@ -4,21 +4,15 @@
 #include "NativeCanvas.h"
 #include "DesktopCommon.h"
 #include "Desktop.h"
+#include "FontDatabase.h"
 #include <mutex>
 
 namespace {
 using namespace ii::gui;
 NSString* native(std::string_view v) { return [[NSString alloc] initWithBytes:v.data() length:v.size() encoding:NSUTF8StringEncoding]; }
 void register_fonts() {
-    static std::once_flag once;
-    std::call_once(once,[] {
-        for(NSString* face in @[@"Regular",@"Medium",@"SemiBold",@"Bold"]) {
-            auto url=[NSBundle.mainBundle URLForResource:[@"Pretendard-" stringByAppendingString:face] withExtension:@"ttf"];
-            if(url) CTFontManagerRegisterFontsForURL((__bridge CFURLRef)url,kCTFontManagerScopeProcess,nullptr);
-        }
-        auto inter=[NSBundle.mainBundle URLForResource:@"Inter-Regular" withExtension:@"ttf"];
-        if(inter) CTFontManagerRegisterFontsForURL((__bridge CFURLRef)inter,kCTFontManagerScopeProcess,nullptr);
-    });
+    const auto loaded=FontDatabase::application()->load_bundled_fonts();
+    if(!loaded)throw std::runtime_error(loaded.error().message);
 }
 WidgetKey key(unsigned short code) {
     switch(code) {
@@ -62,6 +56,14 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
 - (NSString*)accessibilityIdentifier { return native(identity); }
 - (NSString*)accessibilityRole {
     auto n=read?read():WidgetSnapshot{};
+    if(n.accessibility_semantics){
+        if(n.accessibility_semantics->role==AccessibilityRole::progress)return NSAccessibilityProgressIndicatorRole;
+        if(n.accessibility_semantics->role==AccessibilityRole::image)return NSAccessibilityImageRole;
+        if(n.accessibility_semantics->role==AccessibilityRole::slider)return NSAccessibilitySliderRole;
+        if(n.accessibility_semantics->role==AccessibilityRole::stepper)return NSAccessibilityIncrementorRole;
+        if(n.accessibility_semantics->role==AccessibilityRole::tab_group)return NSAccessibilityTabGroupRole;
+        if(n.accessibility_semantics->role==AccessibilityRole::menu)return NSAccessibilityMenuRole;
+    }
     if(n.text_input)return n.multiline?NSAccessibilityTextAreaRole:NSAccessibilityTextFieldRole;
     switch(n.kind) {
         case WidgetKind::menu:return NSAccessibilityMenuRole;
@@ -69,7 +71,12 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
         case WidgetKind::scroll_view:return NSAccessibilityScrollAreaRole;
         case WidgetKind::menu_item:return NSAccessibilityMenuItemRole;
         case WidgetKind::button:case WidgetKind::combo_box:return NSAccessibilityButtonRole;
-        case WidgetKind::action_surface:return n.action_role==ActionRole::link?NSAccessibilityLinkRole:NSAccessibilityButtonRole;
+        case WidgetKind::action_surface:
+            if(n.action_role==ActionRole::link)return NSAccessibilityLinkRole;
+            if(n.action_role==ActionRole::menu_item)return NSAccessibilityMenuItemRole;
+            if(n.action_role==ActionRole::radio_button||n.action_role==ActionRole::tab)return NSAccessibilityRadioButtonRole;
+            if(n.action_role==ActionRole::check_box||n.action_role==ActionRole::toggle_switch)return NSAccessibilityCheckBoxRole;
+            return NSAccessibilityButtonRole;
         case WidgetKind::stepper:return NSAccessibilityIncrementorRole;
         case WidgetKind::check_box:case WidgetKind::toggle_switch:return NSAccessibilityCheckBoxRole;
         case WidgetKind::radio_button:return NSAccessibilityRadioButtonRole;
@@ -82,6 +89,13 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
         default:return NSAccessibilityStaticTextRole;
     }
 }
+- (NSString*)accessibilitySubrole {auto n=read?read():WidgetSnapshot{};
+    return n.kind==WidgetKind::action_surface&&n.action_role==ActionRole::tab?NSAccessibilityTabButtonSubrole:nil;}
+- (NSArray*)accessibilityTabs {auto n=read?read():WidgetSnapshot{};
+    return n.accessibility_semantics&&n.accessibility_semantics->role==AccessibilityRole::tab_group?[entries copy]:nil;}
+- (NSArray*)accessibilitySelectedChildren {auto n=read?read():WidgetSnapshot{};
+    if(!n.accessibility_semantics||n.accessibility_semantics->role!=AccessibilityRole::tab_group)return nil;
+    auto result=[NSMutableArray new];for(IIGUIWidgetElement* child in entries)if(child.isAccessibilitySelected)[result addObject:child];return result;}
 - (NSString*)accessibilityLabel {
     auto n=read?read():WidgetSnapshot{};
     if(!n.accessibility_name.empty()) return native(n.accessibility_name);
@@ -93,16 +107,31 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
 - (id)accessibilityValue {
     if(read && read().password)return @"";
     auto n=read?read():WidgetSnapshot{};
+    if(n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::progress||n.accessibility_semantics->role==AccessibilityRole::slider))
+        return n.accessibility_semantics->range?@(n.value):nil;
     if(n.kind==WidgetKind::tab) return @(n.selected);
-    if(n.kind==WidgetKind::check_box || n.kind==WidgetKind::radio_button || n.kind==WidgetKind::toggle_switch) return @(n.checked);
+    if(n.kind==WidgetKind::check_box || n.kind==WidgetKind::radio_button || n.kind==WidgetKind::toggle_switch ||
+       (n.kind==WidgetKind::action_surface && (n.action_role==ActionRole::check_box || n.action_role==ActionRole::radio_button || n.action_role==ActionRole::toggle_switch || n.action_role==ActionRole::tab || n.action_role==ActionRole::menu_item))) return @(n.checked);
     if(n.kind==WidgetKind::slider || n.kind==WidgetKind::progress) return @(n.value);
     if(n.color_state)return native("#"+n.color_state->hex);
     if(n.text_input&&n.kind!=WidgetKind::input_field){if(n.text_length>65536||!text_content)return nil;auto content=text_content(identity,{0,n.text_length});return content?native(content->text):nil;}
     return native(n.text);
 }
+- (id)accessibilityMinValue {
+    auto n=read?read():WidgetSnapshot{};
+    if(n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::progress||n.accessibility_semantics->role==AccessibilityRole::slider))
+        return n.accessibility_semantics->range?@(n.minimum):nil;
+    return (n.kind==WidgetKind::slider||n.kind==WidgetKind::progress)?@(n.minimum):nil;
+}
+- (id)accessibilityMaxValue {
+    auto n=read?read():WidgetSnapshot{};
+    if(n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::progress||n.accessibility_semantics->role==AccessibilityRole::slider))
+        return n.accessibility_semantics->range?@(n.maximum):nil;
+    return (n.kind==WidgetKind::slider||n.kind==WidgetKind::progress)?@(n.maximum):nil;
+}
 - (NSInteger)accessibilityNumberOfCharacters { auto n=read?read():WidgetSnapshot{};return NSInteger(std::min(n.text_length,std::size_t(NSIntegerMax))); }
 - (NSRange)accessibilitySelectedTextRange { auto n=read?read():WidgetSnapshot{};return n.text_input?NSMakeRange(n.text_selection.location,n.text_selection.length):NSMakeRange(NSNotFound,0); }
-- (NSString*)accessibilityStringForRange:(NSRange)range { if(!text_content||range.location==NSNotFound||range.length>65536)return nil;auto content=text_content(identity,{range.location,range.length});return content&&content->range.length==range.length?native(content->text):nil; }
+- (NSString*)accessibilityStringForRange:(NSRange)range { if((read&&read().password)||!text_content||range.location==NSNotFound||range.length>65536)return nil;auto content=text_content(identity,{range.location,range.length});return content&&content->range.length==range.length?native(content->text):nil; }
 - (BOOL)isAccessibilityEnabled { auto n=read?read():WidgetSnapshot{};return n.attached && n.enabled && n.visible && !n.input_blocked; }
 - (BOOL)isAccessibilityFocused { return read && read().focused; }
 - (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {
@@ -111,8 +140,9 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     if(selector==@selector(accessibilityPerformShowMenu)) return n.enabled && n.has_context_menu;
     if(selector==@selector(accessibilityPerformCancel)) return (n.kind==WidgetKind::menu||n.kind==WidgetKind::popover)&&n.opened;
     if(selector==@selector(setAccessibilityValue:)) return n.text_input && n.enabled && !n.read_only;
-    if(selector==@selector(accessibilityPerformIncrement)) return n.enabled && ((n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::down) || (n.color_state && n.color_field>=ColorField::hue_rail));
-    if(selector==@selector(accessibilityPerformDecrement)) return n.enabled && ((n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::up) || (n.color_state && n.color_field>=ColorField::hue_rail));
+    const bool adjustable=n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::slider||n.accessibility_semantics->role==AccessibilityRole::stepper);
+    if(selector==@selector(accessibilityPerformIncrement)) return n.enabled && ((adjustable&&n.accessibility_semantics->can_increment) || (n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::down) || (n.color_state && n.color_field>=ColorField::hue_rail));
+    if(selector==@selector(accessibilityPerformDecrement)) return n.enabled && ((adjustable&&n.accessibility_semantics->can_decrement) || (n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::up) || (n.color_state && n.color_field>=ColorField::hue_rail));
     if(selector==@selector(accessibilityPerformPress) || selector==@selector(setAccessibilityFocused:))
         return n.enabled && (n.text_input || n.kind==WidgetKind::button || n.kind==WidgetKind::action_surface || n.kind==WidgetKind::check_box || n.kind==WidgetKind::radio_button || n.kind==WidgetKind::toggle_switch || n.kind==WidgetKind::slider || n.kind==WidgetKind::tab || n.kind==WidgetKind::stepper || n.kind==WidgetKind::combo_box || n.kind==WidgetKind::menu_item || n.kind==WidgetKind::color_surface);
     return [super isAccessibilitySelectorAllowed:selector];
@@ -132,7 +162,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     auto action=send; auto id=identity;
     auto n=read?read():WidgetSnapshot{};
     if(!action || !n.enabled || !n.attached || !n.visible || n.input_blocked) return NO;
-    if(n.text_input || n.kind==WidgetKind::slider || n.kind==WidgetKind::color_surface) {
+    if(n.text_input || n.kind==WidgetKind::slider || (n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::slider||n.accessibility_semantics->role==AccessibilityRole::stepper)) || n.kind==WidgetKind::color_surface) {
         action({.kind=WidgetInputKind::focus,.target=std::move(id)});
         if(surface) NSAccessibilityPostNotification(surface,NSAccessibilityFocusedUIElementChangedNotification);
         return YES;
@@ -151,12 +181,12 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
 }
 - (BOOL)accessibilityPerformIncrement {
     auto n=read?read():WidgetSnapshot{};auto action=send;
-    if(!action || !n.attached || !n.visible || n.input_blocked || !n.enabled || !((n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::down) || (n.color_state && n.color_field>=ColorField::hue_rail))) return NO;
+    if(!action || !n.attached || !n.visible || n.input_blocked || !n.enabled || !((n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::slider||n.accessibility_semantics->role==AccessibilityRole::stepper)&&n.accessibility_semantics->can_increment) || (n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::down) || (n.color_state && n.color_field>=ColorField::hue_rail))) return NO;
     action({.kind=WidgetInputKind::increment,.target=identity});return YES;
 }
 - (BOOL)accessibilityPerformDecrement {
     auto n=read?read():WidgetSnapshot{};auto action=send;
-    if(!action || !n.attached || !n.visible || n.input_blocked || !n.enabled || !((n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::up) || (n.color_state && n.color_field>=ColorField::hue_rail))) return NO;
+    if(!action || !n.attached || !n.visible || n.input_blocked || !n.enabled || !((n.accessibility_semantics&&(n.accessibility_semantics->role==AccessibilityRole::slider||n.accessibility_semantics->role==AccessibilityRole::stepper)&&n.accessibility_semantics->can_decrement) || (n.kind==WidgetKind::stepper && n.arrow!=StepperArrow::up) || (n.color_state && n.color_field>=ColorField::hue_rail))) return NO;
     action({.kind=WidgetInputKind::decrement,.target=identity});return YES;
 }
 - (void)setAccessibilityValue:(id)value {
@@ -325,7 +355,7 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     for(IIGUIWidgetElement* peer in peers.allValues) {[peer->entries removeAllObjects];peer.accessibilityParent=nil;}
     for(auto& item:current) {
         if(!item.visible || item.input_blocked) continue;
-        if(!item.text_input&&(item.kind==WidgetKind::vertical_stack || item.kind==WidgetKind::horizontal_stack || item.kind==WidgetKind::overlay_stack || item.kind==WidgetKind::absolute_stack || item.kind==WidgetKind::spacer || item.kind==WidgetKind::tab_bar || item.kind==WidgetKind::segmented_control || item.kind==WidgetKind::menu_divider)) continue;
+        if(!item.text_input&&!item.accessibility_semantics&&(item.kind==WidgetKind::vertical_stack || item.kind==WidgetKind::horizontal_stack || item.kind==WidgetKind::overlay_stack || item.kind==WidgetKind::absolute_stack || item.kind==WidgetKind::spacer || item.kind==WidgetKind::tab_bar || item.kind==WidgetKind::segmented_control || item.kind==WidgetKind::menu_divider)) continue;
         auto id=native(item.id); auto peer=peers[id];
         if(!peer) {
             peer=[IIGUIWidgetElement new];peer->entries=[NSMutableArray new]; peer->identity=item.id; peer->surface=self;
@@ -340,7 +370,12 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     }
     for(auto& item:current) {
         auto peer=peers[native(item.id)];if(!peer || !item.visible || item.input_blocked || !peer.accessibilityParent) continue;
-        if(!item.popup_id.empty() && item.popup_id!=item.id) {
+        auto group=peers[native(item.parent_id)];auto group_state=group&&group->read?group->read():WidgetSnapshot{};
+        if(group&&group_state.accessibility_semantics&&item.kind==WidgetKind::action_surface&&
+           ((group_state.accessibility_semantics->role==AccessibilityRole::tab_group&&item.action_role==ActionRole::tab)||
+            (group_state.accessibility_semantics->role==AccessibilityRole::menu&&item.action_role==ActionRole::menu_item))){
+            [group->entries addObject:peer];peer.accessibilityParent=group;}
+        else if(!item.popup_id.empty() && item.popup_id!=item.id) {
             auto parent=peers[native(item.popup_id)];if(parent) {[parent->entries addObject:peer];peer.accessibilityParent=parent;}
         } else [result addObject:peer];
     }
@@ -392,7 +427,7 @@ WidgetSurface::WidgetSurface(void* value,WidgetSurfaceCallbacks callbacks):impl_
     view->snapshots=impl_->callbacks.accessibility; view->lookup=impl_->callbacks.lookup; view->failure=impl_->callbacks.failure;
     view->text_content=impl_->callbacks.text_content;view->text_position=impl_->callbacks.text_position;
     [parent addSubview:view];
-    impl_->canvas=std::make_unique<NativeCanvas>((__bridge void*)view,nullptr,Acceleration::prefer_hardware,impl_->callbacks.renderer);
+    impl_->canvas=std::make_unique<NativeCanvas>((__bridge void*)view,nullptr,Acceleration::prefer_hardware,impl_->callbacks.renderer,impl_->callbacks.presentations);
     auto state=impl_.get(); view->paint=[state] { state->dirty=true;if(!state->paced) state->draw(); };
     [view.window makeFirstResponder:view]; invalidate();
 }
@@ -410,11 +445,7 @@ void WidgetSurface::flush() { if(!impl_->paced || impl_->dirty || size()!=impl_-
 Size WidgetSurface::size() const { auto s=impl_->view.bounds.size; return {s.width,s.height}; }
 double WidgetSurface::backing_scale() const {return impl_->view.window.backingScaleFactor;}
 std::string WidgetSurface::resolve_font_family(std::string_view requested) const {
-    auto family=native(requested);
-    NSFont* font=[NSFont fontWithName:[family stringByAppendingString:@"-Regular"] size:13];
-    if(!font) font=[NSFont fontWithName:family size:13];
-    if(!font) font=[NSFont systemFontOfSize:13];
-    return std::string(font.familyName.UTF8String);
+    return FontDatabase::application()->resolve_family(requested);
 }
 GraphicsInfo WidgetSurface::info() { return impl_->canvas->info(); }
 PixelBuffer WidgetSurface::capture() { return impl_->canvas->capture(); }

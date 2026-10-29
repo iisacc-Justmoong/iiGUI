@@ -1,5 +1,6 @@
 #pragma once
 #include <iiGUI/Graphics.h>
+#include "Presentation.h"
 #include <memory>
 #include <cmath>
 #include <stdexcept>
@@ -35,7 +36,7 @@ private:
 };
 class NativeCanvas final {
 public:
-    NativeCanvas(void* parent,void* display,Acceleration policy,Renderer renderer);
+    NativeCanvas(void* parent,void* display,Acceleration policy,Renderer renderer,std::shared_ptr<PresentationStream> = {});
     ~NativeCanvas();
     NativeCanvas(const NativeCanvas&)=delete;
     NativeCanvas& operator=(const NativeCanvas&)=delete;
@@ -45,7 +46,8 @@ public:
     bool native_event(const void*);
 private:
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::shared_ptr<Impl> impl_;
+    std::shared_ptr<PresentationStream> presentations_;
 };
 struct alignas(16) GpuPanel final {
     float bounds[4], top[4], bottom[4], radius, padding[3];

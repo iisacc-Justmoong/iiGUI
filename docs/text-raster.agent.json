@@ -1,0 +1,93 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:3e8a1b3f3643157452e8caf58ba60c4d1e45056a8e2cd01930d1cb32b088430f",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/text-raster.md",
+    "sha256": "bfdeea2fb7fa85cfd74c2f0d2d65a1a29b2aca53cebb791464ab2839ae9a98b8",
+    "bytes": 795,
+    "line_count": 10,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 텍스트의 픽셀 생성",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 텍스트의 픽셀 생성\n",
+      "level": 1,
+      "title": "네이티브 텍스트의 픽셀 생성"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`render_text(TextRun, scale)`은 창이나 웹뷰를 만들지 않고 네이티브 글꼴 엔진으로\n한글, 대체 글꼴, 줄바꿈과 정렬을 처리한다. 결과는 위쪽이 원점인 straight-alpha\nRGBA8 sRGB 픽셀이다. 화면 캡처의 premultiplied-alpha 버퍼와 구분한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "앱의 네이티브 글꼴 환경이 살아 있는 UI 소유 스레드에서 호출한다. 텍스트는 64 KiB,\n생성 표면은 각 축 8192 픽셀로 제한하며, 비정상 좌표·색·크기·UTF-8은 오류이다.\nCongregation은 이 결과를 문서의 래스터 자산으로 반영하며 포인터 기록이나 플랫폼\n글꼴 객체를 문서에 저장하지 않는다. 테스트는 한글·이모지, 투명도, 배율과 오류를 검사한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 텍스트의 픽셀 생성",
+      "anchor": "네이티브-텍스트의-픽셀-생성",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "글꼴 객체를 문서에 저장하지 않는다. 테스트는 한글·이모지, 투명도, 배율과 오류를 검사한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

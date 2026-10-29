@@ -1,0 +1,107 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:0dc5f2fef835a0c3ad3270801abfbbe0f0c4e400570ba1267352af437d89966b",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/RetainedPopupEffects.md",
+    "sha256": "e4f00693fa3fecaf783e80b0524f9f121be613479137541f27a5acffb1c1194b",
+    "bytes": 1013,
+    "line_count": 13,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "팝업 모션과 효과 캐시의 수명",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 팝업 모션과 효과 캐시의 수명\n",
+      "level": 1,
+      "title": "팝업 모션과 효과 캐시의 수명"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "전환이 있는 팝업은 배경 dim, 고유 크기의 그림자·glass, 변환되는 카드 표면과\n콘텐츠를 각각의 레이어로 구성한다. 효과에는 opacity만 전달하고 카드의 배율을\n그림자 마스크 크기나 Gaussian blur 입력 크기에 반영하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 9,
+      "raw": "전환 시작의 dim alpha가 0이어도 해당 레이어의 투명 패널을 유지한다. 첫 표시\n프레임에서 dim 레이어가 새로 삽입되며 뒤쪽 레이어의 캐시 슬롯이 바뀌는 일을 막는다.\n투명 패널의 GPU 합성 결과는 0이며, 닫혀 더 이상 표시되지 않는 팝업은 제거한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 13,
+      "raw": "LVRS 모션 검사는 기존 그림자 blur·배경 blur·전경 래스터화 횟수의 동일 조건을\n그대로 확인한다. 추가로 같은 모션에서 마스크 생성과 배경 원본 캡처도 재실행하지\n않는지 확인한다. 이동·크기·실제 배경 변경의 별도 무효화와 GPU 메모리 한도는 유지한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "팝업 모션과 효과 캐시의 수명",
+      "anchor": "팝업-모션과-효과-캐시의-수명",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "그림자 마스크 크기나 Gaussian blur 입력 크기에 반영하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

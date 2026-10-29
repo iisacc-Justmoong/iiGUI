@@ -20,11 +20,15 @@ core::Result<void> Widget::set_text(std::string_view text) const {
 core::Result<WidgetPlacement> Widget::placement()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->placement(index_);}
 core::Result<WidgetInteraction> Widget::interaction()const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->interaction(index_);}
 core::Result<Size> Widget::measure(double w)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->measure(index_,w);}
+core::Result<void> Widget::set_measure_handler(std::function<void(const WidgetMeasurement&)> handler)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->measurement_handler(index_,std::move(handler));}
 core::Result<void> Widget::observe_interaction(std::shared_ptr<const WidgetInteractionPort> p)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->observe_interaction(index_,std::move(p));}
 core::Result<void> Widget::set_label_options(LabelOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->label_options(index_,std::move(v));}
+core::Result<void> Widget::set_label_color(std::optional<WidgetColor> v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->label_color(index_,v);}
 core::Result<void> Widget::set_input_options(InputOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->input_options(index_,std::move(v));}
 core::Result<void> Widget::set_clip_content(bool v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->clip_content(index_,v);}
+core::Result<void> Widget::set_opacity(double v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->opacity(index_,v);}
 core::Result<void> Widget::set_accessibility_name(std::string_view v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->accessibility_name(index_,v);}
+core::Result<void> Widget::set_accessibility_semantics(std::optional<AccessibilitySemantics> v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->accessibility_semantics(index_,std::move(v));}
 core::Result<void> Widget::set_enabled(bool enabled) const {
     auto state = lock(); if (!state) return std::unexpected(state.error());
     return (*state)->enabled(index_, enabled);
@@ -77,10 +81,14 @@ core::Result<void> Widget::set_scroll_options(ScrollOptions v) const {auto s=loc
 core::Result<void> Widget::set_scroll_offset(double v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->scroll_offset(index_,v);}
 core::Result<void> Widget::set_horizontal_scroll_offset(double v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->horizontal_scroll_offset(index_,v);}
 core::Result<void> Widget::set_scroll_position(double x,double y) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->scroll_position(index_,x,y);}
+core::Result<void> Widget::set_virtual_scroll_content(Size content,double x,double y) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->virtual_scroll_content(index_,content,x,y);}
 core::Result<void> Widget::set_scroll_handler(std::function<void(const ScrollViewport&)> v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->scroll_handler(index_,std::move(v));}
 core::Result<void> Widget::set_content(WidgetFactory factory,std::function<core::Result<void>()> commit) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->content(index_,std::move(factory),std::move(commit));}
 core::Result<void> Widget::clear_content() const {return set_content({});}
 core::Result<Widget> Widget::content_item(std::string_view id) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->content_item(index_,id);}
+core::Result<void> Widget::set_keyed_content(std::vector<KeyedContentItem> items,KeyedContentOptions options) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->keyed_content(index_,std::move(items),std::move(options));}
+core::Result<Widget> Widget::keyed_content_item(std::string_view key,std::string_view id) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->keyed_content_item(index_,key,id);}
+core::Result<std::vector<std::string>> Widget::keyed_content_keys() const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->keyed_content_keys(index_);}
 core::Result<void> Widget::set_layout_handler(std::function<void(Rect)> v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->layout_handler(index_,std::move(v));}
 core::Result<void> Widget::set_paint_handler(WidgetPaintHandler callback)const{return set_paint_handler(std::move(callback),Widget{});}
 core::Result<void> Widget::set_paint_handler(WidgetPaintHandler callback,Widget owner)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->paint_handler(index_,std::move(callback),owner);}
@@ -91,9 +99,12 @@ core::Result<void> Widget::request_frames()const{auto s=lock();if(!s)return std:
 core::Result<void> Widget::set_drawing(WidgetDrawing v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->drawing(index_,std::move(v));}
 core::Result<void> Widget::set_input_handler(WidgetInputHandler v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->input_handler(index_,std::move(v));}
 core::Result<void> Widget::set_text_input_provider(std::shared_ptr<const TextInputProvider> v)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_input_provider(index_,std::move(v));}
+core::Result<void> Widget::notify_text_input_changed(bool value_changed)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_input_changed(index_,value_changed);}
 core::Result<TextContent> Widget::text_content(TextRange r)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_content(index_,r);}
 core::Result<std::size_t> Widget::text_position(double x,double y)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_position(index_,x,y);}
 core::Result<void> Widget::set_stack_options(StackOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->stack_options(index_,std::move(v));}
+core::Result<void> Widget::set_stack_layout(StackLayoutOptions v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->stack_layout(index_,std::move(v));}
+core::Result<StackLayoutOptions> Widget::stack_layout() const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->stack_layout(index_);}
 core::Result<void> Widget::set_button_style(ButtonStyle v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->button_style(index_,std::move(v));}
 core::Result<void> Widget::set_button_icon(std::shared_ptr<const RasterImage> v,std::string_view name) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->button_icon(index_,std::move(v),name);}
 core::Result<void> Widget::set_action_options(ActionOptions v)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->action_options(index_,std::move(v));}
@@ -111,6 +122,18 @@ core::Result<WidgetSnapshot> Widget::snapshot() const {
 WidgetMount::WidgetMount(std::weak_ptr<detail::WidgetState> state)
     : state_(std::move(state)), owner_(std::this_thread::get_id()) {}
 core::Result<WidgetAppearance> WidgetBuilder::appearance() const {return state_->appearance();}
+core::Result<WindowPropertiesTarget> WidgetBuilder::window_properties() const {
+    auto value=state_->window_properties();if(!value)return std::unexpected(value.error());
+    return WindowPropertiesTarget(state_);
+}
+core::Result<void> WindowPropertiesTarget::update(WindowProperties value) const {
+    auto state=state_.lock();if(!state)return core::fail(core::ErrorCode::closed,"Window properties owner retired");
+    return state->window_properties(std::move(value));
+}
+core::Result<WindowProperties> WindowPropertiesTarget::snapshot() const {
+    auto state=state_.lock();if(!state)return core::fail(core::ErrorCode::closed,"Window properties owner retired");
+    return state->window_properties();
+}
 core::Result<std::shared_ptr<MotionPreferences>> WidgetBuilder::motion_preferences()const{return state_->motion_preferences();}
 core::Result<std::reference_wrapper<runtime::EventLoop>> WidgetBuilder::event_loop()const{return state_->event_loop();}
 core::Result<std::shared_ptr<detail::WidgetState>> WidgetMount::lock() const {
@@ -188,6 +211,8 @@ core::Result<void> Widget::set_button_options(ButtonOptions options)const{auto s
 core::Result<void> WidgetBuilder::retain(std::shared_ptr<void> owner) {
     return state_->retain(std::move(owner));
 }
+core::Result<void> WidgetBuilder::on_publish(runtime::Task task) { return state_->on_publish(std::move(task)); }
+core::Result<void> WidgetBuilder::on_retire(runtime::Task task) { return state_->on_retire(std::move(task)); }
 core::Result<Widget> WidgetBuilder::color_surface(Widget p,std::string_view id,ColorSurfaceOptions o,std::function<void(WidgetColor)> f) {return state_->color_surface(p,id,std::move(o),std::move(f));}
 core::Result<Widget> WidgetBuilder::color_button(Widget p,std::string_view id,ColorButtonOptions o,ControlEvents e) {return state_->color_button(p,id,std::move(o),std::move(e));}
 } // namespace ii::gui

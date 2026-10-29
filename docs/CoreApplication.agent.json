@@ -1,0 +1,256 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:029b7b756ced0a514fee582554b297e351068c680c116d7ea66a1236e4825317",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/CoreApplication.md",
+    "sha256": "415116bbe2bd6b19a8f52109254ec90d6d7f9578ad990578a8b1110b00b17bf0",
+    "bytes": 3823,
+    "line_count": 66,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Core-owned native widget applications",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Core-owned native widget applications\n",
+      "level": 1,
+      "title": "Core-owned native widget applications"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 3,
+      "raw": "\n\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "quote",
+      "start_line": 4,
+      "end_line": 6,
+      "raw": "> Implementation update: the earlier AppKit-control path described below is\n> superseded by [iiGUI's self-rendered C++ widgets](SelfRenderedWidgets.md).\n> Core ownership and attachment lifetimes remain; OS controls/layout do not.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 13,
+      "raw": "The native SDK GUI path now uses Core's `Application`, entrypoint and attachment\nlifetime. iiGUI supplies an OS driver and native widgets, borrowing the exact\nCore-owned EventLoop through HostOptions. Core includes no GUI/DSL dependency.\n`attach_application` binds a shared Host to the Core driver; `view_attachment`\nadapts a C++ widget object's attach/detach methods. Ordinary C++ widgets and\nLVUI-generated C++ widget classes use the same contract.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 24,
+      "raw": "`iisdkcore_add_application` supplies Core's installed `ApplicationEntry.cpp`,\nlinks native C++ sources/SDK targets and attaches bundle resources. Application\ncode defines `ii::runtime::configure_application(Application&)` and configures\nattachments instead of constructing another worker runtime or writing main().\nCore owns arguments, event loop, shared workers, owned work scope, cooperative\nstop and exit status. It activates attachments in order. After the native driver\nreturns, it stops/cancels/joins owned work before reverse deactivation. A closing\nwindow revokes native handles; generated C++ widget instances retain imported\nbackends until Core detaches them. Unowned external jobs require their own lifetime\ncoordination. Native Host construction/run/destruction still require the UI thread.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "heading",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "## LVRS appearance with native semantics\n",
+      "level": 2,
+      "title": "LVRS appearance with native semantics"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 33,
+      "raw": "`Appearance.h` defines encoded sRGB visual values independent of Qt. The checked-in\n`lvrs_appearance()` snapshot applies the current 2% accent window fill, text roles,\nbutton state colors, 22-point button height, 8-point padding/radius, and stack\nalignment/spacing. Native buttons remain NSButton instances with AppKit input,\nfocus, accessibility and target/action; only visual drawing uses the LVRS values.\nLabels remain NSTextField and layout remains NSStackView/Auto Layout.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 41,
+      "raw": "The four unmodified Pretendard font faces and their upstream SIL OFL notice are\nin `resources/native/`. `iiGUI_NATIVE_RESOURCES` exposes installed resource files\nto Core's final executable helper. The macOS native backend registers the bundle's\nfonts with CoreText; a missing face falls back to native system fonts. The actual\nHello World self-test requires the bundled Pretendard family and verifies it.\nDesign-source/font hashes are recorded in `resources/lvrs-native-appearance.json`\nand tested for drift. LVRS/QML source is not a runtime dependency or bundled UI.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 43,
+      "end_line": 45,
+      "raw": "This is the implemented appearance for the bounded AOT widget set, not every\nLVRS material, grain or animation. Windows/Linux native widget mounting and\ngeneral reactive property tracking remain outside this macOS implementation.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "## Build and verify\n",
+      "level": 2,
+      "title": "Build and verify"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 52,
+      "raw": "First build/install the updated Core and LVUI into their `build/install` prefixes,\nthen configure iiGUI using those package directories and the existing Vulkan kit.\nBuild and run CTest in `iiGUI/build`. The standalone example and installed copy\nboth use the Core entrypoint.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "fenced_code",
+      "start_line": 54,
+      "end_line": 59,
+      "raw": "```sh\ncmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n```\n",
+      "language": "sh",
+      "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n",
+      "closed": true
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 60,
+      "end_line": 60,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 61,
+      "end_line": 66,
+      "raw": "The verifier requires a fresh destination. It relocates installed packages,\ncompiles the installed Core entry source into the consumer executable, checks\nbundled font hashes and Qt/DSL-parser absence, then runs with the consumer source\nand lvui-compile unavailable. Core Runtime and the existing Vulkan kit remain\nnative deployment dependencies; this verification does not implement distribution\nsigning, notarization or a fully self-contained bundle.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Core-owned native widget applications",
+      "anchor": "core-owned-native-widget-applications",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000009",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "LVRS appearance with native semantics",
+      "anchor": "lvrs-appearance-with-native-semantics",
+      "start_line": 26
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Build and verify",
+      "anchor": "build-and-verify",
+      "start_line": 47
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 6,
+        "text": "> Core ownership and attachment lifetimes remain; OS controls/layout do not.",
+        "basis": "lexical_match",
+        "context": "quote"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000021",
+        "language": "sh",
+        "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "iiGUI's self-rendered C++ widgets",
+        "target": "SelfRenderedWidgets.md",
+        "kind": "relative",
+        "line": 5
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

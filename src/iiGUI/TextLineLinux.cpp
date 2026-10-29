@@ -1,5 +1,6 @@
 #include "TextLineNative.h"
 #include "NativeText.h"
+#include "FontDatabase.h"
 #include <pango/pangocairo.h>
 #include <limits>
 
@@ -21,7 +22,8 @@ public:
         auto map = pango_cairo_font_map_get_default(); auto context = pango_font_map_create_context(map);
         line_ = pango_layout_new(context); g_object_unref(context);
         auto font = pango_font_description_new();
-        pango_font_description_set_family(font, style.font_family.empty() ? "sans" : style.font_family.c_str());
+        const auto family=style.font_family.empty()?FontDatabase::application()->resolve_family(""):style.font_family;
+        pango_font_description_set_family(font,family.c_str());
         pango_font_description_set_absolute_size(font, style.font_size*PANGO_SCALE); pango_font_description_set_weight(font, PangoWeight(style.font_weight));
         pango_layout_set_font_description(line_,font); pango_font_description_free(font);
         pango_layout_set_single_paragraph_mode(line_,TRUE); pango_layout_set_width(line_,-1);

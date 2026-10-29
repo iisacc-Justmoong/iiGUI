@@ -6,7 +6,21 @@ read 요청은 호출마다 65,536 UTF-16 단위로 제한한다. 반환된 `Tex
 
 `focus_changed`는 별도의 일반 변경 콜백이다. 공급자가 포커스를 얻거나 잃을 때 실행된다. `auto_focus_on_press=false`이면 pointer capture는 유지하되 자동 키보드 포커스를 부여하지 않는다. 공급자 자신의 키·텍스트 handler가 편집과 클립보드를 처리한다. 일반 단일 행 `input_field`에는 기존 동작을 보존하는 내장 공급 경로가 있다.
 
-Cocoa의 NSTextInputClient는 선택·marked range·주변 문자열·화면 caret·문자 hit test를 조회한다. `unmarkText`는 `commit_composition`, 취소용 빈 preedit는 `composition`으로 구분한다. Windows IMM32와 Linux XIM은 실제 caret 위치에 후보/조합 창을 배치하며 사용자 편집 위젯을 텍스트 대상으로 인식한다. 사용자 위젯의 복사·잘라내기는 문서 전체를 OS 어댑터로 복사하지 않고 위젯 명령으로 전달한다.
+사용자 위젯이 텍스트·선택·조합을 갱신한 뒤 `notify_text_input_changed`를 호출하면
+화면을 다시 그리고 접근성 메타데이터를 갱신한다. `value_changed=false`는 선택 등
+값 자체가 바뀌지 않은 갱신에 사용한다. 이 알림은 공급자의 읽기 콜백 밖에서만
+호출하며, 공급자가 없거나 해당 세대가 종료되면 실패한다.
+선택적으로 `set_text` 변경 콜백을 제공하면 범용 `Widget::set_text`도 같은 소유
+편집기에 전달된다. UTF-8과 크기는 전달 전에 검증하고 콜백의 오류와 예외를
+호출자에게 전파한다. 이 콜백은 읽기 제공자와 달리 위젯 변경을 수행할 수 있다.
+
+공급자는 `TextInputState::password`로 비밀 입력을 표시한다. snapshot에는 플래그와
+메타데이터만 전달하며, 텍스트 서비스에 필요한 범위 읽기는 소유자가 계속 제공한다.
+Cocoa 접근성의 값과 범위별 문자열은 비밀 입력에서 반환하지 않으며 iOS 보안 키보드
+여부에도 같은 플래그를 사용한다. 마스킹과 사용자 정의 컨트롤의 복사·잘라내기
+차단은 해당 컨트롤의 책임이다. 플랫폼 접근성 실행 검증은 별개로 남아 있다.
+
+Cocoa의 NSTextInputClient는 선택·marked range·주변 문자열·화면 caret·문자 hit test를 조회한다. `unmarkText`는 `commit_composition`, 취소용 빈 preedit는 `composition`으로 구분한다. 조합 확정은 일반 텍스트 입력과 같이 중첩 콘텐츠와 팝업의 포커스된 편집기로 전달한다. Windows IMM32와 Linux XIM은 실제 caret 위치에 후보/조합 창을 배치하며 사용자 편집 위젯을 텍스트 대상으로 인식한다. 사용자 위젯의 복사·잘라내기는 문서 전체를 OS 어댑터로 복사하지 않고 위젯 명령으로 전달한다.
 
 Cocoa 가상 접근성 peer에는 텍스트 영역 역할·길이·선택·제한된 범위 읽기가 추가된다. 이는 완전한 접근성 편집 프로토콜이나 Windows UIA/Linux AT-SPI 구현 완료를 의미하지 않는다. Linux의 현재 XIM 조합 창 경로는 유지하며 inline preedit callback, 전체 bidi caret affinity와 모든 플랫폼 IME 교정은 최종 실행 단계의 확인 대상이다.
 

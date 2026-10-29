@@ -1,0 +1,352 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7a6f6998b924b421b26ec605aec65b2622717883d4ae0ae8013dd7a61d307644",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/PopupContent.md",
+    "sha256": "43a549d5db04137edd10053d8f19250345fdc1d27bb17d2e202eaae6fe60c02a",
+    "bytes": 8276,
+    "line_count": 130,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Activation-owned popup content",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Activation-owned popup content\n",
+      "level": 1,
+      "title": "Activation-owned popup content"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 8,
+      "raw": "`Widget::set_popup_content(WidgetFactory)` is an alternative to statically mounted\nPopover children. The factory constructs one root C++ View when a closed popup\nopens. Repositioning an already open popup keeps that activation. Closing revokes\nits handles and releases its owned widgets/subscriptions/objects before the\nparent's closed notification. A subsequent open constructs a fresh activation.\nThe factory itself stays owned by the outer popup until replaced or unmounted.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "fenced_code",
+      "start_line": 10,
+      "end_line": 21,
+      "raw": "```cpp\n// Build an empty Popover in LVUI or WidgetBuilder, then configure it while closed.\nauto result = popup.set_popup_content([](ii::gui::WidgetBuilder& b)\n        -> ii::core::Result<void> {\n    auto field = b.input_field({}, \"field\", {.placeholder = \"Fresh editor\"});\n    if (!field) return std::unexpected(field.error());\n    return {};\n});\n// Check every Result on the UI owner. After open:\n// auto current = popup.popup_content(\"field\");\n// close_popup() revokes current; popup_content() without an ID returns its root.\n```\n",
+      "language": "cpp",
+      "code": "// Build an empty Popover in LVUI or WidgetBuilder, then configure it while closed.\nauto result = popup.set_popup_content([](ii::gui::WidgetBuilder& b)\n        -> ii::core::Result<void> {\n    auto field = b.input_field({}, \"field\", {.placeholder = \"Fresh editor\"});\n    if (!field) return std::unexpected(field.error());\n    return {};\n});\n// Check every Result on the UI owner. After open:\n// auto current = popup.popup_content(\"field\");\n// close_popup() revokes current; popup_content() without an ID returns its root.\n",
+      "closed": true
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 32,
+      "raw": "Factories and static ordinary children are mutually exclusive. Change/clear a\nfactory while its popup is closed and the shared domain is idle. A closed popup\nbeing constructed inside the currently staged activation may also set its own\nfactory before publication; it cannot open during construction or mutate a\npreviously published popup. A rejected candidate leaves the live tree intact. `retain`\ninside the factory owns a C++ object for that content activation. Repeated opens,\nrendering, callbacks, focus changes and model subscriptions do not reconstruct\nthe parent LVUI backend or application. No VM, source parser or OS control is\nintroduced. An embedded activation creates no NSView, native window or GPU context:\nthe original surface presents its flattened panels/text/images and popup layers.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 34,
+      "end_line": 39,
+      "raw": "Each activation uses a separate generation-owned state. Local IDs can repeat\nbetween activations. `popup_content(local_id)` returns a weak handle for the\ncurrent activation only. Snapshot/accessibility IDs are qualified opaque targets;\nthe `@iiscope:` namespace is reserved for these targets. Old handles and old AX\ntargets cannot address a replacement. An inactive popup has no content item.\nNative focus/IME resolves the actual focused descendant rather than the shell.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 45,
+      "raw": "Frames, snapshots, pointer coordinates and input share the host's coordinate\ndomain. Owned nested menus can overflow the content box and still use the whole\nwindow's placement bounds. Their own clipping remains independent from the\nparent content clip. Text editing, child-first Escape, Tab, capture, modal outside\ninput and parent focus return retain their ordinary C++ behavior.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 53,
+      "raw": "The shared domain admits at most 4096 live widget nodes, eight open popups and\neight embedded activation levels. Closed activations return their capacity;\nfactory candidates count against remaining capacity. Factory construction and\ncontent retirement serialize admission across the domain. A failed/throwing\nfactory retires its candidate and publishes no partial content. The existing\nouter mount survives. Reopening is supported from the parent's closed callback,\nafter content retirement, rather than during construction/destructor/blur work.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 61,
+      "raw": "Ownership release is distinct from finishing an active C++ invocation. A callback\nalready executing may keep its captures/model alive until it returns. Those\nobjects are not forcibly destroyed while in use; their widget admission is already\nclosed. External shared owners follow normal C++ ownership. Use retained Core\nTaskScope/weak receivers for content-owned asynchronous work; arbitrary external\njobs are not inferred or cancelled automatically. Teardown and factory failures\nmust not throw from user destructors.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 63,
+      "end_line": 67,
+      "raw": "`iiGUI.popup_content_*` covers lifecycle, 500 reopenings, native input/AX, retained\nsingle-surface identity, stale targets, actual Metal pixels, nested menu overflow,\nbudget/failure/reentrancy, owner removal during blur and active capture retirement.\n`LVRS/examples/NativeActivationGallery` uses LVUI for the outer view and a compiled\nC++ ColorPicker factory for each open, with Core-owned parent/content lifetimes.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 70,
+      "raw": "The dedicated [LVRS Modal](../../LVRS/docs/native/Modal.md) additionally keeps\nstatic header/action chrome while using the anchored body path below.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 71,
+      "end_line": 71,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "heading",
+      "start_line": 72,
+      "end_line": 72,
+      "raw": "## Retained chrome with a per-open body\n",
+      "level": 2,
+      "title": "Retained chrome with a per-open body"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 73,
+      "end_line": 73,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 74,
+      "end_line": 79,
+      "raw": "`popup.set_popup_content_at(anchor, factory)` binds an empty, unfixed VStack\ndescendant in the same popup generation. Static widgets outside that anchor stay\nowned by the mount. Each opening creates one body view; its measured size and\npadding participate in the normal static layout. While inactive the anchor is\nhidden and contributes no spacing. Body text/wrapping changes invalidate the\nanchor and its ancestor measurements; resizing preserves the current activation.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 81,
+      "end_line": 88,
+      "raw": "Closing immediately retires body widgets, receivers and retained owners before\nthe popup's closed callback. Static chrome remains available through mount lookup.\nWith `PopoverOptions::transition`, chrome can finish its exit while the body has\nalready gone. Its resulting height is recomputed without the body, matching a\nLoader whose `active` and `visible` become false on close. Reopening during exit\nkeeps the current reveal value and static handles but constructs a fresh body.\nWhole-popup factories retain their original immediate retirement contract and\nrequire an explicit body anchor to combine with native transitions.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 89,
+      "end_line": 89,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 90,
+      "end_line": 94,
+      "raw": "`popup_content(id)` first searches the current body and then static chrome owned\nby that popup; it requires an open popup. `popup_content()` returns the body root\nwhen present, otherwise the static content root. The popup's own ID and nested\nunrelated popup children are not exposed as content. Qualified stale body IDs\ncannot address a replacement; static IDs do not change between openings.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 95,
+      "end_line": 95,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 96,
+      "end_line": 99,
+      "raw": "Input/AX uses inherited frame scale for the body. Tab/Shift-Tab crosses the body\nand static action row in layout order. Capture stays with the body or chrome\nthat accepted the press, stale hover is cleared across that boundary, and a\nnested modal menu dismisses before an outside press can reach static actions.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 100,
+      "end_line": 100,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 101,
+      "end_line": 105,
+      "raw": "Cancellation belongs to the popup generation that closed. If a closed callback\nreopens the popup, even if it also closes that new opening immediately, the old\ncancellation is suppressed. A current cancellation is delivered after the closed\nnotification. This policy applies to generic popups and does not depend on an\napplication's component library.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 106,
+      "end_line": 106,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 107,
+      "end_line": 120,
+      "raw": "An application can supply `PopoverAdaptiveLayout` for retained popup content.\nThe host calls the layout provider first with an empty content measurement to\nselect a width, measures the retained content and named scroll viewport at that\nwidth, and calls it again for the final viewport-relative rectangle. The final\nwidth must match the first width. The host validates the rectangle and exposes\nprovider errors to callers; it rejects a failing layout before opening a popup.\nThe provider runs synchronously on the UI owner and must not access or mutate\nthe widget domain, including its parent. The host rejects reentrant UI access.\nAn optional bottom-slide transition is a hosting capability; placement and input\npolicy remain application-owned. Adaptive layout currently requires static\nretained popup content and cannot be combined with explicit bounds or the older\nsheet-layout option.\nGeneral mixed independent-popup policies and all nested transform/IME cases are\nstill covered by the native parity ledger rather than claimed complete here.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 121,
+      "end_line": 121,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 122,
+      "end_line": 130,
+      "raw": "`iiGUI.anchored_content_*` checks repeated lifecycle, width-aware measurement,\ndynamic body height, frame reversal/reduced motion, visual input coordinates,\nfocus crossing, actual GPU pixels, teardown/admission, pointer capture, nested\nmenus and unchanged explicit label colors during exit. GPU resources belonging\nto already-submitted draws retire through the normal presentation path.\nBodies without focusable controls add no Tab stop. If a focus-loss callback\nretires or replaces the view, pending focus is not delivered to its old body.\nInitial focus follows layout order once; `focus_on_open=false` preserves the\ncaller's focus instead of letting body construction override that policy.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Activation-owned popup content",
+      "anchor": "activation-owned-popup-content",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Retained chrome with a per-open body",
+      "anchor": "retained-chrome-with-a-per-open-body",
+      "start_line": 72
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 29,
+        "text": "rendering, callbacks, focus changes and model subscriptions do not reconstruct",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 61,
+        "text": "must not throw from user destructors.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 94,
+        "text": "cannot address a replacement; static IDs do not change between openings.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000033",
+        "line": 111,
+        "text": "width must match the first width. The host validates the rectangle and exposes",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000033",
+        "line": 113,
+        "text": "The provider runs synchronously on the UI owner and must not access or mutate",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000019",
+        "label": "LVRS Modal",
+        "target": "../../LVRS/docs/native/Modal.md",
+        "kind": "relative",
+        "line": 69
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

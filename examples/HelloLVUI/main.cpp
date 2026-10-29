@@ -1,4 +1,5 @@
 #include <iiGUI/iiGUI.h>
+#include <LVUI/NativeDocument.h>
 #include "ViewSource.h"
 #include <chrono>
 #include <cmath>

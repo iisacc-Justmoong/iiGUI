@@ -3,24 +3,84 @@
   "license_source": "https://raw.githubusercontent.com/orioncactus/pretendard/main/LICENSE",
   "fonts": [
     {
+      "file": "Inter-Regular.ttf",
+      "source": "LVRS/resources/font/Inter-Regular.ttf",
+      "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+      "family": "Inter",
+      "style": "Regular",
+      "weight": 400
+    },
+    {
       "file": "Pretendard-Regular.ttf",
       "source": "LVRS/resources/font/Pretendard-Regular.ttf",
-      "sha256": "6d0af5258997aec7354a6e340fc2325ba321c410ca48b3af858c8c3d6e92a324"
+      "sha256": "6d0af5258997aec7354a6e340fc2325ba321c410ca48b3af858c8c3d6e92a324",
+      "family": "Pretendard",
+      "style": "Regular",
+      "weight": 400
     },
     {
       "file": "Pretendard-Medium.ttf",
       "source": "LVRS/resources/font/Pretendard-Medium.ttf",
-      "sha256": "3bae579377eb8e9ac412cb4809ebc3de1d956ed75995c1e346f0c1311053f4e2"
+      "sha256": "3bae579377eb8e9ac412cb4809ebc3de1d956ed75995c1e346f0c1311053f4e2",
+      "family": "Pretendard",
+      "style": "Medium",
+      "weight": 500
     },
     {
       "file": "Pretendard-SemiBold.ttf",
       "source": "LVRS/resources/font/Pretendard-SemiBold.ttf",
-      "sha256": "5e1c548732af70873103066c16e1369b9a8a871f0b38c321a1d5bc73e43cea2d"
+      "sha256": "5e1c548732af70873103066c16e1369b9a8a871f0b38c321a1d5bc73e43cea2d",
+      "family": "Pretendard",
+      "style": "SemiBold",
+      "weight": 600
     },
     {
       "file": "Pretendard-Bold.ttf",
       "source": "LVRS/resources/font/Pretendard-Bold.ttf",
-      "sha256": "c16b88c670d23e83fa1170c954cbc4822d3b8dad3c3cde15d798a94b43d97985"
+      "sha256": "c16b88c670d23e83fa1170c954cbc4822d3b8dad3c3cde15d798a94b43d97985",
+      "family": "Pretendard",
+      "style": "Bold",
+      "weight": 700
+    },
+    {
+      "file": "Pretendard-Light.ttf",
+      "source": "LVRS/resources/font/Pretendard-Light.ttf",
+      "sha256": "1ba73b22955754bb9ed6bbf7678416af647f90704e9064661f7924da578dad3e",
+      "family": "Pretendard",
+      "style": "Light",
+      "weight": 300
+    },
+    {
+      "file": "Pretendard-ExtraLight.ttf",
+      "source": "LVRS/resources/font/Pretendard-ExtraLight.ttf",
+      "sha256": "041fad1c6a532208d52def16576f0d1dd7f1b77b9306c657f69bf619f2b638cc",
+      "family": "Pretendard",
+      "style": "ExtraLight",
+      "weight": 200
+    },
+    {
+      "file": "Pretendard-Thin.ttf",
+      "source": "LVRS/resources/font/Pretendard-Thin.ttf",
+      "sha256": "5f65cfe7d99934ee73de983df26154666c65418d73a62f634110945f2ddc0caf",
+      "family": "Pretendard",
+      "style": "Thin",
+      "weight": 100
+    },
+    {
+      "file": "Pretendard-ExtraBold.ttf",
+      "source": "LVRS/resources/font/Pretendard-ExtraBold.ttf",
+      "sha256": "eedbd2877218242323bdff816684f7f5c325e54ae820d5b78eec9a5e5c7edef6",
+      "family": "Pretendard",
+      "style": "ExtraBold",
+      "weight": 800
+    },
+    {
+      "file": "Pretendard-Black.ttf",
+      "source": "LVRS/resources/font/Pretendard-Black.ttf",
+      "sha256": "0a7c1fd65a599f9d25de860cc832ea9ac40c207775e33eb4344a4647392a2b5d",
+      "family": "Pretendard",
+      "style": "Black",
+      "weight": 900
     }
   ],
   "visual_sources": [

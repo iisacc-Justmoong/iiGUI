@@ -1,0 +1,329 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:e4a54cce6560fa5fd1e8a6213442eac77f6c370b785a363c27047bf0ce5e6084",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/DisplayFrames.md",
+    "sha256": "6d97d5042cc7a9309f8b7e901badecd63e4917f05e9978a90e701216dd608342",
+    "bytes": 5454,
+    "line_count": 85,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "One frame runtime for applications and games",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# One frame runtime for applications and games\n",
+      "level": 1,
+      "title": "One frame runtime for applications and games"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 12,
+      "raw": "`runtime::Application::frame_loop()` owns Core's native ordered frame callbacks.\n`HostOptions::frame_loop` optionally connects that loop to the window's display.\nIt must borrow the same EventLoop as the Host and outlive the Host. Without this\noption an event-driven app stays idle until native widget motion requests frames.\nWidget motion borrows an existing frame loop or creates an on-demand loop over\nthe Host's EventLoop; it stops the display source after the final animated frame.\nThis does not start continuous frame delivery for an idle application. See\n[native motion](NativeMotion.md) for the lifetime, preferences and GPU contract.\nUse one driver for a bound loop; do not also call its timer-based `run` or manual\n`poll`/`step` while the display host owns its cadence.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "fenced_code",
+      "start_line": 14,
+      "end_line": 25,
+      "raw": "```cpp\nauto& frames=app.frame_loop();\nauto update=frames.add([](const ii::runtime::FrameContext& frame) {\n    // Native app animation or game update; delta is scaled, unscaled_delta is real time.\n}, {.phase=ii::runtime::FramePhase::update});\nauto physics=frames.add([](const ii::runtime::FrameContext& frame) {\n    // frame.delta is the configured fixed_step, independent of display refresh.\n}, {.phase=ii::runtime::FramePhase::fixed_update});\nauto options=View::options();\noptions.frame_loop=&frames;\nauto host=ii::gui::attach_application(app,options,callbacks);\n```\n",
+      "language": "cpp",
+      "code": "auto& frames=app.frame_loop();\nauto update=frames.add([](const ii::runtime::FrameContext& frame) {\n    // Native app animation or game update; delta is scaled, unscaled_delta is real time.\n}, {.phase=ii::runtime::FramePhase::update});\nauto physics=frames.add([](const ii::runtime::FrameContext& frame) {\n    // frame.delta is the configured fixed_step, independent of display refresh.\n}, {.phase=ii::runtime::FramePhase::fixed_update});\nauto options=View::options();\noptions.frame_loop=&frames;\nauto host=ii::gui::attach_application(app,options,callbacks);\n",
+      "closed": true
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 27,
+      "end_line": 40,
+      "raw": "On macOS 14+ the Host creates NSView's CADisplayLink and runs it on the main run\nloop's common modes. Callbacks follow the display containing the view. The native\npresentation-target timestamps drive Core's monotonic frame clock; moving to a\ndifferent refresh rate changes the source cadence instead of retaining a hardcoded\n16 ms interval. Core processes bounded tasks and advances frame phases. The Host\nreserves one frame callback slot in `present` to flush the C++ widget/GPU surface;\n`end` follows that presentation work and the work is included in Core's measured\nframe budget. App/game producers update in `update`/`prepare_present`.\nNo Cocoa control is created by this connection.\nIn frame mode, widget mutations mark the surface dirty and the native OS paint\nrequest joins that same presentation phase. Unchanged widgets submit no GPU\npresentation; size/backing-scale changes still invalidate. This avoids racing an\nextra OS-triggered draw against each display callback. Game producers that change\nthe scene each frame keep submitting at the native cadence.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 45,
+      "raw": "The host invalidates the display link before releasing widgets and on every\ncleanup path. A callback exception crosses the native barrier as a failed Host\nresult. Core closes frame registrations and releases callback captures after\njoining owned workers and before deactivating application attachments.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "table",
+      "start_line": 47,
+      "end_line": 54,
+      "raw": "| Contract | Meaning |\n|---|---|\n| `UiExecutor::every(duration)` | Elapsed-time scheduling, unrelated to vertical synchronization. A 16 ms timer requests 62.5 calls/s, not 60 display frames/s. |\n| `FrameLoop::add`, interval zero | Once per eligible phase of each host-driven frame. |\n| Tick interval | Throttle to eligible frame boundaries; no timer-like burst catch-up. |\n| `fixed_update` | Fixed-step simulation with bounded catch-up and dropped-step accounting. |\n| `TickClock::scaled` | Gameplay/animation time scale and pause. |\n| `TickClock::unscaled` | UI and real-time frame work while scaled updates are paused. |\n",
+      "columns": [
+        "Contract",
+        "Meaning"
+      ],
+      "rows": [
+        [
+          "`UiExecutor::every(duration)`",
+          "Elapsed-time scheduling, unrelated to vertical synchronization. A 16 ms timer requests 62.5 calls/s, not 60 display frames/s."
+        ],
+        [
+          "`FrameLoop::add`, interval zero",
+          "Once per eligible phase of each host-driven frame."
+        ],
+        [
+          "Tick interval",
+          "Throttle to eligible frame boundaries; no timer-like burst catch-up."
+        ],
+        [
+          "`fixed_update`",
+          "Fixed-step simulation with bounded catch-up and dropped-step accounting."
+        ],
+        [
+          "`TickClock::scaled`",
+          "Gameplay/animation time scale and pause."
+        ],
+        [
+          "`TickClock::unscaled`",
+          "UI and real-time frame work while scaled updates are paused."
+        ]
+      ]
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 55,
+      "end_line": 55,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 56,
+      "end_line": 61,
+      "raw": "`HostStats::display_callbacks` counts actual delivered display callbacks and\n`display_interval` records the native target interval. The former divided by\nelapsed native frame time gives delivered update rate. Graphics scene renders,\npresentation requests, and physical scanout/completion are distinct. No timer or\ndisplay callback counter is advertised as proof that a GPU frame physically\nappeared on screen. OS load and visibility can reduce delivered callbacks.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 63,
+      "end_line": 69,
+      "raw": "The view's display source may suspend while hidden or off-display. Normal Core\ntimers and background jobs remain independent. Core clamps scaled resume delta\nand bounds fixed-step catch-up; unscaled elapsed time retains the real gap.\nThe current native display connection requires macOS 14+. Windows/Linux accept\nthe same Core frame phases, but this Host option is explicitly rejected until\ntheir native presentation cadence adapters are implemented; it never silently\nsubstitutes a duration timer for synchronization.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 70,
+      "end_line": 70,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 71,
+      "end_line": 75,
+      "raw": "`iiGUI.frame_host_*` checks real display callbacks, fixed/variable phases, GPU\nupdates, owner/event-domain validation, exception shutdown and no-source idle\nbehavior. `LVRSNativeGallery` displays a sampled native frame/update rate instead\nof a 200 ms timer count. Its label refreshes four times per second to avoid\nrebuilding text on every display pulse, while frame callbacks follow the display.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 77,
+      "end_line": 82,
+      "raw": "Frame integration tests finish after observing the required actual display\ncallbacks. Process liveness is bounded by the outer CTest timeout; an internal\nfour-second timer no longer infers whether twelve or twenty-four frames should\nhave arrived. The assertions on frame phases, failures, rendering and redundant\npresentation remain in place. Instrumented startup bounds are documented in\n[NativeMotion](NativeMotion.md).\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 83,
+      "end_line": 83,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 84,
+      "end_line": 85,
+      "raw": "Apple documents the [view-bound display link](https://developer.apple.com/documentation/appkit/nsview/displaylink(target:selector:))\nand [presentation-target timestamp](https://developer.apple.com/documentation/quartzcore/cadisplaylink/targettimestamp).\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "One frame runtime for applications and games",
+      "anchor": "one-frame-runtime-for-applications-and-games",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "It must borrow the same EventLoop as the Host and outlive the Host. Without this",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000003",
+        "line": 11,
+        "text": "Use one driver for a bound loop; do not also call its timer-based `run` or manual",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 68,
+        "text": "their native presentation cadence adapters are implemented; it never silently",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 77,
+        "text": "Frame integration tests finish after observing the required actual display",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 79,
+        "text": "four-second timer no longer infers whether twelve or twenty-four frames should",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "native motion",
+        "target": "NativeMotion.md",
+        "kind": "relative",
+        "line": 10
+      },
+      {
+        "block_id": "b000019",
+        "label": "NativeMotion",
+        "target": "NativeMotion.md",
+        "kind": "relative",
+        "line": 82
+      },
+      {
+        "block_id": "b000021",
+        "label": "view-bound display link",
+        "target": "https://developer.apple.com/documentation/appkit/nsview/displaylink(target:selector:)",
+        "kind": "external",
+        "line": 84
+      },
+      {
+        "block_id": "b000021",
+        "label": "presentation-target timestamp",
+        "target": "https://developer.apple.com/documentation/quartzcore/cadisplaylink/targettimestamp",
+        "kind": "external",
+        "line": 85
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000011",
+        "columns": [
+          "Contract",
+          "Meaning"
+        ],
+        "rows": [
+          [
+            "`UiExecutor::every(duration)`",
+            "Elapsed-time scheduling, unrelated to vertical synchronization. A 16 ms timer requests 62.5 calls/s, not 60 display frames/s."
+          ],
+          [
+            "`FrameLoop::add`, interval zero",
+            "Once per eligible phase of each host-driven frame."
+          ],
+          [
+            "Tick interval",
+            "Throttle to eligible frame boundaries; no timer-like burst catch-up."
+          ],
+          [
+            "`fixed_update`",
+            "Fixed-step simulation with bounded catch-up and dropped-step accounting."
+          ],
+          [
+            "`TickClock::scaled`",
+            "Gameplay/animation time scale and pause."
+          ],
+          [
+            "`TickClock::unscaled`",
+            "UI and real-time frame work while scaled updates are paused."
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

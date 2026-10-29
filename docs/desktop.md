@@ -20,3 +20,7 @@ URL이 네이티브 게시 전에 `invalid_argument`로 거절되는지 확인�
 # 운영체제의 파일 열기 요청
 
 macOS Finder의 문서 열기 요청은 `HostCallbacks::files_opened`로 전달한다. 경로는 UTF-8이며 최대 256개를 허용한다. 창의 `opened` 이후 동일 Core 루프에서 배달하고 창이 닫힌 뒤에는 호출하지 않는다. 파일의 형식·문서 선택·저장은 소비자의 책임이다. `iiGUI.desktop_files`가 Cocoa delegate의 실제 요청 경로를 검사한다.
+
+## Society 계정 열기
+
+`open_external_url`은 기존 웹·메일 URL과 정확한 `society://account` 주소를 허용한다. 다른 사용자 정의 스킴이나 토큰·쿼리·프래그먼트가 붙은 Society 주소는 허용하지 않는다. OS에 등록된 Society 앱을 열며 WebView를 만들지 않는다. URL 정책 검사는 실제 앱을 실행하지 않고 허용·거부 경계를 검증한다.

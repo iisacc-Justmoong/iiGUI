@@ -1,0 +1,22 @@
+import vm LayoutModel
+let describe: () -> String = vm.record.describe
+let format: () -> String = vm.format
+let inferred = vm.format
+let alias = inferred
+@Static let fixed = alias
+var manual = alias
+let captured = vm.makeParent().make()
+Window { VStack {
+    Label(text: describe())
+    Label(text: format())
+    Label(text: alias())
+    Label(text: fixed())
+    Label(text: manual())
+    PushButton(onClick: captured)
+    PushButton(onClick: vm.run)
+    PushButton(onClick: vm.record.act)
+    PushButton(onClick: vm.makeParent().child.act)
+    PushButton(onClick: vm.records[0].act)
+    PushButton(onClick: vm.makeParent().make())
+    PushButton(onClick: vm.capture(vm.argument()))
+} }

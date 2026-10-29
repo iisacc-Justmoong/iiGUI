@@ -1,0 +1,222 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:780b7c07bb3bb9d820dc6cee29af33dd4c7440aa24a1c9d0bd1e6e904f994481",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/WidgetInteraction.md",
+    "sha256": "9e71c2f52162c5733d553496e08d48d9089ae45814360cdabfe3c7fcabb5f290",
+    "bytes": 3554,
+    "line_count": 19,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "위젯 상호작용의 독립 관찰",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 위젯 상호작용의 독립 관찰\n",
+      "level": 1,
+      "title": "위젯 상호작용의 독립 관찰"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "Widget::interaction()은 생성 스레드에서 bounds·clip·surface·implicit_size와 생존·가시성·활성·입력 차단·하위 hover/press/focus·팝업 열림 상태를 조회한다. 좌표는 네이티브 콘텐츠 표면의 절대 좌표이다. 문자열·문서·그리기 데이터나 OS 컨트롤을 복사하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "observe_interaction(shared_ptr<const WidgetInteractionPort>)는 기존 입력·포커스·배치 핸들러를 교체하지 않는 약한 Core QueryPort 구독이다. 입력과 배치가 정리된 뒤 변경된 메타데이터만 전달한다. 같은 포트·같은 대상의 중복 등록은 한 번만 유지한다. 조회나 repaint만 반복되어 값이 같으면 통지를 반복하지 않는다. 별도의 폴링 타이머·스레드·프레임 슬롯을 만들지 않는다. 한 세대의 구독 상한은 1,024개이다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "콜백은 소유 스레드에서 읽기와 위젯 변경을 할 수 있다. 변경이 추가되면 최대 여덟 차례까지 정리하며 계속 상태를 뒤집는 수신자는 busy 오류가 된다. 수신자 하나가 실패해도 다른 살아 있는 수신자에게 반영된 상태를 전달한 후 failed를 반환한다. 이미 반영된 입력을 무조건 재시도하지 않는다. 구독을 놓으면 전달 대상에서 제외되며, 세대 종료 시 마지막 alive=false를 전달한다. 닫힌 핸들은 새로운 세대를 가리키지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "Widget::measure(available_width)는 실제 네이티브 글꼴 서비스와 기존 배치 엔진으로 폭 제약에 따른 선호 크기를 계산·캐시한다. 폭은 (0,8192]이며 문서 변경이나 자식 위젯 재생성을 수행하지 않는다. WidgetPlacement::domain은 불투명하고 약한 포함 도메인 식별자이다. 다른 콘텐츠 세대라도 같은 포함 도메인인지 확인할 수 있으며 구현 객체를 노출하지 않는다. is_null은 비어 있는 기본 핸들과 이미 폐기된 핸들을 구분한다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "heading",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "## 명시적 팝업과 통과 영역\n",
+      "level": 2,
+      "title": "명시적 팝업과 통과 영역"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "PopoverOptions.bounds는 콘텐츠 표면 절대 좌표의 팝업 프레임이다. input_bounds는 팝업 로컬 좌표의 입력 사각형이며, 프레임 안의 그림이라도 이 영역 밖이면 아래 컨트롤로 입력이 통과한다. 툴팁의 꼬리·장식에 사용할 수 있다. 입력 영역은 자식의 입력과 바깥 클릭 판정에도 적용한다. 프레임의 한 변 상한은 8,192이며 유효하지 않은 사각형과 Sheet 조합은 거절한다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "preserve_input=true는 비모달·focus_on_open=false 팝업에만 허용한다. 팝업을 열고 닫을 때 기원 컨트롤의 press·hover·포인터 캡처를 보존한다. 팝업 자신에게 속한 캡처는 닫을 때 정리한다. Escape 닫힘과 기존 컨트롤의 클릭 경로를 유지한다. PopoverTransition.origin은 정규화한 축척 중심이며 기본값은 기존 팝업과 같은 중앙이다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "수동 말풍선이 모달 위에 열리더라도 기존 모달의 배경 입력 차단은 유지한다. 포함 콘텐츠 세대는 상위의 배치·가시성 변경을 함께 정리하며, 내부 대상 좌표는 전역 표면으로 변환한다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "관련 검사는 tests/widget_interaction.cpp에 있다. 이 단계에서는 컴파일·설치·정적 검사만 수행하며 실제 앱·테스트 실행은 전체 LVRS 이식 마지막의 일괄 단계까지 보류한다. 다른 플랫폼의 입력 어댑터와 실제 IME·접근성·픽셀 결과는 별도 실행 확인 사항이다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "위젯 상호작용의 독립 관찰",
+      "anchor": "위젯-상호작용의-독립-관찰",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000011",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "명시적 팝업과 통과 영역",
+      "anchor": "명시적-팝업과-통과-영역",
+      "start_line": 11
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 3,
+        "text": "Widget::interaction()은 생성 스레드에서 bounds·clip·surface·implicit_size와 생존·가시성·활성·입력 차단·하위 hover/press/focus·팝업 열림 상태를 조회한다. 좌표는 네이티브 콘텐츠 표면의 절대 좌표이다. 문자열·문서·그리기 데이터나 OS 컨트롤을 복사하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "observe_interaction(shared_ptr<const WidgetInteractionPort>)는 기존 입력·포커스·배치 핸들러를 교체하지 않는 약한 Core QueryPort 구독이다. 입력과 배치가 정리된 뒤 변경된 메타데이터만 전달한다. 같은 포트·같은 대상의 중복 등록은 한 번만 유지한다. 조회나 repaint만 반복되어 값이 같으면 통지를 반복하지 않는다. 별도의 폴링 타이머·스레드·프레임 슬롯을 만들지 않는다. 한 세대의 구독 상한은 1,024개이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 7,
+        "text": "콜백은 소유 스레드에서 읽기와 위젯 변경을 할 수 있다. 변경이 추가되면 최대 여덟 차례까지 정리하며 계속 상태를 뒤집는 수신자는 busy 오류가 된다. 수신자 하나가 실패해도 다른 살아 있는 수신자에게 반영된 상태를 전달한 후 failed를 반환한다. 이미 반영된 입력을 무조건 재시도하지 않는다. 구독을 놓으면 전달 대상에서 제외되며, 세대 종료 시 마지막 alive=false를 전달한다. 닫힌 핸들은 새로운 세대를 가리키지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 9,
+        "text": "Widget::measure(available_width)는 실제 네이티브 글꼴 서비스와 기존 배치 엔진으로 폭 제약에 따른 선호 크기를 계산·캐시한다. 폭은 (0,8192]이며 문서 변경이나 자식 위젯 재생성을 수행하지 않는다. WidgetPlacement::domain은 불투명하고 약한 포함 도메인 식별자이다. 다른 콘텐츠 세대라도 같은 포함 도메인인지 확인할 수 있으며 구현 객체를 노출하지 않는다. is_null은 비어 있는 기본 핸들과 이미 폐기된 핸들을 구분한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

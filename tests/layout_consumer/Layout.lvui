@@ -1,0 +1,6 @@
+import vm LayoutModel
+Window {
+    VStack(spacing: vm.gap, padding: vm.padding, width: vm.width, height: 100, alignment: vm.alignment) {
+        Label(text: "Installed native layout")
+    }
+}

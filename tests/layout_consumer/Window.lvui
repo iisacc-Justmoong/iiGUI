@@ -1,0 +1,2 @@
+import vm LayoutModel
+Window(title: vm.title, width: vm.width, minimumWidth: 100, fontFamily: vm.font) { InputField(text: "Installed native Window") }

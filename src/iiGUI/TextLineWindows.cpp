@@ -5,6 +5,7 @@
 #include <wrl/client.h>
 #include "TextLineNative.h"
 #include "NativeText.h"
+#include "FontNative.h"
 
 namespace ii::gui::detail {
 namespace {
@@ -24,9 +25,10 @@ public:
         };
         ComPtr<IDWriteFactory> factory;
         checked(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(factory.GetAddressOf())));
-        const auto family = style.font_family == "Monospace" || style.font_family == "monospace" ? L"Consolas" : style.font_family.empty() ? L"Segoe UI" : utf16(style.font_family);
+        const auto family = style.font_family == "Monospace" || style.font_family == "monospace" ? L"Consolas" : utf16(style.font_family.empty()?FontDatabase::application()->resolve_family(""):style.font_family);
         ComPtr<IDWriteTextFormat> format;
-        checked(factory->CreateTextFormat(family.c_str(), nullptr, DWRITE_FONT_WEIGHT(style.font_weight), DWRITE_FONT_STYLE_NORMAL,
+        auto collection=native_font_collection();
+        checked(factory->CreateTextFormat(family.c_str(), collection.Get(), DWRITE_FONT_WEIGHT(style.font_weight), DWRITE_FONT_STYLE_NORMAL,
             DWRITE_FONT_STRETCH_NORMAL, float(style.font_size), L"", &format));
         checked(format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP)); checked(format->SetIncrementalTabStop(float(style.tab_stop_distance)));
         auto text = utf16(display.text());

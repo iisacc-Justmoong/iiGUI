@@ -25,6 +25,16 @@ void run(std::string name){
             auto r=take(child.snapshot()).bounds;pointer(gui::WidgetInputKind::pointer_down,r);pointer(gui::WidgetInputKind::pointer_up,r);check(inner==1&&outer==0,"Parent action stole a child's click");pointer(gui::WidgetInputKind::pointer_down,initial.bounds);pointer(gui::WidgetInputKind::pointer_up,initial.bounds);check(outer==1,"Parent padding did not remain actionable");
         }else if(name=="keyboard"){
             good(action.focus());good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::enter}));check(outer==0&&take(action.snapshot()).pressed,"Enter activated before release");good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_up,.key=gui::WidgetKey::enter}));check(outer==1,"Enter release did not activate the action");
+            int intercepted=0;
+            good(action.set_input_handler([&](const gui::WidgetInput& event)->core::Result<bool>{
+                if(event.kind==gui::WidgetInputKind::key_down&&event.key==gui::WidgetKey::down){++intercepted;return true;}
+                return false;
+            }));
+            good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::down}));
+            good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_down,.key=gui::WidgetKey::enter}));
+            good(mount.dispatch_input({.kind=gui::WidgetInputKind::key_up,.key=gui::WidgetKey::enter}));
+            check(intercepted==1&&outer==2,"Custom action input lost native keyboard fallback or duplicated activation");
+            good(action.set_input_handler({}));
         }else if(name=="colors"){
             check(initial.foreground_color==options.text_color,"Default action color changed");pointer(gui::WidgetInputKind::pointer_move,initial.bounds);check(take(action.snapshot()).foreground_color==options.hover_text_color,"Hover color missing");pointer(gui::WidgetInputKind::pointer_down,initial.bounds);check(take(action.snapshot()).foreground_color==options.pressed_text_color,"Pressed color missing");good(action.set_enabled(false));check(take(action.snapshot()).foreground_color==options.disabled_text_color,"Disabled color missing");
         }else if(name=="disabled"){

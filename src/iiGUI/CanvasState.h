@@ -13,12 +13,12 @@ struct CanvasState final {
     bool dirty = false;
     double scale = 0, parent_height = 0;
 
-    core::Result<void> set(CanvasFrame value, void* parent, void* display, double backing_scale) {
+    core::Result<void> set(CanvasFrame value, void* parent, void* display, double backing_scale, std::shared_ptr<PresentationStream> presentations = {}) {
         if (!valid_canvas(value)) return core::fail(core::ErrorCode::invalid_argument, "Invalid GPU canvas geometry, color or acceleration policy");
         try {
             (void)canvas_pixels(value, backing_scale);
             if (!native || frame->acceleration != value.acceleration || frame->renderer!=value.renderer) {
-                auto replacement = std::make_unique<NativeCanvas>(parent, display, value.acceleration,value.renderer);
+                auto replacement = std::make_unique<NativeCanvas>(parent, display, value.acceleration,value.renderer,std::move(presentations));
                 native = std::move(replacement);
                 dirty = true;
             }

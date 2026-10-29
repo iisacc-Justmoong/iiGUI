@@ -1,0 +1,423 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:1908d5d47964bcabb7d97809b8cab83018772db1ac1d651ac5265801bb8fbfca",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/KeyedContent.md",
+    "sha256": "f8a13b9e994e52aaa857c6211dc5b3a5b71629589fbf65e194d194ebc759ce8b",
+    "bytes": 12936,
+    "line_count": 139,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "키 기반 콘텐츠 활성화",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 키 기반 콘텐츠 활성화\n",
+      "level": 1,
+      "title": "키 기반 콘텐츠 활성화"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`Widget::set_keyed_content(items, options)`는 콘텐츠 호스트 안에 독립적인 키별 행 세대를\n마운트한다. 같은 키의 팩토리는 다시 호출하지 않으며, 행의 위젯·소유 객체·구독·편집 상태·\n포커스와 한정 ID를 유지한다. 데이터 갱신은 기존 C++ 바인딩이나 모델이 수행한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "`KeyedContentItem`은 `key`와 `WidgetFactory`, `KeyedContentOptions`는 가로 배치 여부와\n일반 `StackOptions`를 받는다. 기본 방향은 세로, 간격은 0, 정렬은 stretch이다.\n`keyed_content_item(key, id)`는 현재 행의 위젯을, `keyed_content_keys()`는 표시 순서를\n반환한다. `clear_content()` 또는 일반 `set_content()`는 키별 활성화도 종료한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 17,
+      "raw": "`KeyedContentOptions::viewport`를 지정하면 절대 위치를 갖는 셀 모드가 된다. 모든 항목은\n`KeyedContentItem::frame`을 제공해야 한다. 좌표는 현재 뷰포트에 상대적이며 여유 영역의\n음수 좌표도 허용한다. 셀 크기는 기존 기하 한계 안의 유한한 음이 아닌 값이어야 한다.\n이 모드와 선형 방향·간격·패딩 옵션을 혼합하면 오류이다. 루트는 뷰포트 경계로 클리핑한다.\n키와 순서가 같은 셀의 위치·크기 변경은 래퍼와 행 세대를 유지하고 기하 정보만 갱신한다.\n모드 변경이나 키 추가·삭제 시에도 유지한 키의 행 소유자는 기존처럼 옮긴다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 24,
+      "raw": "가상화 소유자는 `set_virtual_scroll_content(content, x, y)`로 논리 길이와 기준점을\n보정한 오프셋을 함께 발행한다. 일반 스크롤 옵션 변경과 달리 해당 뷰포트 콜백 중에도\n이 명시적 발행을 허용한다. 콜백 전달 후 기존 최대 8회 배치 정착 검사를 수행한다.\n유효하지 않은 길이는 거부하며 오프셋은 실제 뷰포트와 논리 길이의 범위로 제한한다.\n`set_extent(Size)`는 스크롤 뷰에도 사용할 수 있으며 현재 논리 길이·옵션을 유지하면서\n요청 너비·높이만 바꾼다. 이 API는 제품 문서·파일 상태를 수정하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 30,
+      "raw": "`Widget::set_measure_handler`는 `WidgetMeasurement`의 너비 제약과 선호 자연 크기를\n전달한다. 실제 배정 사각형이 그대로여도 콘텐츠의 자연 크기가 달라지면 알림을 보낸다.\n같은 측정값을 반복 발행하지 않으며 기존 관찰 함수를 갱신하는 것만으로 새 레이아웃을\n강제하지 않는다. 제거와 관찰 중 소유자 퇴역도 처리한다. 크기 측정 자체는 상태·문서를\n수정하지 않으며 관찰자가 필요한 C++ 레이아웃 캐시에 연결할 수 있다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 32,
+      "end_line": 38,
+      "raw": "콘텐츠 세대가 중첩되어도 상위 `set_input_handler`는 자식에게 전달하기 전에 키 입력을\n받는다. 처리 결과가 `true`이면 전달을 마치고, `false`이면 기존 자식 컨트롤로 진행한다.\n`WidgetInput`의 `text_input_active`, `native_control_active`, `native_navigation_active`는\n실제 포커스가 있는 중첩된 컨트롤을 기준으로 전달한다. 포인터 입력은 기존 키 포커스가\n아닌 해당 좌표의 컨트롤을 기준으로 판정한다. 상위 목록은 버튼의 방향키를 사용하면서\nEnter 활성화는 그대로 둘 수 있고, 텍스트 입력·슬라이더 등의 자체 탐색은 가로채지 않을\n수 있다. Escape·Tab·팝업의 기존 특수 라우팅은 유지한다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 40,
+      "end_line": 43,
+      "raw": "LVUI 가상 목록에서 일반 클릭의 선택을 끈 경우에도 Cmd/Ctrl 클릭의 개별 선택과\nShift 클릭의 범위 선택은 포인터 보조키를 통해 전달한다. 창을 열지 않는\n`tests/native_navigated_repetition.cpp`는 일반 클릭의 포커스, 보조키 선택과 문서\n리비전 불변을 함께 확인한다. 실제 운영체제의 포인터 이벤트 검증과는 별개이다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 45,
+      "end_line": 48,
+      "raw": "스택과 콘텐츠 호스트도 명시적으로 `focus()`할 수 있다. 이때 포함하는 콘텐츠 세대들의\n포커스 경로도 함께 갱신한다. 입력 처리기를 가진 컨테이너는 Tab 탐색 후보가 될 수 있다.\n목록의 논리 키·선택·범위 및 화면 밖 노출 정책은 이 저수준 라우터가 소유하지 않으며,\nLVUI 네이티브 어댑터나 제품의 C++ 뷰 상태가 별도로 처리한다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 50,
+      "end_line": 52,
+      "raw": "새 키는 유효한 팩토리가 필요하다. 현재 존재하는 키에는 빈 팩토리를 전달할 수 있다.\n키는 중복 없는 비어 있지 않은 UTF-8 문자열이며 1,024바이트 이하이다. 추가 행 생성이\n실패하면 기존 전체 목록을 보존한다. 후보 행은 종료 훅을 포함하여 퇴역한다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 54,
+      "end_line": 57,
+      "raw": "구조 변경은 새 선형 래퍼와 슬롯을 검증한 뒤 유지할 행 세대의 소유 관계를 옮긴다.\n이전 래퍼를 닫기 전에 유지할 행을 분리하여 행이 함께 닫히지 않게 한다. 키가 같은 행의\n입력·팝업·지역 객체는 기존 C++ 세대에 남는다. 재배치된 슬롯의 측정 캐시와 포커스 경로를\n갱신하고, 예약된 `@iiscope:` 이름 영역 아래에 키별 ID를 유지한다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 59,
+      "end_line": 62,
+      "raw": "활성 노드 한계는 도메인 전체의 기존 4,096개이다. 후보의 임시 허용량은 실제로 제거할\n래퍼·행만 포함한다. 재사용할 행을 허용량에 다시 넣어 최종 노드 한계를 우회하지 않는다.\n키를 교체하는 횟수에 따라 사용하지 않는 래퍼가 누적되지 않는다. 모든 호출은 소유 UI\n실행 영역에서 수행하며 생성 중 재진입은 거부한다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 64,
+      "end_line": 66,
+      "raw": "후보 행을 추가할 때마다 커지는 전체 목록을 다시 배치하지 않는다. 새 행은 아직 게시한\n좌표가 없으므로 중간 배치를 생략하고, 전체 슬롯이 준비된 뒤 게시·배치한다. 일반 콘텐츠\n교체의 기존 배치 계약은 유지하며 이 최적화는 신규 키 행의 후보 생성에만 적용한다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 67,
+      "end_line": 67,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 68,
+      "end_line": 108,
+      "raw": "`tests/keyed_content.cpp`는 창 없는 상태에서 정체성·편집·키보드 라우팅·실패 롤백·\n반복 교체·정확한 노드 경계를 검사한다. LVUI 생성 C++의 연결은\n`tests/native_repetition.cpp`로 따로 검증한다. 실제 OS 창과 GPU·플랫폼 검증을 대신하지 않는다.\n`tests/native_virtual_repetition.cpp`는 LVUI가 생성한 C++를 실제 스크롤·위치 셀에 연결하여\n1,000개 결과의 표시 범위, 픽셀 이동의 세대 보존, 삽입·크기 변경의 기준점, 실패 복구와\n문서 리비전 비변경을 검사한다. `tests/keyed_content.cpp`에는 셀 모드·선형 모드 변경과\n뷰포트 콜백 내 논리 길이 발행의 독립 검사도 있다.\n`tests/ancestor_input.cpp`는 중첩 입력의 단일 전달과 텍스트·조정 키 보존을,\n`tests/native_navigated_repetition.cpp`는 생성 C++의 논리 탐색·키 기반 선택·화면 밖 노출과\n기존 내부 컨트롤 동작을 함께 검사한다.\n`tests/native_returned_callbacks.cpp`는 C++ 팩토리가 반환한 함수를 실제 이벤트에 연결하여\n의존 갱신·재사용 View 입력·조건부 퇴역·콜백 중 종료를 검사한다. 함수 저장과 선택 상태는\nLVUI 네이티브 바인딩의 책임이며 iiGUI가 소스 표현식을 실행하지 않는다.\n`tests/native_backend_construction.cpp`는 생성된 비이동 백엔드의 생성 의존성 주입·부분 생성\n실패·기존 화면 보존·소유 자원 파괴 순서를 검사한다. 생성 정책은 LVUI 활성화가 소유하며,\niiGUI는 기존 후보 콘텐츠 검증·교체·퇴역 경계를 제공한다.\n`tests/native_activation_work.cpp`는 LVUI Runtime을 실제 생성 뷰에 연결하여 워커 결과가\n일반 C++ 값에 반영되고, 패널 제거·구성 실패 중의 작업이 UI 수신자보다 오래 접근하지\n않는지 검사한다. 작업 실행과 종료 조정은 LVUI·Core가 소유한다.\n`tests/native_callable_inputs.cpp`는 명시적인 LVUI 이벤트 콜백 서명을 실제 C++ 위젯에\n연결하여 다단계 전달·정의 위치 기본값·문자열 payload·팩터리 갱신·자기 제거·루트 종료를\n검사한다. 이 입력은 기존 네이티브 이벤트 함수이며 별도 QML·문자열 메서드 호출을\n추가하지 않는다. 시그니처의 타입 검사는 LVUI 생성 코드와 C++ 컴파일러가 담당한다.\n`tests/native_shared_callable.cpp`는 한 콜백 입력을 여러 위젯과 자식에 전달해도 현재 함수\n값을 공유하는지 검사한다. 소비자 제거와 소유 활성화 제거를 구분하고, 초기·갱신 실패와\n자기 제거 중 함수 캡처의 수명을 실제 생성 C++로 확인한다. 공유 값과 반응형 버전은\nLVUI가 소유하며 iiGUI의 기존 세대별 접수·퇴역 경계를 사용한다.\n`tests/native_function_values.cpp`는 반환값이 있는 C++ 함수와 팩터리를 표시 바인딩에\n연결한다. 함수 버전 변경과 Static 선택, 오류 후 이전 표시 보존·복구, 파일 리비전 비변경,\n종료 중 결과 반환을 검사한다. 뷰가 함수 소스를 실행하거나 파일 명령을 발동하지 않는다.\n같은 검사에서 함수 버전의 Static 별칭을 부모·조건부 자식에 연결한다. 원본 함수 교체 후\n선택한 버전 보존, 호출 인자의 갱신, 자식 제거 후 다시 활성화할 때의 새 버전 선택과\n스냅샷 실행 중 자기 화면 종료를 확인한다. 함수 자원과 버전 선택은 LVUI가 소유한다.\n`tests/native_function_variables.cpp`는 가변 함수의 초기 선택·명시적 교체·다중 소비자·\n이벤트 발행·오류 회복·조건부 지역 변수와 실행 중 자기 제거를 실제 생성 C++로 검사한다.\n공개 setter의 닫힌 뷰 접수 차단도 확인한다. 함수 대입과 네이티브 팩터리는 LVUI가\n관리하며, 위젯은 기존 표시·입력·퇴역 경계를 사용한다.\n`tests/native_view_sequences.cpp`는 LVUI `[View]` 슬롯의 직접 자식 순서·독립 지역 상태·\n반응형 입력·조건부 제거·활성 메서드 보존·후보 실패 롤백과 키 기반 행 재사용을 검사한다.\n목록 구성과 어휘 포획은 AOT에서 C++로 확장하며 iiGUI에 중간 레이아웃이나 소스 평가기를\n추가하지 않는다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 109,
+      "end_line": 109,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 110,
+      "end_line": 114,
+      "raw": "`Widget::set_label_color`는 명시적인 Label 색상만 바꾸며 텍스트·글꼴·배치·포커스는\n보존한다. 빈 optional은 기본 색상으로 복원한다. 유한한 0~1 encoded sRGB 채널을\n검사하고 소유 실행 영역과 세대 종료 경계를 따른다. Label 스냅샷의 `foreground_color`는\n명시한 색상을 제공하며 기본값이면 비어 있다. `WidgetColor::encoded_srgb` 표지는 GPU의\n선형광 Color와 다른 값 계약이며 데이터 배치를 변경하지 않는다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 115,
+      "end_line": 115,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 116,
+      "end_line": 119,
+      "raw": "`tests/native_colors.cpp`는 실제 LVUI 생성 C++의 타입 입력·색상 갱신·채널·Static 선택·\n가변 상태·C++ 함수·오류 복구·후보 실패 롤백·종료와 원본 파일 리비전 비변경을 검사한다.\n공통 C++ 패널 그리기 데이터의 크기·선형 RGB·독립 알파·보더도 검사한다. 이 경로는\nOS 창이나 GPU 표면을 생성하지 않는다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 120,
+      "end_line": 120,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 121,
+      "end_line": 127,
+      "raw": "`tests/native_scalar_inputs.cpp`는 같은 C++ 계산 결과를 여러 위젯이 공유하는 LVUI\n스칼라 구성 입력을 검사한다. 명시한 인자의 호출 환경과 기본값의 정의 환경, 이름 가림,\n모든 스칼라 타입·Color 채널, Static·조건부 재활성화·오류 복구·Window/목록 전달과\n앞선 함수 입력의 호출 결과를 기본값으로 쓰는 경우를 실제 AOT 위젯으로 검사한다.\n위젯 스냅샷 조회나 무관한 뷰 상태 변경이 입력 메서드 재실행·파일 리비전 변경을\n일으키지 않는지도 확인한다. 계산·공유 저장소·구독은 LVUI의 기존 네이티브 그래프가\n관리한다. iiGUI에는 별도 식 평가기나 문서 상태 모델을 추가하지 않는다.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 128,
+      "end_line": 128,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 129,
+      "end_line": 131,
+      "raw": "[스택 배치 변경](StackLayout.md)은 옵션·extent·flex를 원자적으로 적용한다. LVUI의\n배치 입력 변경도 유지된 행의 자연 크기 통지에 연결되며, 키·로컬 상태를 보존하고 원본\n목록이나 문서 revision을 발행하지 않는지 `tests/native_layout.cpp`에서 검사한다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 132,
+      "end_line": 132,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 133,
+      "end_line": 135,
+      "raw": "공유 글꼴 관측은 도메인 루트에 한 번만 등록한다. 최대 2,047개 단일 레이블 행의 생성·\n재정렬·넘침 거부·정리 후 재생성도 공통 Observable 관측자 한도와 독립적으로 동작한다.\n글꼴 갱신은 기존 행 세대를 교체하지 않고 게시·후보 트리에 전파한다.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 136,
+      "end_line": 136,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 137,
+      "end_line": 139,
+      "raw": "포인터를 캡처한 행은 포인터 아래의 다른 형제 행보다 먼저 입력을 받는다. 형제의 역순\n히트 검사에 도달하기 전에 활성 자식 캡처를 선택하므로 드래그가 행 경계를 넘어도\n원래 소유자에게 이동·놓기를 전달한다. 놓기 이후에는 일반 히트 검사로 복귀한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "키 기반 콘텐츠 활성화",
+      "anchor": "키-기반-콘텐츠-활성화",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 13,
+        "text": "`KeyedContentItem::frame`을 제공해야 한다. 좌표는 현재 뷰포트에 상대적이며 여유 영역의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 24,
+        "text": "요청 너비·높이만 바꾼다. 이 API는 제품 문서·파일 상태를 수정하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 29,
+        "text": "강제하지 않는다. 제거와 관찰 중 소유자 퇴역도 처리한다. 크기 측정 자체는 상태·문서를",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 60,
+        "text": "래퍼·행만 포함한다. 재사용할 행을 허용량에 다시 넣어 최종 노드 한계를 우회하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 64,
+        "text": "후보 행을 추가할 때마다 커지는 전체 목록을 다시 배치하지 않는다. 새 행은 아직 게시한",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 70,
+        "text": "`tests/native_repetition.cpp`로 따로 검증한다. 실제 OS 창과 GPU·플랫폼 검증을 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 80,
+        "text": "LVUI 네이티브 바인딩의 책임이며 iiGUI가 소스 표현식을 실행하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 90,
+        "text": "추가하지 않는다. 시그니처의 타입 검사는 LVUI 생성 코드와 C++ 컴파일러가 담당한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 97,
+        "text": "종료 중 결과 반환을 검사한다. 뷰가 함수 소스를 실행하거나 파일 명령을 발동하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 108,
+        "text": "추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 114,
+        "text": "선형광 Color와 다른 값 계약이며 데이터 배치를 변경하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 119,
+        "text": "OS 창이나 GPU 표면을 생성하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000033",
+        "line": 127,
+        "text": "관리한다. iiGUI에는 별도 식 평가기나 문서 상태 모델을 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000035",
+        "label": "스택 배치 변경",
+        "target": "StackLayout.md",
+        "kind": "relative",
+        "line": 129
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

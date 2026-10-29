@@ -43,7 +43,7 @@ struct TextRun final {
 };
 enum class Acceleration { prefer_hardware, require_hardware };
 // opengl_es3 keeps its old enum value for source compatibility; no default GLES backend remains.
-enum class GraphicsApi { none, metal, direct3d11, opengl_es3, vulkan };
+enum class GraphicsApi { none, metal, direct3d11, opengl_es3, vulkan, webgl2 };
 // Native accelerator first, then Vulkan. Linux uses Vulkan directly.
 enum class Renderer { automatic, native, vulkan };
 struct ImageGradient final {

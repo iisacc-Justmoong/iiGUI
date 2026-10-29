@@ -2,24 +2,30 @@
 
 The compiled component-language route is documented separately in
 [NativeWidgets.md](NativeWidgets.md). `examples/HelloWorld` AOT-compiles `.lvui`
-into native C++23 and mounts actual Cocoa widgets. The document below describes
+into native C++23 and mounts iiGUI's own C++ widgets on a Cocoa surface. The document below describes
 the earlier HTML-shaped runtime-parsed GPU canvas API, which remains available.
 
-LVUI is a separate declarative UI language: familiar tags and inline styles
-describe a view. iiGUI consumes the validated document directly. No browser,
-WebView, HTML importer, JavaScript runtime or Qt dependency is involved.
+LVUI는 별도 모듈이다. 앱이 LVUI 문서 어댑터와 iiGUI 호스트를 조합하면
+LVUI가 계산한 프레임을 iiGUI가 표시한다. 데스크톱 경로에 브라우저 엔진,
+WebView, JavaScript 런타임이나 Qt는 필요하지 않다.
 
-The package boundary is application → iiGUI → LVUI → iiSDKCore Contracts;
-iiGUI additionally uses Core Runtime for its native host. The LVUI package
-contains the parser, immutable tree, style values and source diagnostics.
-iiGUI owns layout, native typography, graphics and presentation. Neither LVUI
-nor Core references iiGUI. The full initial language vocabulary and layout
-rules are in LVUI's `docs/Language.md`, installed with that package.
+이 문서의 브라우저·JavaScript 부재 설명은 데스크톱 렌더링 경로에 해당한다.
+새 Web 대상은 C++23 AOT Wasm과 브라우저 API bridge를 사용하며 DOM 위젯을 만들지
+않는다. Android·직접 Wayland·Web 호스트의 계약과 제한은
+[HostPlatforms.md](HostPlatforms.md)에 정리되어 있다.
+
+앱은 LVUI와 iiGUI를 각각 선택한다. LVUI 문서 어댑터가 레이아웃을 소유하며,
+iiGUI는 범용 텍스트 측정·그래픽·표시를 제공한다. iiGUI 소스와 패키지는
+LVUI 타입을 참조하거나 LVUI를 찾지 않는다. 전체 문서 규칙은 LVUI의
+`docs/Language.md`와 `docs/NativeDocument.md`에 있다.
+이전 `Host::set_view(lvui::Document, ...)` 이진 심볼을 사용하던 앱은 LVUI
+어댑터 헤더와 명시적 LVUI 링크로 다시 빌드해야 한다.
 
 ## Application usage
 
 ```cpp
 #include <iiGUI/iiGUI.h>
+#include <LVUI/NativeDocument.h>
 #include <stdexcept>
 
 int main() {
@@ -52,12 +58,9 @@ run without a GPU, using the target's native fonts. Native font APIs may
 require the target's graphical/font environment; the application example
 performs layout on the UI thread.
 
-`layout_view(document, logical_size)` also returns `ViewLayout::elements`,
-containing the bounds for every element with an ID. This allows applications
-and tests to inspect layout without exposing native window types. Parsed
-documents are immutable; application state and re-parsing changed source
-remain ordinary C++ responsibilities. There is no event-binding or scripting
-implementation in this initial language surface.
+`lvui::native::layout_document(document, logical_size)`는 프레임과 ID가 있는
+요소의 경계를 반환한다. 파싱된 문서는 불변 값이며 앱 상태와 소스의 재파싱은
+앱 책임이다. 이 초기 문서 경로에는 이벤트 바인딩과 스크립트가 없다.
 
 ## Native text in the canvas
 
@@ -85,11 +88,15 @@ data binding, CSS selectors and arbitrary HTML compatibility are not implemented
 
 ## Build and verify
 
-First build/install the sibling LVUI package under its `build/install`. Then:
+기본 iiGUI 빌드에는 LVUI가 필요하지 않다. 별도 HelloLVUI 앱까지 빌드하려면
+앱이 사용할 LVUI 패키지를 준비하고 선택적 예제를 활성화한다. LVUI 생성 위젯의
+기존 통합 검사를 iiGUI 빌드에 추가하려면 `IIGUI_BUILD_LVUI_INTEGRATION_TESTS=ON`을
+명시하고 LVUI의 빌드된 컴파일러와 런타임을 제공한다.
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \
+  -DIIGUI_BUILD_LVUI_EXAMPLES=ON \
   -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \
   -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
 cmake --build build --parallel 4
@@ -104,12 +111,8 @@ GPU capture to stdout and closes; redirection/export belongs to the caller.
 The application source has no platform conditionals. It can also be built
 standalone with installed Core/LVUI/iiGUI packages.
 
-Tests cover parser grammar/errors/limits in the LVUI package; iiGUI adds
-box/percentage/padding/typography/wrapping contracts, native glyph pixels,
-color conversion, rectangular clipping, resize, retained-scene reuse and
-invalid replacement preservation. The relocated installed consumer invokes
-both parser and renderer. Runtime results must be reported per platform;
-macOS execution does not establish Windows or Linux execution.
+LVUI의 창 없는 조합 검사는 박스·백분율·패딩·글꼴·줄바꿈과 잘못된 입력을
+확인한다. 플랫폼 GPU·창·스크린 리더 실행은 이 검사와 별도로 보고한다.
 
 Native API references: [AppKit attributed text drawing](https://developer.apple.com/documentation/foundation/nsattributedstring/draw%28in%3A%29)
 and [Direct2D rendering into a WIC bitmap](https://learn.microsoft.com/en-us/windows/win32/direct2d/server-side-rendering-overview).

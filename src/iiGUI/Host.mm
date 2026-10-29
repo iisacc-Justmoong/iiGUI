@@ -142,6 +142,7 @@ struct Host::Impl {
 
     HostOptions options;
     std::shared_ptr<detail::DispatchState> dispatch;
+    std::shared_ptr<PresentationStream> presentations=std::make_shared<PresentationStream>([this](runtime::Task task){return dispatch->loop.post(std::move(task));});
     std::unique_ptr<runtime::FrameLoop> motion_frames;
     std::shared_ptr<MotionPreferences> motion_preferences=std::make_shared<MotionPreferences>();
     std::size_t motion_clients=0;
@@ -193,7 +194,7 @@ struct Host::Impl {
             },
             .preferences=motion_preferences,
             .renderer=options.renderer,
-            .events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;}
+            .events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations
         };
     }
     void refresh_frames() {
@@ -339,7 +340,7 @@ struct Host::Impl {
         [window orderOut:nil];
         update_snapshot();
         state.visible = false;
-        state.closed = true;
+        state.closed = true;presentations->close();
         phase = Phase::closed;
         if(secondary){
             auto callback=std::move(callbacks.closed);auto endpoint=parent?parent->dispatch:std::shared_ptr<detail::DispatchState>{};cleanup();
@@ -502,16 +503,20 @@ struct Host::Impl {
         previous_menu = nil;
         application = nil;
         state.visible = false;
-        state.closed = true;
+        state.closed = true;presentations->close();
         phase = Phase::closed;
     }
 };
 
+core::Result<std::shared_ptr<PresentationSource>> Host::presentation_source() const {
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Presentation source requires host owner");
+    return std::static_pointer_cast<PresentationSource>(impl_->presentations);
+}
 Host::Host(HostOptions options) : impl_(std::make_unique<Impl>(std::move(options))) {}
 Host::~Host() {
     if (!is_ui_thread() || impl_->phase == Impl::Phase::running || impl_->phase == Impl::Phase::closing)
         std::terminate();
-    impl_->dispatch->retire();
+    impl_->presentations->close();impl_->dispatch->retire();
     if (!impl_->secondary&&(impl_->phase != Impl::Phase::created || impl_->dispatch->owned_loop)) impl_->dispatch->loop.request_stop();
     impl_->gate->detach();
 }
@@ -637,6 +642,25 @@ core::Result<void> Host::set_content_size(Size size) {
     impl_->update_snapshot();
     return {};
 }
+core::Result<void> Host::set_window_geometry(const WindowGeometry& update) {
+    if(auto ready=impl_->ready();!ready)return ready;
+    impl_->update_snapshot();
+    const WindowGeometryValue previous{impl_->state.title,impl_->state.size,impl_->options.minimum_size};
+    auto next=resolve_window_geometry(previous,update);if(!next)return std::unexpected(next.error());
+    @try {
+        impl_->options.minimum_size=next->minimum_size;
+        impl_->window.contentMinSize=NSMakeSize(next->minimum_size.width,next->minimum_size.height);
+        if(next->title!=previous.title)impl_->window.title=native_text(next->title);
+        if(next->size!=previous.size)[impl_->window setContentSize:NSMakeSize(next->size.width,next->size.height)];
+        impl_->state.title=next->title;impl_->update_snapshot();return {};
+    } @catch(NSException* error) {
+        impl_->options.minimum_size=previous.minimum_size;
+        impl_->window.contentMinSize=NSMakeSize(previous.minimum_size.width,previous.minimum_size.height);
+        impl_->window.title=native_text(previous.title);
+        [impl_->window setContentSize:NSMakeSize(previous.size.width,previous.size.height)];
+        return core::fail(core::ErrorCode::failed,native_error(error));
+    }
+}
 core::Result<void> Host::request_close() {
     if (auto ready = impl_->ready(); !ready) return ready;
     [impl_->window performClose:nil];
@@ -647,7 +671,7 @@ core::Result<void> Host::set_canvas(CanvasFrame frame) {
     if (auto ready = impl_->ready(); !ready) return ready;
     if (impl_->mounting) return core::fail(core::ErrorCode::busy, "A widget factory is active");
     auto result = impl_->canvas.set(std::move(frame), (__bridge void*)impl_->window.contentView,
-                                   nullptr, impl_->state.backing_scale);
+                                   nullptr, impl_->state.backing_scale,impl_->presentations);
     if (result) {
         if (impl_->widgets) { impl_->widgets->close(); impl_->widgets.reset(); }
         impl_->clear_legacy();
@@ -665,21 +689,24 @@ core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory, const Widge
     struct Reset final { bool& value; ~Reset() { value = false; } } reset{impl_->mounting};
     impl_->mounting = true;
     @try {
+            auto hooks=impl_->frame_hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};
         try {
             auto replacement = std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work) {
                 host->guard([&] { if (host->phase == Impl::Phase::running) work(); });
-            }, appearance,impl_->frame_hooks());
-            WidgetBuilder builder(replacement);
-            if (auto built = factory(builder); !built) return std::unexpected(built.error());
+            }, appearance,std::move(hooks));
+            if (auto built = replacement->construct(std::move(factory)); !built) return std::unexpected(built.error());
             if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
             if (auto attached = replacement->attach((__bridge void*)impl_->window.contentView); !attached)
                 return std::unexpected(attached.error());
+            if(auto committed=replacement->commit_window_properties();!committed)return std::unexpected(committed.error());
             impl_->canvas.clear();
             if (impl_->widgets) impl_->widgets->close();
             impl_->widgets = std::move(replacement);
             impl_->clear_legacy();
             impl_->widgets->set_frame_paced(impl_->display_link!=nil || impl_->options.frame_loop!=nullptr);
-            return WidgetMount(impl_->widgets);
+            auto published=impl_->widgets;published->commit_publication();
+            if(auto alive=published->ready();!alive)return std::unexpected(alive.error());
+            return WidgetMount(published);
         } catch (...) {
             return core::fail(core::ErrorCode::failed, "Native widget factory failed", std::current_exception());
         }

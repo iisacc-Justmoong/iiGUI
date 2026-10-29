@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.31)
 project(iiGUIInstalledConsumer LANGUAGES CXX)
 include(CTest)
-# The unchanged 0.1 public API must remain consumable after adding backends.
+# This application explicitly composes the independently packaged SDKs.
 find_package(iiGUI 0.1 CONFIG REQUIRED)
+find_package(LVUI 0.1 CONFIG REQUIRED)
 add_executable(iiGUIInstalledConsumer WIN32 MACOSX_BUNDLE main.cpp)
-target_link_libraries(iiGUIInstalledConsumer PRIVATE iiGUI::iiGUI)
+target_link_libraries(iiGUIInstalledConsumer PRIVATE iiGUI::iiGUI LVUI::LVUI)
 if(MSVC)
     target_link_options(iiGUIInstalledConsumer PRIVATE /ENTRY:mainCRTStartup)
 endif()

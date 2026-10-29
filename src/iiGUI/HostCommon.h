@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iiGUI/Host.h>
+#include "WindowProperties.h"
 #include <iiSDKCore/Core/Text/Utf8.h>
 #include <algorithm>
 #include <chrono>
@@ -41,6 +42,10 @@ inline HostOptions validate_options(HostOptions options) {
 inline bool valid_content_size(Size size, const HostOptions& options) {
     return valid_size(size) && size.width >= options.minimum_size.width &&
            size.height >= options.minimum_size.height;
+}
+inline bool full_surface_canvas(const CanvasFrame& frame,Size size) {
+    const auto r=frame.viewport;
+    return r.x==0&&r.y==0&&std::abs(double(r.width)-size.width)<.01&&std::abs(double(r.height)-size.height)<.01;
 }
 // Round up, so a native timeout cannot spin just before a Core deadline.
 inline int deadline_timeout(const std::optional<runtime::Clock::time_point>& next) {

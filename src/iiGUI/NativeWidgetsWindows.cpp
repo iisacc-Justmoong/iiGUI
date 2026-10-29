@@ -1,3 +1,4 @@
+#include "FontDatabase.h"
 #define NOMINMAX
 #include <windows.h>
 #include <windowsx.h>
@@ -16,7 +17,7 @@ WidgetInput event(WidgetInputKind kind){return {.kind=kind,.shift=(GetKeyState(V
 }
 struct WidgetSurface::Impl final {
     HWND parent;WidgetSurfaceCallbacks callbacks;NativeCanvas canvas;bool dirty=true,frame_paced=false;wchar_t surrogate=0;
-    Impl(HWND window,WidgetSurfaceCallbacks value):parent(window),callbacks(std::move(value)),canvas(window,nullptr,Acceleration::prefer_hardware,callbacks.renderer){DragAcceptFiles(parent,TRUE);}
+    Impl(HWND window,WidgetSurfaceCallbacks value):parent(window),callbacks(std::move(value)),canvas(window,nullptr,Acceleration::prefer_hardware,callbacks.renderer,callbacks.presentations){DragAcceptFiles(parent,TRUE);}
     ~Impl(){DragAcceptFiles(parent,FALSE);}
     double scale()const{const auto dpi=GetDpiForWindow(parent);return dpi?dpi/96.:1;}
     Size size()const{RECT r{};GetClientRect(parent,&r);return {(r.right-r.left)/scale(),(r.bottom-r.top)/scale()};}
@@ -61,7 +62,7 @@ void WidgetSurface::set_frame_paced(bool value){impl_->frame_paced=value;}
 void WidgetSurface::flush(){impl_->flush();}
 Size WidgetSurface::size()const{return impl_->size();}
 double WidgetSurface::backing_scale()const{return impl_->scale();}
-std::string WidgetSurface::resolve_font_family(std::string_view value)const{return value.empty()?"Segoe UI":std::string(value);}
+std::string WidgetSurface::resolve_font_family(std::string_view value)const{return FontDatabase::application()->resolve_family(value);}
 GraphicsInfo WidgetSurface::info(){return impl_->canvas.info();}
 PixelBuffer WidgetSurface::capture(){impl_->flush();return impl_->canvas.capture();}
 bool WidgetSurface::native_event(const void* value){try{return impl_->process(*static_cast<const MSG*>(value));}catch(...){impl_->callbacks.failure(std::current_exception());return true;}}

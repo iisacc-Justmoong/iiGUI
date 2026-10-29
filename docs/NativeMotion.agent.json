@@ -1,0 +1,386 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:277735a17ac6308a38bc89fa6e0b09096728064590f9705d059c15065b4a676f",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/NativeMotion.md",
+    "sha256": "57897a7de8cca89c09b6c2ee5ce92122320500931c0667ad55126c3997802083",
+    "bytes": 7530,
+    "line_count": 92,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 프레임 모션",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 프레임 모션\n",
+      "level": 1,
+      "title": "네이티브 프레임 모션"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 9,
+      "raw": "`MotionPreferences`는 C++23 소유 스레드 객체이다. `enabled && !reduced_motion`인 경우\n기본 시간을 `clamp(speed, 0.1, 4)`로 나누고 밀리초로 반올림한다. 비유한 speed는 1을\n사용한다. 음수 시간과 모션 비활성 상태는 0이며 큰 시간의 오버플로는 최댓값으로 포화한다.\n`state()`와 편집은 소유 스레드에서 실행한다. 다른 작업자의 결과는 Core 실행기로 전달한다.\n약한 Core `QueryPort` 구독은 모델당 256개이며 같은 구독의 중복 등록은 무효과이다.\n변경이 먼저 커밋되고 통지가 전달된다. 통지 중 재편집은 `busy`이고, 수신 실패는 원인을\n포함한 오류를 반환한다. 수신 실패가 이미 커밋된 설정을 되돌리지는 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "## 팝업의 실제 프레임 구동\n",
+      "level": 2,
+      "title": "팝업의 실제 프레임 구동"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 21,
+      "raw": "`PopoverOptions::transition`은 정적 C++ 콘텐츠의 enter/exit 시간·Core easing·overshoot·\ncollapsed_scale과 선택적 공유 모델을 지정한다. 기본 Popover는 모션을 켜지 않는다.\n기본 시간은 0이며 명시적으로 지정한다. 시간은 0~24시간, 축소 비율은 0.5~1,\novershoot는 0~4이다. 정적 콘텐츠를 유지하는 LVRS Alert과 정적 외곽 안에 열림 단위\n본문을 넣는 LVRS Modal이 이 경로를 사용한다. Modal의 본문은 닫힘 즉시 해제하고\n외곽만 퇴장한다. 일반 팩토리와 모션의 조합에는 `set_popup_content_at`으로 명시적인\n본문 앵커가 필요하다. [콘텐츠 수명](PopupContent.md)에 배치·입력·정리 계약을 명시한다.\n중첩 팝업의 모든 동적 앵커/변환 조합도 완전 동등성을\n검증한 범위가 아니다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 27,
+      "raw": "macOS 14+에서 창의 실제 디스플레이 콜백이 Core `FrameLoop`를 한 번씩 전진시킨다.\n각 위젯 트리는 재사용하는 `update` 콜백 하나를 예약하며 `unscaled` 시계를 선택한다.\nCore의 게임 일시 정지와 시간 배율이 UI 모션을 멈추지 않는다. 호스트는 `present` 콜백\n하나를 먼저 예약하므로 콜백 용량 부족은 팩토리/설정 단계에서 오류가 된다. 네이티브\n디스플레이 소스가 없는 호스트는 16ms 타이머로 대체하지 않고 `unsupported`를 반환한다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 33,
+      "raw": "명시적인 `HostOptions::frame_loop`가 있으면 기존 연속 프레임 구동을 공유한다. 없으면\n호스트가 같은 EventLoop 위에 내부 프레임 루프를 필요할 때 만들고, 실제 활성 모션이\n있을 때만 디스플레이 소스를 시작한다. 마지막 모션의 최종 상태를 present한 뒤 소스를\n멈춘다. 일반 이벤트/기한 타이머와 백그라운드 결과 전달은 계속 독립적으로 동작한다.\n매 프레임 설정/해제하지 않고 콜백 슬롯과 래스터 텍스처를 재사용한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 40,
+      "raw": "닫힘은 즉시 `opened=false`, 입력 차단·포커스 복귀·closed 통지를 처리한다. 정적 위젯과\nexit 픽셀만 애니메이션이 끝날 때까지 유지한다. 진행 중 다시 열면 현재 표시 값에서\n새 곡선을 시작한다. 모델의 reduced_motion 또는 enabled를 실행 중 바꾸면 해당 트랙은\n즉시 목표 값에 도달한다. speed 변경은 같은 시작 시점에 적용하는 시간을 갱신한다.\n위젯 숨김/트리 해제는 모션과 Core 구독을 즉시 회수한다. 열린 팝업은 도메인당 8개,\n열림과 exit를 합친 시각 팝업은 16개이며, 새 열림은 한도 초과 시 오류이다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "## 합성·좌표·지원 범위\n",
+      "level": 2,
+      "title": "합성·좌표·지원 범위"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 44,
+      "end_line": 48,
+      "raw": "`CanvasLayer::content_transform`은 중심점 기준 uniform scale·opacity·이동을 GPU 합성에\n적용한다. 패널·글자·이미지·clip에 적용하며, 명시적인 `shadow`와 `backdrop` 효과는\n변환하지 않는다. 원본 Alert의 그림자/유리는 카드 밖의 비변환 형제이기 때문이다.\nscale은 1/1024~4, opacity는 0~1이다. 현재 실제 지원은 Metal이며 Vulkan/D3D에서\n비항등 변환을 요구하면 명시적으로 거부한다. 캔버스 레이어는 최대 64개이다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 50,
+      "end_line": 54,
+      "raw": "글자/이미지 래스터 키는 변환값을 제외한다. GPU는 선형 색 공간에서 각 샘플을 먼저\npremultiply한 뒤 보간하여 축소 가장자리의 어두운 테두리를 방지한다. 현재 래스터\n표면은 원래 viewport에 잘리므로 원래 화면 밖에 있던 글자를 변환만으로 끌어오는\n일반 카메라/오프스크린 장면 기능은 아니다. popup shadow/blur 합계 64MiB 한도는\n[그림자](Shadows.md)와 [재질](BackdropMaterials.md) 계약을 따른다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 55,
+      "end_line": 55,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 56,
+      "end_line": 58,
+      "raw": "`WidgetSnapshot::bounds`는 기존 논리 배치이며 `visual_bounds`는 합성 뒤 경계이다.\n포인터 hit test와 슬라이더/색상 필드 입력은 역변환한다. 접근성 프레임은 합성 경계를\n사용한다. `reveal_progress`, `transitioning`, `exiting`으로 표시 상태를 관찰할 수 있다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 69,
+      "raw": "`ContentTransform::offset_x/offset_y`는 논리 좌표의 이동이다. 패널·전경·clip과 역변환\n입력/접근성 경계가 같은 이동을 적용하며, Metal은 정수 이동과 subpixel 이동 모두에서\n기존 전경을 재사용한다. 이동 값은 유한한 ±32767 범위이다. LVRS Sheet는 모바일의\n하단 진입/퇴장과 grabber 드래그·OutBack 복귀에 이를 사용한다. 보관한 본문을 닫힘\n즉시 해제하지 않으며 두 전환은 기본 420ms이다. 드래그 복귀도 모션 감소·속도와\nCore unscaled 프레임을 공유한다. 캔버스 밖 원본을 새로 생성하는 일반 오프스크린\n장면 기능으로 확장했다는 뜻은 아니다.\n입력 비활성화는 레이블의 명시적 색상이나 텍스트 역할을 바꾸지 않으며, 버튼의\n비활성 외형과 프레임 opacity는 각각 원래 계약을 따른다.\n모든 네이티브 입력·중첩·IME 조합의 플랫폼 동등성을 의미하지는 않는다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 70,
+      "end_line": 70,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "heading",
+      "start_line": 71,
+      "end_line": 71,
+      "raw": "## 검증\n",
+      "level": 2,
+      "title": "검증"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 72,
+      "end_line": 72,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 73,
+      "end_line": 77,
+      "raw": "`iiGUI.motion_*`는 설정/약한 구독/용량을 검사한다. `iiGUI.content_transform_*`는 실제\nMetal 픽셀·clip·premultiplied 가장자리·32회 래스터 재사용·미지원 백엔드 거부를 검사한다.\n`iiGUI.popup_motion_*`는 실제 디스플레이 구동 및 유휴 복귀, 방향 전환, 실시간 설정,\n변환 입력, 게임 일시 정지, 트리 회수를 검사한다. Core의 easing 검사는 Values 타깃만\n사용하며 GUI 모듈을 참조하지 않는다. Windows/Linux 네이티브 모션 실행은 미검증이다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "heading",
+      "start_line": 78,
+      "end_line": 78,
+      "raw": "## 프레임 완료 검사와 계측 실행 시간\n",
+      "level": 2,
+      "title": "프레임 완료 검사와 계측 실행 시간"
+    },
+    {
+      "id": "b000029",
+      "kind": "blank",
+      "start_line": 79,
+      "end_line": 79,
+      "raw": "\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "paragraph",
+      "start_line": 80,
+      "end_line": 83,
+      "raw": "네이티브 수명 검사는 실제 display callback과 모션 상태, GPU 제출, idle 소스 정지를\n관측한다. 일정한 wall-clock timer가 지났다는 이유로 최소 프레임 수를 추정하지 않는다.\n지연된 첫 표시 프레임에서 실제 시간 기반 모션이 곧바로 완료되는 것도 유효하다.\n결정적인 중간 곡선·반전·pause·preference 검사는 별도의 Core timestamp 검사로 유지한다.\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "paragraph",
+      "start_line": 85,
+      "end_line": 87,
+      "raw": "`frame_host`의 12/24회 완료 조건도 실제 네이티브 콜백을 센다. 4초 내부 타이머로\n첫 표시·콜백 완료를 추정하지 않으며 외부 CTest 제한으로 프로세스 생존을 제한한다.\n기존의 고정·가변 단계, GPU 갱신, 프레임 실패 차단, 변경 없는 표시 억제 조건은 유지한다.\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "blank",
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "paragraph",
+      "start_line": 89,
+      "end_line": 91,
+      "raw": "ASan/UBSan 빌드의 외부 CTest 시간 제한은 최소 120초로 둔다. 계측 프로세스 전체의\n시작/OS/GPU 초기화 시간을 release 지연\n보장으로 취급하지 않는다. 일반 빌드의 시간 제한은 변경하지 않는다.\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "blank",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 프레임 모션",
+      "anchor": "네이티브-프레임-모션",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "팝업의 실제 프레임 구동",
+      "anchor": "팝업의-실제-프레임-구동",
+      "start_line": 11
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "합성·좌표·지원 범위",
+      "anchor": "합성좌표지원-범위",
+      "start_line": 42
+    },
+    {
+      "block_id": "b000025",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "검증",
+      "anchor": "검증",
+      "start_line": 71
+    },
+    {
+      "block_id": "b000028",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "프레임 완료 검사와 계측 실행 시간",
+      "anchor": "프레임-완료-검사와-계측-실행-시간",
+      "start_line": 78
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000017",
+        "line": 46,
+        "text": "변환하지 않는다. 원본 Alert의 그림자/유리는 카드 밖의 비변환 형제이기 때문이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 77,
+        "text": "사용하며 GUI 모듈을 참조하지 않는다. Windows/Linux 네이티브 모션 실행은 미검증이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000030",
+        "line": 81,
+        "text": "관측한다. 일정한 wall-clock timer가 지났다는 이유로 최소 프레임 수를 추정하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000034",
+        "line": 91,
+        "text": "보장으로 취급하지 않는다. 일반 빌드의 시간 제한은 변경하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000007",
+        "label": "콘텐츠 수명",
+        "target": "PopupContent.md",
+        "kind": "relative",
+        "line": 19
+      },
+      {
+        "block_id": "b000019",
+        "label": "그림자",
+        "target": "Shadows.md",
+        "kind": "relative",
+        "line": 54
+      },
+      {
+        "block_id": "b000019",
+        "label": "재질",
+        "target": "BackdropMaterials.md",
+        "kind": "relative",
+        "line": 54
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

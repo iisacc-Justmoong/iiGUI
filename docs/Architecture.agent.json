@@ -1,0 +1,736 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:850a483412aa2f76e5cc10082241d6e63b306b10bb6f54e060ddcba6dbf02d71",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Architecture.md",
+    "sha256": "00cad535fc9d49a28cf628742cec5aff0839df9004d441c8069bff4740743cdb",
+    "bytes": 11545,
+    "line_count": 182,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Native host boundary",
+    "role": "reference",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native host boundary\n",
+      "level": 1,
+      "title": "Native host boundary"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "heading",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "## Dependency and platform boundary\n",
+      "level": 2,
+      "title": "Dependency and platform boundary"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 12,
+      "raw": "`application -> iiGUI -> iiSDKCore Runtime -> C++23 / native runtime`.\n앱은 LVUI와 iiGUI를 각각 선택해 조합한다. LVUI는 구문·불변 문서·문서\n레이아웃을 소유하고 iiGUI는 범용 글꼴 측정과 그래픽을 제공한다. iiGUI는\nLVUI 타입이나 패키지를 참조하지 않는다. [LVUI 연동](LVUI.md)을 참고한다.\nCore does not reference iiGUI, AppKit or another feature SDK. iiSDKBuilder is\nbuild-time orchestration, not an application runtime dependency. No GUI or\nstorage implementation is added to Core. iiGUI itself creates no files; future\napplication document/export behavior must use iiFileProvider.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 17,
+      "raw": "The public Host, UiExecutor, option, callback, snapshot and statistics records\nuse composition and final C++ types. No NSObject, NSWindow, HWND, Display,\nnative handle or platform header crosses this boundary. Platform callbacks\nremain private; they introduce no public base class or registry.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 27,
+      "raw": "CMake selects exactly one backend: Host.mm on macOS, HostWindows.cpp on\nWindows, or HostLinux.cpp on Linux. NativeCanvas owns a private renderer selection chain:\nCanvasMetal.mm or CanvasWindows.cpp first, with VulkanCanvas.cpp as the\nshared fallback. Linux uses Vulkan directly and links X11/Pango/Cairo/Vulkan. Other systems are rejected explicitly.\nTextMac.mm, TextWindows.cpp and TextLinux.cpp implement the corresponding\nprivate canvas text measurement/rasterization boundary. 앱에서 선택한 LVUI 어댑터가\n문서를 논리 박스와 CanvasFrame으로 변환한다.\nHostCommon.h shares value validation and deadline rounding; Dispatch.cpp\nremains the common Core scheduling endpoint.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "heading",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "## Execution\n",
+      "level": 2,
+      "title": "Execution"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 40,
+      "raw": "Host is constructed, run, inspected, mutated and destroyed on one owning UI\nthread. Use the process main thread for portable applications: AppKit requires\nit; Win32 and X11 allow a dedicated owning thread. Only executor() and\nis_ui_thread() are cross-thread Host operations. On macOS the host owns a\nstandalone NSApplication run and rejects an existing delegate/run. Windows\nand Linux reject a second concurrently running iiGUI Host. Embedded/multi-host\napplications are outside this API.\n`run()` is single use and rejects reentrancy. Destruction during `run()` or on\nanother thread is a lifetime violation and terminates; close through the API\nand let `run()` return before destroying its owner.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 47,
+      "raw": "UiExecutor is a weak, copyable Core TaskExecutor endpoint. `post`, `at`, `after`,\n`every` and `cancel` can be used by producers on other threads. They delegate\nadmission, priorities, cancellation, queue capacity and periodic coalescing to\nCore EventLoop. A zero/negative period is rejected by Core. Accepted pre-run\nwork stays queued until the window opens; the open callback consumes no user\nqueue slot, so startup also works with a completely full one-slot queue.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 52,
+      "raw": "Each successful submission signals a native wake gate. A mutex protects its\nattach/signal/detach lifetime. No worker retains a native window or calls its\nGUI APIs. Each bounded dispatch invokes Core poll(PumpBudget); ready work and\nthe next Core deadline determine the next wake.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "table",
+      "start_line": 54,
+      "end_line": 58,
+      "raw": "| Backend | Cross-thread wake | Deadline and native dispatch |\n|---|---|---|\n| macOS | Retained CFRunLoopSource and CFRunLoopWakeUp | One-shot CFRunLoopTimer; AppKit dispatch |\n| Windows | Auto-reset event and coalesced private window message | MsgWaitForMultipleObjectsEx for event/input; WM_TIMER killed/rearmed per Core deadline, including native move/size modal loops |\n| Linux | Nonblocking CLOEXEC eventfd; workers never touch Display | poll on the X connection and eventfd with a rounded-up Core deadline; at most 64 native events before another Core turn |\n",
+      "columns": [
+        "Backend",
+        "Cross-thread wake",
+        "Deadline and native dispatch"
+      ],
+      "rows": [
+        [
+          "macOS",
+          "Retained CFRunLoopSource and CFRunLoopWakeUp",
+          "One-shot CFRunLoopTimer; AppKit dispatch"
+        ],
+        [
+          "Windows",
+          "Auto-reset event and coalesced private window message",
+          "MsgWaitForMultipleObjectsEx for event/input; WM_TIMER killed/rearmed per Core deadline, including native move/size modal loops"
+        ],
+        [
+          "Linux",
+          "Nonblocking CLOEXEC eventfd; workers never touch Display",
+          "poll on the X connection and eventfd with a rounded-up Core deadline; at most 64 native events before another Core turn"
+        ]
+      ]
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 63,
+      "raw": "Windows retires the gate's HWND before native destruction and closes its wake\nevent only after the wait loop returns. Linux detaches/closes eventfd under\nthe producer gate lock. There is no permanent frame/polling timer. Windows\nretains OS timer granularity; scheduling is cooperative, not hard real-time.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 65,
+      "end_line": 68,
+      "raw": "The initial native dispatch calls `opened` after the window has been shown,\nbefore queued application work. Resize callbacks are delivered only after\n`opened` starts. Window changes and all public callbacks execute on the owner\nthread. A SerialQueue alone does not establish that thread affinity.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 74,
+      "raw": "Only GUI scheduling is exposed here. Core I/O reactors can run in their own\nexecution domain and post results to UiExecutor; this release does not adopt\nnative I/O watches into the window-system loop. Long callbacks can delay\nnative input; move blocking computation to Runtime. There is no hard real-time\nguarantee and no automatic rendering/frame loop.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "heading",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "## Window state and shutdown\n",
+      "level": 2,
+      "title": "Window state and shutdown"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 78,
+      "end_line": 95,
+      "raw": "Sizes describe content dimensions. macOS uses AppKit points; Windows uses\n96-DPI logical units and temporarily adopts a per-monitor-v2 DPI context on\nthe owning thread, restoring the previous context at cleanup. WM_DPICHANGED\nupdates logical size and DirectWrite/Direct2D DPI. Linux reads the Xft.dpi\nRESOURCE_MANAGER value (48..384 DPI, otherwise 96), reacts to property changes,\nand uses scaled physical dimensions for Cairo text and the Vulkan canvas. It\nprovides one X11 desktop scale; direct Wayland/per-output fractional scaling\nare not implemented. Pixel\nrounding can produce a sub-unit difference on Windows. Finite positive sizes\nup to 32767 and initial size >= minimum are required. Native resizing updates\ncached size and text layout. UTF-8 is validated before replacement; titles\nreject embedded NUL. Linux uses UTF8_STRING/_NET_WM_NAME and Pango/Cairo;\nWindows uses DirectWrite layouts, retained until text/size/DPI changes.\nBoth support native complex-script shaping, bidirectional layout and font\nfallback; glyph coverage depends on installed fonts. Input-method/editor\nbehavior is outside this read-only display contract. Equal text replacements\navoid paint work; Linux defers/coalesces text damage until a host dispatch.\nDirect2D recreates its text render target on D2DERR_RECREATE_TARGET.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 97,
+      "end_line": 104,
+      "raw": "The GPU canvas is an explicit native child surface. CanvasState shares\nvalidation/admission/coalescing among the hosts; GPU resources remain private\nand UI-owned. An instanced draw renders ordered panels into a retained sRGB\nattachment; GPU copy/blit presents it without CPU readback. Native resize or\nbacking-scale changes invalidate physical dimensions; expose reuses retained\ncontent. There is no automatic frame timer. The canvas is released before\nthe host destroys its native window/display. See Graphics.md for limits,\nhardware policy, shader math and failure behavior.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 105,
+      "end_line": 105,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 106,
+      "end_line": 113,
+      "raw": "`request_close()` and the native close button use the same close-veto callback.\nCommand-Q on macOS, Alt-F4 on Windows and WM_DELETE_WINDOW on Linux request\nthis close. No normal close path calls exit().\nOnce accepted, close stops admission, cancels queued Core work, hides the\nwindow, emits `closed` exactly once and stops the native application run.\nCallbacks cannot submit new work after that barrier. The wake source and timer\nare detached before native resources and delegates are released. Late weak\nendpoints reject instead of reviving the host.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 114,
+      "end_line": 114,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 115,
+      "end_line": 120,
+      "raw": "Callback exceptions are captured and returned as a Core error, with the C++\nexception_ptr when available. They do not unwind across Objective-C/CF callback\nboundaries, Win32 window procedures or native event dispatch. Failure bypasses\na close veto to release the host. Initial native\nsetup failure also cleans partial resources, but does not promise `opened` or\n`closed` notifications for a window that never finished opening.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 121,
+      "end_line": 121,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 122,
+      "end_line": 125,
+      "raw": "The host does not own background Runtime workers. The application closes its\nown work scopes and joins workers after `run()` returns. Workers must not wait\nsynchronously for a UI reply during shutdown. A rejected UI delivery is an\nexpected outcome when the user closes before computation completes.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 126,
+      "end_line": 126,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "heading",
+      "start_line": 127,
+      "end_line": 127,
+      "raw": "## References\n",
+      "level": 2,
+      "title": "References"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 128,
+      "end_line": 128,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "list",
+      "start_line": 129,
+      "end_line": 135,
+      "raw": "- [AppKit and UIKit main-thread rules](https://developer.apple.com/documentation/technologyoverviews/uikit-appkit)\n- [Core Foundation run-loop sources](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html)\n- [NSApplication](https://developer.apple.com/documentation/appkit/nsapplication)\n- [Win32 event/input wait](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjectsex)\n- [Win32 thread DPI context](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddpiawarenesscontext)\n- [Per-monitor-v2 DPI availability](https://learn.microsoft.com/en-us/windows/win32/hidpi/dpi-awareness-context)\n- [Xlib window/event protocol](https://xorg.freedesktop.org/archive/current/doc/libX11/libX11/libX11.html)\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "[AppKit and UIKit main-thread rules](https://developer.apple.com/documentation/technologyoverviews/uikit-appkit)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Core Foundation run-loop sources](https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[NSApplication](https://developer.apple.com/documentation/appkit/nsapplication)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Win32 event/input wait](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjectsex)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Win32 thread DPI context](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddpiawarenesscontext)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Per-monitor-v2 DPI availability](https://learn.microsoft.com/en-us/windows/win32/hidpi/dpi-awareness-context)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Xlib window/event protocol](https://xorg.freedesktop.org/archive/current/doc/libX11/libX11/libX11.html)",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 136,
+      "end_line": 136,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 137,
+      "end_line": 139,
+      "raw": "An X11/XWayland server must remain available for the Linux host's lifetime.\nXlib's process-level protocol/connection error policy remains in effect;\nrecovering from an X server restart is outside this standalone host.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 140,
+      "end_line": 140,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 141,
+      "end_line": 142,
+      "raw": "These platform APIs are used directly. Qt's platform abstraction is a problem\nreference only; no Qt implementation, API hierarchy or platform plugin is used.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 143,
+      "end_line": 143,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "heading",
+      "start_line": 144,
+      "end_line": 144,
+      "raw": "## Core host integration (iiGUI 0.4 / Core 0.16)\n",
+      "level": 2,
+      "title": "Core host integration (iiGUI 0.4 / Core 0.16)"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 145,
+      "end_line": 145,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 146,
+      "end_line": 152,
+      "raw": "DispatchState owns its EventLoop and one Core HostLoop connection. A native gate\nis attached first; HostLoop then receives a noexcept callback that signals it.\nCore, rather than UiExecutor's submission wrapper, performs coalescing and all\nsubmission/token/lifecycle/readiness notifications. The native host still owns\none-shot deadline timers and bounded event dispatch. No native handle is exposed\nby Core. The dependency remains application -> iiGUI -> Core -> standard/native\nruntime. Core imports neither iiGUI nor the graphics/text backends.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 153,
+      "end_line": 153,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 154,
+      "end_line": 158,
+      "raw": "One Core readiness waiter parks when no unready I/O exists. Pending I/O uses the\nexisting poller's bounded waits; completions execute only on UI poll. Thread\nshutdown and in-flight wake barriers finish before the native gate detaches.\nHostStats.host preserves the final Core host counters after disconnection.\nThere is no permanent UI polling or frame timer.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 159,
+      "end_line": 159,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 160,
+      "end_line": 166,
+      "raw": "Host::event_loop returns an owner-checked borrowed reference while open. It\nsupports Core FrameLoop/QueryPort integration; the bound Core dispatcher rejects\nforeign pumping or another blocking driver. Use FrameLoop::step from a scheduled\nUI callback, and keep the host alive until frame owners are destroyed. Direct\nCore request_stop is terminal and closes the native host through normal cleanup;\nit bypasses the application's close veto because the scheduler cannot restart.\nUse Host::request_close when veto behavior is required.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 167,
+      "end_line": 167,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 168,
+      "end_line": 174,
+      "raw": "Use weak UiExecutor/Core Sender values across worker boundaries. TaskScope timed\nsubmission accepts UiExecutor without a concrete EventLoop adapter. Operation's\nthen_on retains the endpoint value and a weak receiver scope; a temporary local\nexecutor therefore cannot dangle. Host closure stops queued delivery and late\nweak submissions reject. Pending Operation::wait_for returns would_block while\nthe calling thread is connected to an external host; arbitrary blocking OS/C++\ncalls remain the application's responsibility.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 175,
+      "end_line": 175,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "heading",
+      "start_line": 176,
+      "end_line": 176,
+      "raw": "## Graphics API selection\n",
+      "level": 2,
+      "title": "Graphics API selection"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 177,
+      "end_line": 177,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 178,
+      "end_line": 182,
+      "raw": "See [native rendering and Vulkan fallback](Renderers.md). Cocoa/AppKit and Win32\nremain the native window/text boundaries. The common Vulkan renderer creates\nplatform surfaces through private VulkanWindow implementations and retains\nthe same CanvasFrame/LVUI contracts. RendererChain owns the two concrete\nbackends, records failure reasons and switches once on native failure.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native host boundary",
+      "anchor": "native-host-boundary",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000003",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Dependency and platform boundary",
+      "anchor": "dependency-and-platform-boundary",
+      "start_line": 3
+    },
+    {
+      "block_id": "b000011",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Execution",
+      "anchor": "execution",
+      "start_line": 29
+    },
+    {
+      "block_id": "b000027",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Window state and shutdown",
+      "anchor": "window-state-and-shutdown",
+      "start_line": 76
+    },
+    {
+      "block_id": "b000039",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "References",
+      "anchor": "references",
+      "start_line": 127
+    },
+    {
+      "block_id": "b000047",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Core host integration (iiGUI 0.4 / Core 0.16)",
+      "anchor": "core-host-integration-iigui-04--core-016",
+      "start_line": 144
+    },
+    {
+      "block_id": "b000057",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Graphics API selection",
+      "anchor": "graphics-api-selection",
+      "start_line": 176
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 8,
+        "text": "LVUI 타입이나 패키지를 참조하지 않는다. [LVUI 연동](LVUI.md)을 참고한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 12,
+        "text": "application document/export behavior must use iiFileProvider.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 58,
+        "text": "| Linux | Nonblocking CLOEXEC eventfd; workers never touch Display | poll on the X connection and eventfd with a rounded-up Core deadline; at most 64 native events before another Core turn |",
+        "basis": "lexical_match",
+        "context": "table"
+      },
+      {
+        "block_id": "b000029",
+        "line": 87,
+        "text": "up to 32767 and initial size >= minimum are required. Native resizing updates",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 116,
+        "text": "exception_ptr when available. They do not unwind across Objective-C/CF callback",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 120,
+        "text": "`closed` notifications for a window that never finished opening.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 123,
+        "text": "own work scopes and joins workers after `run()` returns. Workers must not wait",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000043",
+        "line": 137,
+        "text": "An X11/XWayland server must remain available for the Linux host's lifetime.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000053",
+        "line": 166,
+        "text": "Use Host::request_close when veto behavior is required.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "LVUI 연동",
+        "target": "LVUI.md",
+        "kind": "relative",
+        "line": 8
+      },
+      {
+        "block_id": "b000041",
+        "label": "AppKit and UIKit main-thread rules",
+        "target": "https://developer.apple.com/documentation/technologyoverviews/uikit-appkit",
+        "kind": "external",
+        "line": 129
+      },
+      {
+        "block_id": "b000041",
+        "label": "Core Foundation run-loop sources",
+        "target": "https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Multithreading/RunLoopManagement/RunLoopManagement.html",
+        "kind": "external",
+        "line": 130
+      },
+      {
+        "block_id": "b000041",
+        "label": "NSApplication",
+        "target": "https://developer.apple.com/documentation/appkit/nsapplication",
+        "kind": "external",
+        "line": 131
+      },
+      {
+        "block_id": "b000041",
+        "label": "Win32 event/input wait",
+        "target": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjectsex",
+        "kind": "external",
+        "line": 132
+      },
+      {
+        "block_id": "b000041",
+        "label": "Win32 thread DPI context",
+        "target": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setthreaddpiawarenesscontext",
+        "kind": "external",
+        "line": 133
+      },
+      {
+        "block_id": "b000041",
+        "label": "Per-monitor-v2 DPI availability",
+        "target": "https://learn.microsoft.com/en-us/windows/win32/hidpi/dpi-awareness-context",
+        "kind": "external",
+        "line": 134
+      },
+      {
+        "block_id": "b000041",
+        "label": "Xlib window/event protocol",
+        "target": "https://xorg.freedesktop.org/archive/current/doc/libX11/libX11/libX11.html",
+        "kind": "external",
+        "line": 135
+      },
+      {
+        "block_id": "b000059",
+        "label": "native rendering and Vulkan fallback",
+        "target": "Renderers.md",
+        "kind": "relative",
+        "line": 178
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000019",
+        "columns": [
+          "Backend",
+          "Cross-thread wake",
+          "Deadline and native dispatch"
+        ],
+        "rows": [
+          [
+            "macOS",
+            "Retained CFRunLoopSource and CFRunLoopWakeUp",
+            "One-shot CFRunLoopTimer; AppKit dispatch"
+          ],
+          [
+            "Windows",
+            "Auto-reset event and coalesced private window message",
+            "MsgWaitForMultipleObjectsEx for event/input; WM_TIMER killed/rearmed per Core deadline, including native move/size modal loops"
+          ],
+          [
+            "Linux",
+            "Nonblocking CLOEXEC eventfd; workers never touch Display",
+            "poll on the X connection and eventfd with a rounded-up Core deadline; at most 64 native events before another Core turn"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

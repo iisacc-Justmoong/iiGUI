@@ -1,0 +1,265 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:2885a8317c641194e6e300baf68f35c880d6eb1aae5cdc8d5926392e33e0b2a3",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/editor-input.md",
+    "sha256": "2cc00a041103976e611ae2450dea31224b5f78dcbce6abb2871037ef6e9e5da2",
+    "bytes": 4244,
+    "line_count": 30,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "편집기 입력과 텍스트 서비스",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 편집기 입력과 텍스트 서비스\n",
+      "level": 1,
+      "title": "편집기 입력과 텍스트 서비스"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "`WidgetInput`은 논리 좌표와 함께 포인터 종류·장치 ID·압력·기울기(도)·회전(도)·단조 시각(초), 버튼 비트와 Shift/Control/Alt/Meta를 전달한다. 정밀 휠은 가로·세로 논리 델타를 보존한다. 마우스의 기본 압력은 1이며 펜의 접촉 압력은 0~1이다. 비유한 값과 범위 밖 압력은 명령 전달 전에 거부한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "입력 처리기가 소비한 누름은 해당 처리기에 이동·해제를 캡처하고 키보드 초점을 준다. 포커스 상실·뷰 폐기·숨김 시 캡처를 해제한다. 상위 단축키 처리기는 `text_input_active`를 확인하여 텍스트 입력 중 도구 변경을 억제할 수 있다. 플랫폼별 일반 문자 키는 `WidgetKey::character`와 수정키 없는 `text`로 전달한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "문자 입력을 소유한 사용자 정의 편집기는 인쇄 가능한 공백을 key-down과 text로\n중복 삽입하지 않고 text 이벤트로 받는다. UIKit 하드웨어 키보드에서 편집 중인\n수정키 없는 공백은 text service에 맡기며, 버튼과 수정키 단축키는 기존 키 입력을\n유지한다. 실제 기기 키보드 검증은 별도로 필요하다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "IME의 `replacement_range`와 `composition_selection`, 스냅샷의 선택·조합 범위는 UTF-16 단위이다. 내부 편집은 UTF-8 스칼라 경계에서만 일어난다. 서로게이트 중간 범위를 거부하고, 조합 문자열은 확정 전 문서 텍스트를 변경하지 않는다. `InputOptions.multiline`은 Enter를 줄바꿈으로 처리하며 Control/Meta+Enter는 제출한다. 복사·잘라내기·붙여넣기는 네이티브 클립보드와 현재 선택을 사용한다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 15,
+      "raw": "Cocoa의 `NSRange`는 `ii::gui::TextRange`로 변환하며 `size_t` 범위를 보존한다.\nApple의 동명 CoreServices 자료형과 혼동하거나 32비트 필드로 축소하지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 20,
+      "raw": "macOS의 Copy/Paste 명령은 편집기가 활성화된 경우 기존 문자 선택 경로를 유지한다.\n그 외의 자체 컨트롤에는 copy 키와 `WidgetInput.content`를 가진 text 이벤트를 전달한다.\n이 때문에 표는 행렬을 붙여넣고 편집기는 문자를 붙여넣을 수 있다. 전체 클립보드 payload는\n기존 크기·UTF-8 검증을 거치며 Source text 필드의 65,536바이트 한도와 구분한다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "`iiGUI.editor_input`은 압력과 보조키 보존, 화면 밖 캡처·취소, UTF-16 교체·잘못된 서로게이트, 한글 조합·확정, 다중행, 단축키 보호와 속성 바인딩 해제를 실제 Host에서 검사한다. 이 합성 입력 검사는 물리 펜 하드웨어 검증과 구분한다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "## XInput 펜 센서 상태\n",
+      "level": 2,
+      "title": "XInput 펜 센서 상태"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "XInput의 펜 및 지우개 입력은 source device별로 마지막 유효한 압력·기울기·회전을 유지한다. 장치를 처음 확인할 때 가능한 현재 축 값을 읽고, 이후 이벤트에는 축 마스크에 포함된 값만 반영한다. 따라서 센서 축이 없는 버튼 누름·떼기에는 마지막으로 확인된 표본이 전달되며 명시적으로 전달된 0은 새 값으로 반영된다. 비유한 축이 있는 갱신은 전체를 거부하고 이전 표본으로 이벤트를 전달해 누름·떼기를 잃지 않는다. 터치와 마우스는 이 펜 상태를 공유하지 않는다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "보존한 값은 최종 이벤트의 실제 측정값이 아니라 해당 장치에서 마지막으로 관찰한 값이다. XInput의 기존 `Abs Rotation` 축은 그대로 사용하며, `Abs Wheel`이 회전과 슬라이더를 겸하는 경우 이를 추정으로 분리하지 않는다. [XWayland 소스](https://raw.githubusercontent.com/mirror/xserver/master/hw/xwayland/xwayland-input.c)는 이런 축 결합과 회전의 원점·배율 변환을 보여 준다. XInput 장치 종류·축 변경의 동적 재검색, 혼합 축 판별, Wayland 태블릿 프로토콜 및 실제 Linux 펜 기기 검증은 별도다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "`iiGUI.xinput_pen_state`는 센서 값이 빠진 버튼 입력, 한 축만 바뀐 입력, 명시적 0, 서로 다른 장치와 유효하지 않은 값의 원자적 거부를 순수 합성 상태 검사로 확인한다. 이 검사는 X 서버 또는 펜을 실행하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "편집기 입력과 텍스트 서비스",
+      "anchor": "편집기-입력과-텍스트-서비스",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "XInput 펜 센서 상태",
+      "anchor": "xinput-펜-센서-상태",
+      "start_line": 24
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000009",
+        "line": 12,
+        "text": "IME의 `replacement_range`와 `composition_selection`, 스냅샷의 선택·조합 범위는 UTF-16 단위이다. 내부 편집은 UTF-8 스칼라 경계에서만 일어난다. 서로게이트 중간 범위를 거부하고, 조합 문자열은 확정 전 문서 텍스트를 변경하지 않는다. `InputOptions.multiline`은 Enter를 줄바꿈으로 처리하며 Control/Meta+Enter는 제출한다. 복사·잘라내기·붙여넣기는 네이티브 클립보드와 현재 선택을 사용한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 15,
+        "text": "Apple의 동명 CoreServices 자료형과 혼동하거나 32비트 필드로 축소하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 26,
+        "text": "XInput의 펜 및 지우개 입력은 source device별로 마지막 유효한 압력·기울기·회전을 유지한다. 장치를 처음 확인할 때 가능한 현재 축 값을 읽고, 이후 이벤트에는 축 마스크에 포함된 값만 반영한다. 따라서 센서 축이 없는 버튼 누름·떼기에는 마지막으로 확인된 표본이 전달되며 명시적으로 전달된 0은 새 값으로 반영된다. 비유한 축이 있는 갱신은 전체를 거부하고 이전 표본으로 이벤트를 전달해 누름·떼기를 잃지 않는다. 터치와 마우스는 이 펜 상태를 공유하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 28,
+        "text": "보존한 값은 최종 이벤트의 실제 측정값이 아니라 해당 장치에서 마지막으로 관찰한 값이다. XInput의 기존 `Abs Rotation` 축은 그대로 사용하며, `Abs Wheel`이 회전과 슬라이더를 겸하는 경우 이를 추정으로 분리하지 않는다. [XWayland 소스](https://raw.githubusercontent.com/mirror/xserver/master/hw/xwayland/xwayland-input.c)는 이런 축 결합과 회전의 원점·배율 변환을 보여 준다. XInput 장치 종류·축 변경의 동적 재검색, 혼합 축 판별, Wayland 태블릿 프로토콜 및 실제 Linux 펜 기기 검증은 별도다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 30,
+        "text": "`iiGUI.xinput_pen_state`는 센서 값이 빠진 버튼 입력, 한 축만 바뀐 입력, 명시적 0, 서로 다른 장치와 유효하지 않은 값의 원자적 거부를 순수 합성 상태 검사로 확인한다. 이 검사는 X 서버 또는 펜을 실행하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000021",
+        "label": "XWayland 소스",
+        "target": "https://raw.githubusercontent.com/mirror/xserver/master/hw/xwayland/xwayland-input.c",
+        "kind": "external",
+        "line": 28
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

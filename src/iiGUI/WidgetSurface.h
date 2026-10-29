@@ -16,6 +16,7 @@ struct WidgetSurfaceCallbacks final {
     std::function<core::Result<TextContent>(std::string_view,TextRange)> text_content;
     std::function<core::Result<std::size_t>(std::string_view,double,double)> text_position;
     Renderer renderer=Renderer::automatic;
+    std::shared_ptr<PresentationStream> presentations;
 };
 class WidgetSurface final {
 public:
@@ -36,6 +37,8 @@ public:
     bool native_event(const void*);
 private:
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    // A native callback keeps this private state while an action can retire
+    // its wrapper/generation. It does not prolong the widget's admission.
+    std::shared_ptr<Impl> impl_;
 };
 } // namespace ii::gui::detail

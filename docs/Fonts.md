@@ -1,0 +1,49 @@
+# 네이티브 글꼴 서비스
+
+`FontDatabase`는 창이나 OS 컨트롤을 생성하지 않고 글꼴 목록, 시스템 글꼴, 애플리케이션 기본 글꼴, 대체 목록과 번들 등록 결과를 제공한다. 글꼴 정책과 플랫폼 조회는 `FontProvider` 인터페이스로 분리한다. iiSDKCore의 `Result`, UTF 변환, `Observable`을 사용하며 Qt 의존성은 없다.
+
+## 소유와 적용
+
+`FontDatabase::application()`은 해당 UI 스레드가 소유하는 기본 애플리케이션 서비스이다. 스레드가 끝날 때 정리되며 동일 스레드의 창·정책이 이를 공유한다. 다른 환경이나 테스트는 명시적으로 생성한 데이터베이스를 주입한다. 생성자에 `nullopt`를 전달하면 애플리케이션 글꼴이 없는 환경이고, 이때 기본 글꼴 변경은 false를 반환한다. 이 존재 여부는 Qt 전역 객체가 아니라 iiSDK 서비스의 소유 상태를 뜻한다.
+
+조회·수정·구독·폐기는 소유 스레드에서 수행한다. 변경 통지 중 조회는 허용하고 재진입 수정은 busy로 거부한다. 수신 오류는 이미 반영된 글꼴 상태를 롤백하지 않는다. 기본 글꼴 설정은 iiSDK가 그리는 텍스트에 적용하며 사용자 OS의 전역 글꼴 설정을 변경하지 않는다.
+
+위젯 트리는 같은 서비스를 구독하고 글꼴 변경 시 측정 캐시와 레이아웃을 무효화한다. 노드·입력·선택·포커스·content generation은 교체하지 않는다. 임베디드 콘텐츠는 부모의 글꼴 서비스를 공유한다. 폐기 시 구독을 닫는다. 명시적인 글꼴명이 있으면 이를 우선하며, 누락된 글꼴은 등록된 대체 목록·애플리케이션 글꼴·시스템 글꼴 순으로 해결한다.
+
+사용자 정의 그리기 제공자는 `WidgetPaintState::font_family`로 현재 해결된 글꼴
+가족을 받는다. 애플리케이션 글꼴이나 대체 결과가 바뀌면 기존 위젯의 다음 그리기에도
+새 가족이 전달된다. 이 값은 상위 컴포넌트의 텍스트 그리기에 사용할 수 있으며
+iiGUI가 그 컴포넌트의 스타일이나 상태를 소유하지는 않는다.
+
+`lvrs_text_tokens()`는 LVRS 원본의 7개 텍스트 토큰을 보관하는 설계 스냅샷이다. iiGUI의 기본 렌더링과 LVRS 정책 계층이 같은 데이터를 사용한다. 지정된 픽셀 크기가 토큰과 일치하면 해당 굵기를 적용하되 명시적인 label 굵기와 compact Inter 설정은 유지한다. 이 데이터는 상위 SDK의 헤더나 Qt 런타임을 참조하지 않는다.
+
+## 플랫폼과 리소스
+
+| 플랫폼 | 조회·등록 경로 |
+|---|---|
+| macOS·iOS | CoreText 가족 목록과 프로세스 범위 글꼴 등록 |
+| Windows 10+ | DirectWrite 시스템·번들 font set을 결합한 공통 collection |
+| Linux | Fontconfig 애플리케이션 글꼴 등록과 Pango font map 갱신 |
+| Android | API 29+ native matcher 또는 구형 시스템 설정에서 기본 가족 식별, 시스템 SFNT 메타데이터 및 APK 자산 |
+
+Windows의 private collection은 실제 텍스트 측정·렌더링에도 전달한다. 등록됐다는 별도 목록만 만들고 화면에서 다른 collection을 사용하는 구조를 피한다. 플랫폼 코드의 존재, 컴파일, 실제 실행은 각각 별도로 검증해야 한다.
+
+`resources/lvrs-native-appearance.json`이 번들 파일 목록과 SHA-256의 기준이다. 원본 순서대로 Inter 1개와 Pretendard 9개를 제공한다. 글꼴 10개와 라이선스 2개의 설치·앱 리소스 목록을 이 자료에서 생성한다. 원본 LVRS는 갱신 도구에서만 읽으며 빌드·런타임 의존성이 아니다. `tools/update_native_font_assets.py --check`로 원본 목록·바이트·순서를 대조한다.
+
+각 파일의 등록 성공 여부와 오류를 별도로 반환한다. 일부 파일의 실패를 전체 성공으로 숨기지 않으며, 사용 가능한 글꼴 목록으로 실제 family 존재 여부를 확인한다. 동일 데이터베이스에서는 등록을 한 번 시도한다. 표시 조회는 정규화한 가족명 인덱스를 사용하고 매번 OS 목록을 재열거하지 않는다. OS 외부의 설치·제거는 `refresh()`로 다시 조회한다.
+
+Android의 시스템 기본 가족명은 고정된 Roboto 문자열로 추정하지 않는다. [NDK font matcher](https://developer.android.com/ndk/reference/group/font)가 반환한 파일·collection index의 실제 이름을 읽고, 이전 API에서는 시스템 fonts.xml의 기본 가족을 읽는다. glyph 데이터는 텍스트 run 동안 강하게 유지한다. 시스템 glyph face 캐시는 최근 8개로 제한하며 번들 자산은 별도로 유지한다. Windows private set은 [DirectWrite의 font set 결합](https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-sets-win10) 방식이다.
+
+## 제한된 메타데이터 판독
+
+Android 목록 조회에 사용하는 `FontMetadata`는 SFNT/TTC의 name·OS/2 테이블만 읽는다. 파일 전체를 glyph 버퍼로 복사하지 않는다. 파일·테이블·레코드·문자열 범위를 검사하고 UTF-16BE를 Core UTF-8로 변환한다. 이 판독기는 글리프 파서나 일반적인 임의 글꼴 렌더러가 아니다. Android의 기존 ASCII shaping 제한과 16 MiB 글리프 데이터 한도, TTC의 개별 face 처리, 플랫폼별 glyph cascade 동등성은 별도 검증 대상이다.
+
+검사는 `font_database.cpp`, `font_metadata.cpp`, `font_widgets.cpp`에 둔다. mock 공급자 검사는 실제 정책·상태 코드를 실행하고, native 공급자 검사는 창 없이 프로세스 범위 리소스와 시스템 메타데이터만 조회한다. LVRS의 최종 앱·테스트 실행 유보 방침과 iiGUI 서비스 검증을 구분한다.
+
+## 대량 행의 글꼴 구독
+
+같은 글꼴 데이터베이스를 쓰는 콘텐츠·키 행·팝업은 루트 뷰의 구독 하나를 차용한다.
+변경 시 게시된 하위 트리와 아직 게시하지 않은 후보의 조상·자식을 함께 갱신하고 루트를
+한 번 무효화한다. 행마다 공유 Observable 구독을 만들지 않으므로 4,096 노드 경계의
+2,047행도 관측자 한도를 먼저 소진하지 않는다. 후보 생성 중 글꼴 변경, 기존 편집·포커스,
+퇴역과 최대 행 수의 재활성화를 회귀 검사한다. Core의 공통 관측자 한도는 바꾸지 않는다.

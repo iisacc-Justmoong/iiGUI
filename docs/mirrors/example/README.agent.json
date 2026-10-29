@@ -1,0 +1,79 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:a7a3c6bdd50683baf54130f42772b199af1adea954933035cb627b737445dec4",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "example/README.md",
+    "sha256": "e2757c8ce1d4ddb69c57ffbb5f2a2791ca20cd2b333bff4588d342635e011f8b",
+    "bytes": 281,
+    "line_count": 3,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "iiGUI native examples",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# iiGUI native examples\n",
+      "level": 1,
+      "title": "iiGUI native examples"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "The runnable contracts and examples are maintained in [`examples/`](../examples/). Build them in the repository `build/` directory. Use the installed native SDK kit documented in `docs/`; the Congregation integration uses C++23 and contains no Qt runtime.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "iiGUI native examples",
+      "anchor": "iigui-native-examples",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "`examples/`",
+        "target": "../examples/",
+        "kind": "relative",
+        "line": 3
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

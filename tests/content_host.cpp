@@ -8,9 +8,23 @@ template<class T>T take(core::Result<T> value){if(!value){if(value.error().cause
 void good(core::Result<void> value){if(!value){if(value.error().cause)std::rethrow_exception(value.error().cause);throw std::runtime_error(value.error().message);}}
 void run(std::string name){
     gui::Host host({.size={540,400}});gui::WidgetMount mount;gui::Widget slot,old,button,after;
-    int created=0,destroyed=0,clicked=0,committed=0;
-    struct Owner final{int& count;explicit Owner(int& value):count(value){}~Owner(){++count;}};
-    auto factory=[&](gui::WidgetBuilder& b)->core::Result<void>{++created;good(b.retain(std::make_shared<Owner>(destroyed)));auto root=take(b.vstack({},"page",{.spacing=4,.alignment=gui::StackAlignment::stretch}));button=take(b.button(root,"action",{.text="Native page"},[&]{++clicked;}));return {};};
+    int created=0,destroyed=0,clicked=0,committed=0,retired=0;
+    bool retirement_order=true;
+    struct Owner final{
+        int& count; bool& ordered; std::shared_ptr<bool> admission_closed;
+        Owner(int& value,bool& order,std::shared_ptr<bool> closed):count(value),ordered(order),admission_closed(std::move(closed)){}
+        ~Owner(){ordered &= *admission_closed;++count;}
+    };
+    auto factory=[&](gui::WidgetBuilder& b)->core::Result<void>{
+        ++created;
+        auto closed=std::make_shared<bool>(false);
+        good(b.on_retire([&,closed]{*closed=true;++retired;}));
+        good(b.on_retire([]{throw std::runtime_error("Retirement failure must not skip later hooks");}));
+        good(b.on_retire([closed]{check(*closed,"Retirement callbacks lost registration order");}));
+        check(!b.on_retire({}),"Empty retirement callback was accepted");
+        good(b.retain(std::make_shared<Owner>(destroyed,retirement_order,closed)));
+        auto root=take(b.vstack({},"page",{.spacing=4,.alignment=gui::StackAlignment::stretch}));button=take(b.button(root,"action",{.text="Native page"},[&]{++clicked;}));return {};
+    };
     good(host.run({.opened=[&]{
         mount=take(host.mount_widgets([&](gui::WidgetBuilder& b)->core::Result<void>{auto root=take(b.vstack({},"root",{.spacing=8,.alignment=gui::StackAlignment::leading}));slot=take(b.content_host(root,"slot",{360,220}));after=take(b.button(root,"after",{.text="After"}));return {};}));
         good(slot.set_content(factory));old=button;check(take(slot.snapshot()).has_content,"Host did not publish a page");const auto generation=take(slot.snapshot()).content_generation;
@@ -62,6 +76,7 @@ void run(std::string name){
         }else throw std::runtime_error("Unknown content host case");
         good(host.request_close());
     }}));
+    check(retirement_order&&retired==created&&destroyed==created,"A generation retained owners or retired after destroying them");
 }
 }
 int main(int argc,char** argv){try{run(argc>1?argv[1]:"lifetime");std::cout<<"CONTENT_HOST_OK\n";}catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

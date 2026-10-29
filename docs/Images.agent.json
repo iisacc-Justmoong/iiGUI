@@ -1,0 +1,178 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:bb2e84a7bdb324680f469117a9cdeeaca4e9842f1ef05d6ed5ba359cdbea1749",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Images.md",
+    "sha256": "2660a66aabf5b8135c51277d278720efbfa7cfc056b94b0936dc4a9a1610bc06",
+    "bytes": 3380,
+    "line_count": 50,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Native images, SVG assets and ordered layers",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native images, SVG assets and ordered layers\n",
+      "level": 1,
+      "title": "Native images, SVG assets and ordered layers"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 8,
+      "raw": "`rgba_image` transfers an encoded-sRGB straight-alpha RGBA8 buffer into immutable\n`RasterImage` storage. Dimensions must be 1..2048 and the byte count must match.\n`ImageRun` specifies logical bounds, an optional **linear** color tint, and opacity.\nThe rasterizer bilinearly samples in premultiplied linear light and clips to the\nsurface. The GPU samples the resulting sRGB texture and blends in linear light.\nThere is no mutable pixel view or implicit resource-file access.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 10,
+      "end_line": 15,
+      "raw": "`svg_image` accepts <=1 MiB UTF-8 SVG and rasterizes using the native C++\n[LunaSVG 3.5.0](https://github.com/sammycage/lunasvg) asset codec, pinned to commit\n`83c58df8103dc7dca423dfd824992af94d49bed6`. Its PlutoVG dependency is pinned by\nthe upstream submodule. Both MIT license texts ship under `share/iiGUI/licenses`.\nThe initial source build obtains these dependencies; an installed consumer uses\ntheir installed CMake packages and libraries without fetching sources.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 21,
+      "raw": "External SVG file resources and automatic system-font loading are disabled at\ncompile time. Paths, clipping, masks, gradients and embedded data images are\nhandled by the codec. Filters, animation, scripts, foreign objects and external\ndocument declarations return `unsupported` instead of being silently ignored.\nThe decoder handles asset geometry, not a UI language or runtime program.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 28,
+      "raw": "`CanvasFrame` draws its base panels, texts, then images. Each `CanvasLayer` in\n`overlays` draws in that same order **after all content in the previous layer**.\nThus popup backgrounds can cover base text and icons. Up to 16 overlays are\naccepted; aggregate panel/text/image and text-byte budgets are validated.\nThis is a drawing contract. Menu behavior, focus trapping, outside-click dismissal\nand scrolling are separate widget responsibilities and are not supplied by a layer.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 35,
+      "raw": "`CanvasLayer::clip` is an optional logical rectangle relative to the canvas.\nMetal/Vulkan/D3D11 apply hardware scissoring to all panels, text and images in\nthat layer. A zero-size rectangle hides the layer. Bounds are intersected with\nthe attachment and rounded outwards to device pixels. Image UVs remain unchanged.\nClip-only changes reuse the foreground texture and do not rerasterize glyphs or\nupload image pixels. Self-rendered menus use this contract for scrollable rows.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 37,
+      "end_line": 41,
+      "raw": "Metal, Vulkan and D3D11 keep one GPU foreground texture per active nonempty layer.\nText, image identity, tint, opacity, bounds, scale or viewport changes invalidate\nthat layer. Panel-only changes reuse it. Identical frames reuse the scene attachment;\nremoving a layer releases its foreground texture. Vulkan uses a distinct descriptor\nset per layer, so later descriptor updates cannot redirect an earlier draw.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 42,
+      "end_line": 42,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 43,
+      "end_line": 50,
+      "raw": "`iiGUI.images_*` tests cover SVG pixels, invalid inputs, clipping, linear blending,\nactual GPU layer order, foreground cache reuse, selective invalidation and storage\nrelease. Native Metal and Vulkan tests run on macOS; D3D11 source uses the same\ncontract but Windows execution is not covered by those macOS results.\nThe outer process timeout allows a cold app/font load from external storage;\nthe example's five-second callback watchdog starts after its view is mounted.\nSanitizer builds instrument iiGUI and the native SVG codec targets; an independently\ninstalled Core shared library is not instrumented by that build option.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native images, SVG assets and ordered layers",
+      "anchor": "native-images-svg-assets-and-ordered-layers",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "`RasterImage` storage. Dimensions must be 1..2048 and the byte count must match.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 34,
+        "text": "Clip-only changes reuse the foreground texture and do not rerasterize glyphs or",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000005",
+        "label": "LunaSVG 3.5.0",
+        "target": "https://github.com/sammycage/lunasvg",
+        "kind": "external",
+        "line": 11
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

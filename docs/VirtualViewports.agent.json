@@ -1,0 +1,413 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:18ac1a7739c4da674219a5dbfb556614779ff16a40c054439d6e556f66df3063",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/VirtualViewports.md",
+    "sha256": "221d8137707031ae8ace7c4d5e3ade6ad06e272c4328e90982b3cb7c06050c1c",
+    "bytes": 7320,
+    "line_count": 92,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "가상 viewport와 보관형 그리기",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 가상 viewport와 보관형 그리기\n",
+      "level": 1,
+      "title": "가상 viewport와 보관형 그리기"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "대용량 표의 논리 행 좌표를 실제 위젯 위치에 그대로 넣지 않도록 세 가지 C++23 계약을\n추가했다. Qt나 OS 스크롤 컨트롤을 만들지 않으며 기존 iiGUI 표면·GPU 그리기·입력 경로를\n사용한다. 새 테스트는 작성·빌드 단계이며 실행 검증은 최종 일괄 단계까지 유보한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "## 논리 스크롤 범위\n",
+      "level": 2,
+      "title": "논리 스크롤 범위"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 13,
+      "raw": "`ScrollOptions::virtual_content_height`와 `virtual_content_width`는 각 축의 논리\n범위를 지정한다. 유한한 0~1e15를 허용하며 실제 viewport 폭·높이는 기존 최대\n8192이다. 지정한 축의 자식은 viewport 원점과 크기에 머문다. 수백만/수조 논리\n픽셀을 스크롤해도 같은 크기의 실제 위젯이나 비트맵을 만들지 않는다. 소유자가\n현재 두 축의 offset을 받아 화면과 교차하는 데이터만 그리는 구조이다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 19,
+      "raw": "세로 범위를 생략하면 기존 자연 높이 배치를 사용한다. 가로 범위를 생략한 기본값은\n기존처럼 자식 폭을 viewport에 맞춘다. `horizontal_enabled=true`는 자식의 자연\n폭을 보존하여 일반 콘텐츠도 가로로 이동하게 한다. 가상 축과 자연 축을 섞을 수 있다.\nfocus reveal은 자연 축만 자동 이동하며 가상 셀의 드러내기는 모델 소유자가 담당한다.\n`enabled=false`는 두 offset을 0으로 제한한다. 콘텐츠 축소도 두 축을 다시 제한한다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 25,
+      "raw": "`set_scroll_position(x,y)`는 두 값을 검증한 뒤 한 번에 적용하고 한 상태를 통지한다.\n기존 `set_scroll_offset(y)`는 가로 위치를 유지하며 `set_horizontal_scroll_offset(x)`는\n세로 위치를 유지한다. 스냅샷에는 `horizontal_scroll_offset`과 `content_width`를 더했다.\n콜백은 `ScrollViewport{bounds,offset,content_height,horizontal_offset,content_width}`를\n받으며 기존 첫 세 필드의 순서는 유지한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 26,
+      "end_line": 26,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 27,
+      "end_line": 31,
+      "raw": "가로·세로 휠을 함께 처리한다. Shift+세로 휠은 수평 이동이며 OS가 이미 scroll_x를\n제공하면 다시 축을 바꾸지 않는다. 중첩 viewport는 이동한 축만 소비하고 막힌 축은\n조상에게 전달한다. 한 축이 경계에 일부만 도달한 경우 해당 이벤트의 그 축은 소비하며\n남은 거리까지 쪼개 재전달하는 방식은 아니다. 가로·세로 표시기는 모서리에서 겹치지\n않게 그린다. 표시기 직접 드래그와 터치 관성은 아직 포함하지 않는다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 33,
+      "end_line": 35,
+      "raw": "등록 후 첫 유효 조회/입력/표시 경계와 이후 실효 상태 변경에 통지한다. 같은 상태를\n반복 통지하지 않으며 layout revision으로 불필요한 전체 노드 재순회를 피한다.\n색상·그리기 데이터만 바꾼 경우 layout revision을 증가시키지 않는다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 37,
+      "end_line": 43,
+      "raw": "통지는 입력 처리, 명시적인 snapshot, scroll 옵션/offset 변경, capture/info/present\n같은 UI 경계에서 처리한다. GPU frame 생성 함수 안에서는 사용자 코드를 호출하지\n않는다. 소유자는 viewport 크기를 직접 설정하는 경우 그 변경 경계에서 갱신할 수 있다.\n수신 중인 같은 viewport의 옵션/offset 재변경은 busy로 거절한다. 다른 위젯과 그리기는\n갱신할 수 있으며, 연결된 layout 변경은 최대 8회 정착 과정을 거친다. 수신자가 실패했을\n때 이미 적용된 offset/옵션을 자동으로 되돌리지 않는다. 통지에서 트리를 해제하면\n남은 통지는 중단하고 조회는 closed를 반환한다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "heading",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "## 위젯 안의 그리기 데이터\n",
+      "level": 2,
+      "title": "위젯 안의 그리기 데이터"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 49,
+      "raw": "스택 위젯의 `set_drawing(WidgetDrawing)`은 지역 좌표의 Panel·TextRun·ImageRun 목록을\n보관한다. 기본 Graphics의 선형 sRGB, 폰트, 이미지와 유효성·용량 한도를 그대로 쓴다.\n유효하지 않은 입력은 기존 내용을 바꾸지 않는다. 같은 값은 재무효화하지 않는다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 51,
+      "end_line": 56,
+      "raw": "보관한 그리기는 해당 스택의 기하에 맞춰 이동하고 스택 경계와 조상 viewport에 clip한다. `TextRun::clip`은 텍스트 조판 경계를\n바꾸지 않는 추가 지역 clip이며 스택 이동과 중첩 팝업의 좌표 이동을 함께 따른다.\n그 뒤 실제 자식 위젯이 그려지므로, 표의 많은 읽기 셀은 하나의 그리기 목록으로 표현하고\n활성 편집기만 실제 iiGUI 편집기로 둘 수 있다. primitive마다 노드를 만들지 않는다.\n모든 그리기 목록은 기존 frame의 64개 레이어·패널/텍스트/이미지·텍스트 바이트 한도를\n함께 사용한다. 이 API가 한도를 무제한으로 확장한 것은 아니다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 58,
+      "end_line": 61,
+      "raw": "그리기 데이터는 네이티브 렌더러가 소비하는 값이며 소스 평가기나 UI 인터프리터가 아니다.\n`WidgetSnapshot`의 drawing_panels/drawing_texts/drawing_images는 보관한 개수이다.\n이 목록만으로 접근성 자식이나 편집 의미를 합성하지 않는다. 구체적인 위젯이 그 의미와\n수명·편집기를 제공해야 한다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "heading",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "## C++ 입력 가로채기\n",
+      "level": 2,
+      "title": "C++ 입력 가로채기"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 65,
+      "end_line": 68,
+      "raw": "`set_input_handler`는 stack에 소유된 C++ handler를 연결한다. 실제 대상에서 조상으로\n올라가며 일반 컨트롤 동작 전에 호출한다. 입력의 target은 실제 대상 ID이며 x/y는 해당\npopup 변환을 역으로 적용한 논리 표면 좌표이다. true는 처리 완료, false는 기본 동작을\n계속한다. Result 오류는 상위 입력 경계로 전달한다. 콜백 예외는 기존 Host 장벽을 쓴다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 76,
+      "raw": "pointer_down을 처리하면 해당 handler가 move/up을 캡처한다. 포인터가 경계 밖으로\n나가도 전달하며 up, focus loss, 숨김, handler 교체, popup 열기/닫기와 트리 해제에서\n회수한다. 동작 중 취소에는 focus_lost를 전달한다. Host 종료 장벽이 이미 사용자 콜백을\n거절하는 단계에서는 논리 캡처만 회수하며 콜백을 새로 실행하지 않는다. 위젯의 소유 자원\n정리는 RAII 수명에 두어야 한다. focus_lost는 기본 포커스/IME 정리도 수행한다.\nhandler가 연결된 stack은 Tab 경로에 참여할 수 있다. 일반 자식 컨트롤의 기본 동작은\nhandler가 false를 반환하거나 연결이 해제된 경우 유지한다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 78,
+      "end_line": 81,
+      "raw": "처리기가 있는 조상 경로의 hover를 보관하여 포인터가 해당 하위 트리를 벗어나면\n`pointer_leave`를 한 번 전달한다. 이 정리 이벤트는 범용 handler가 이동을 소비한 경우에도\n유지되며 캡처 중인 드래그는 기존 소유자에게 계속 전달한다. 새 hover 검사 코드도\n최종 일괄 실행 단계까지 유보한다.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 82,
+      "end_line": 82,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 83,
+      "end_line": 85,
+      "raw": "이 경로는 이미 컴파일된 C++ callback을 실행한다. 표의 선택·편집·키보드 규칙은\n구체적인 LVRS Table 구현이 제공한다. 범용 입력 API 자체가 clipboard 명령, resize hit\n영역이나 접근성 셀 모델을 자동으로 합성하지 않는다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 86,
+      "end_line": 86,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "heading",
+      "start_line": 87,
+      "end_line": 87,
+      "raw": "## 검사 코드\n",
+      "level": 2,
+      "title": "검사 코드"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 89,
+      "end_line": 92,
+      "raw": "`iiGUI.virtual_viewport_geometry/drawing/input/lifetime`은 큰 논리 offset, content shrink,\n원점 유지와 변경 통지, GPU 픽셀, 잘못된 그리기의 원자성, primitive 수와 독립적인 노드 수,\n조상 가로채기, 경계 밖 캡처, 기본 자식 입력 복귀, 숨김/해제 취소를 검사하도록 작성했다.\n현재는 컴파일·링크 근거만 수집하며 실행 통과를 주장하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "가상 viewport와 보관형 그리기",
+      "anchor": "가상-viewport와-보관형-그리기",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "논리 스크롤 범위",
+      "anchor": "논리-스크롤-범위",
+      "start_line": 7
+    },
+    {
+      "block_id": "b000019",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "위젯 안의 그리기 데이터",
+      "anchor": "위젯-안의-그리기-데이터",
+      "start_line": 45
+    },
+    {
+      "block_id": "b000027",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "C++ 입력 가로채기",
+      "anchor": "c-입력-가로채기",
+      "start_line": 63
+    },
+    {
+      "block_id": "b000037",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "검사 코드",
+      "anchor": "검사-코드",
+      "start_line": 87
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000013",
+        "line": 31,
+        "text": "않게 그린다. 표시기 직접 드래그와 터치 관성은 아직 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 49,
+        "text": "유효하지 않은 입력은 기존 내용을 바꾸지 않는다. 같은 값은 재무효화하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 60,
+        "text": "이 목록만으로 접근성 자식이나 편집 의미를 합성하지 않는다. 구체적인 위젯이 그 의미와",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 61,
+        "text": "수명·편집기를 제공해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 73,
+        "text": "거절하는 단계에서는 논리 캡처만 회수하며 콜백을 새로 실행하지 않는다. 위젯의 소유 자원",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 85,
+        "text": "영역이나 접근성 셀 모델을 자동으로 합성하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000039",
+        "line": 92,
+        "text": "현재는 컴파일·링크 근거만 수집하며 실행 통과를 주장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

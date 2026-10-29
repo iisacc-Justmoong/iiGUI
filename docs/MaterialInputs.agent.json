@@ -1,0 +1,226 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:451bc1d498ee78f72e8f48abe4da0a294911c448aecc22511bb365489545d1d9",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/MaterialInputs.md",
+    "sha256": "94c1cf1b7c54674e0b911ffea66e61e1eb998b379ef10f6e664da578ac97dae7",
+    "bytes": 4238,
+    "line_count": 50,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 머티리얼 입력",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 머티리얼 입력\n",
+      "level": 1,
+      "title": "네이티브 머티리얼 입력"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 9,
+      "raw": "BackdropMaterial은 선택적 불변 alpha mask와 흐림 전 underlay, 그 위치,\n기본 색상 및 capture 여부를 받는다. capture=false는 현재 프레임을 읽지 않고\nbase와 underlay만 선형 premultiplied 공간에서 합성한 뒤 흐린다. 마스크는 bounds에\n매핑한 이미지 alpha이며, 임의 경로의 border는 전경 벡터/이미지로 그려야 한다.\n따라서 mask와 양의 border_width를 함께 지정하면 검증에서 거절한다.\ninner_highlight는 현재 커버리지에서 아래로 이동한 커버리지를 빼서 구한다.\nBoxShadow도 불변 alpha mask를 같은 경계에 매핑해 그림자 모양을 정의한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 14,
+      "raw": "일반 WidgetDrawing과 순수 paint provider가 backdrop·shadow를 반환할 수 있다.\n메타데이터는 위젯의 로컬 좌표이며 임베딩·이동·콘텐츠 변환 시 같이 변환된다.\nWidgetPaintState.backing_scale은 마스크를 실제 화면 배율에 맞춰 준비하기 위한 값이다.\n그리기 중 UI 조회/변경은 계속 금지하며 provider가 불변 데이터를 캐시한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 16,
+      "end_line": 23,
+      "raw": "Metal은 입력을 잘라낸 선형 합성 텍스처로 준비하고 MPS Gaussian blur를 사용한다.\nVulkan·Direct3D는 같은 선형 합성·마스크·가우시안 계약을 fragment 경로에서 수행한다.\nVulkan push constant는 최소 보장 크기인 128바이트 안에 둔다. 이미지 텍스처는\n포인터 정체성으로 재사용하고 그림자와 머티리얼이 같은 원본을 공유한다.\n효과 예산은 물리 뷰포트 픽셀당 32바이트를 기준으로 최소 64 MiB, 최대 256 MiB이다.\n작은 팝업과 4K 창 표면을 같은 고정 한도로 취급하지 않는다. Metal은 다른 효과 작업\n공간까지 이 예산에 포함하며 Vulkan·D3D는 공유 입력 이미지에 적용한다.\neffect_texture_budget_bytes로 현재 한도를 보고한다. 드라이버 실제 할당량과 실행 성능은 별도 검증 대상이다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 27,
+      "raw": "RGBA·SVG 출력은 최대 축 8192 및 16 Mi 픽셀로 제한한다. PNG 디코더의 기존 입력·축\n제한은 유지한다. 큰 창 마스크를 지원하되 무제한 이미지를 만들지 않는다.\n정적 SVG는 여전히 필터/스크립트/외부 문서 없이 도형과 그라데이션만 사용한다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 31,
+      "raw": "관련 검사와 앱 실행은 전체 LVRS 전환의 최종 일괄 단계에서 수행한다. 중간에는\n라이브러리·검사 실행 파일 컴파일과 셰이더 오프라인 컴파일·패키지 정적 검사만 한다.\n컴파일 성공을 실제 GPU 픽셀·성능·플랫폼 실행 통과로 표시하지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 33,
+      "end_line": 38,
+      "raw": "공통 위젯 프레임 콜백은 뷰별 Core 프레임 슬롯 하나를 재사용한다. set_frame_handler는\n기본 비활성이고 request_frames로 재시작한다. 콜백의 false 반환은 해당 위젯 요청을\n멈추며, 콜백 안의 재요청/교체는 revision으로 보호한다. 제거된 세대의 콜백은 실행하지\n않는다. 호스트 기본 Motion은 WidgetBuilder.motion_preferences로 공유한다. underlay_tint는\nRGB 전환 중 alpha 원본을 재사용하며 색상 네 채널은 최대 1/1024 미만 오차의 half로\n압축해 128바이트 push-constant 한도를 유지한다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 40,
+      "end_line": 42,
+      "raw": "공유 프레임 슬롯은 최초 활성 요청 시 지연 생성한다. 매 프레임에는 활성 위젯 목록만\n순회하고 비활성 머티리얼 전체를 스캔하지 않는다. previous_layers 캡처는 현재 레이어의\n그림자보다 먼저 수행해 스스로 그린 효과가 배경으로 다시 들어가지 않게 한다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 44,
+      "end_line": 46,
+      "raw": "검사의 작은 호스트 창은 초기 크기에 맞는 `minimum_size`를 명시한다. 기본 최소 크기는\n320×220이므로 256×192 또는 300×200 크기만 지정하면 호스트 유효성 검사에서 거절된다.\n이 픽스처 보정은 공개 기본값이나 크기 검증을 변경하지 않는다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 48,
+      "end_line": 50,
+      "raw": "Metal 그림자 예산 검사는 초과 장면의 렌더링 실패와 효과 예산 오류를 확인하고,\n보고된 한도가 64~256 MiB 범위인지 및 거절된 장면이 그림자·입력 작업 텍스처를\n할당하지 않았는지도 확인한다. 오류 문자열에 고정된 `64 MiB`가 있다고 가정하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 머티리얼 입력",
+      "anchor": "네이티브-머티리얼-입력",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 14,
+        "text": "그리기 중 UI 조회/변경은 계속 금지하며 provider가 불변 데이터를 캐시한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 21,
+        "text": "작은 팝업과 4K 창 표면을 같은 고정 한도로 취급하지 않는다. Metal은 다른 효과 작업",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 31,
+        "text": "컴파일 성공을 실제 GPU 픽셀·성능·플랫폼 실행 통과로 표시하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 41,
+        "text": "순회하고 비활성 머티리얼 전체를 스캔하지 않는다. previous_layers 캡처는 현재 레이어의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000017",
+        "line": 46,
+        "text": "이 픽스처 보정은 공개 기본값이나 크기 검증을 변경하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 50,
+        "text": "할당하지 않았는지도 확인한다. 오류 문자열에 고정된 `64 MiB`가 있다고 가정하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -1,4 +1,11 @@
+#import <TargetConditionals.h>
+#if TARGET_OS_IOS
+#import <UIKit/UIKit.h>
+using IIGUICanvasView = UIView;
+#else
 #import <AppKit/AppKit.h>
+using IIGUICanvasView = NSView;
+#endif
 #import <Metal/Metal.h>
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -96,7 +103,7 @@ std::runtime_error metal_error(NSError* error) {
 }
 
 struct PlatformCanvas::Impl final {
-    NSView* view = nil;
+    IIGUICanvasView* view = nil;
     CAMetalLayer* layer = nil;
     id<MTLDevice> device = nil;
     id<MTLCommandQueue> queue = nil;
@@ -139,7 +146,7 @@ struct PlatformCanvas::Impl final {
         [submitted waitUntilCompleted];
         [view removeFromSuperview];
     }
-    void initialize(NSView* parent) {
+    void initialize(IIGUICanvasView* parent) {
         device = MTLCreateSystemDefaultDevice();
         require(device != nil, "No native Metal device is available");
         queue = [device newCommandQueue];
@@ -173,15 +180,24 @@ struct PlatformCanvas::Impl final {
         layer.pixelFormat = MTLPixelFormatBGRA8Unorm_sRGB;
         layer.framebufferOnly = NO; // GPU blit destination; no CPU access to drawables.
         layer.maximumDrawableCount = 2;
+#if !TARGET_OS_IOS
         layer.displaySyncEnabled = YES;
+#endif
         layer.allowsNextDrawableTimeout = YES;
         layer.opaque = YES;
         CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
         layer.colorspace = space;
         CGColorSpaceRelease(space);
-        view = [[NSView alloc] initWithFrame:NSZeroRect];
+        view = [[IIGUICanvasView alloc] initWithFrame:CGRectZero];
+        #if !TARGET_OS_IOS
         view.wantsLayer = YES;
+#endif
+        #if TARGET_OS_IOS
+        view.userInteractionEnabled = NO;
+        [view.layer addSublayer:layer];
+#else
         view.layer = layer;
+#endif
         [parent addSubview:view];
         statistics.api = GraphicsApi::metal;
         statistics.adapter = device.name.UTF8String;
@@ -281,8 +297,13 @@ struct PlatformCanvas::Impl final {
     }
     void draw(const CanvasFrame& frame, double scale, double height) {
         const auto [width, pixels_high] = canvas_pixels(frame, scale);
+#if TARGET_OS_IOS
+        view.frame = CGRectMake(frame.viewport.x, frame.viewport.y, frame.viewport.width, frame.viewport.height);
+        layer.frame = view.bounds;
+#else
         view.frame = NSMakeRect(frame.viewport.x, height-frame.viewport.y-frame.viewport.height,
                                frame.viewport.width, frame.viewport.height);
+#endif
         layer.contentsScale = scale;
         layer.drawableSize = CGSizeMake(width, pixels_high);
         bool changed = !previous || *previous != frame || previous_scale!=scale;
@@ -410,7 +431,7 @@ struct PlatformCanvas::Impl final {
     }
 };
 PlatformCanvas::PlatformCanvas(void* parent, void*, Acceleration) : impl_(std::make_unique<Impl>()) {
-    impl_->initialize((__bridge NSView*)parent);
+    impl_->initialize((__bridge IIGUICanvasView*)parent);
 }
 PlatformCanvas::~PlatformCanvas() = default;
 void PlatformCanvas::draw(const CanvasFrame& f,double s,double h) { impl_->draw(f,s,h); }

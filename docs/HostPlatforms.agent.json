@@ -1,0 +1,1077 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:37275a1645233afa8a5a76154c80a812a2ec55ce4d5476bf6aaec9c7f745ddb2",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/HostPlatforms.md",
+    "sha256": "edc05586873ab92de698839e33b743e71f210bb6bea00d116117f03708ee9ee9",
+    "bytes": 17057,
+    "line_count": 225,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Core 대상과 GUI 호스트의 연결",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Core 대상과 GUI 호스트의 연결\n",
+      "level": 1,
+      "title": "Core 대상과 GUI 호스트의 연결"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "iiSDKCore의 컴파일 대상과 iiGUI의 창 시스템 호스트는 별개의 계약이다. Core의\n자료형·작업·I/O를 컴파일할 수 있다는 사실만으로 창·입력·GPU·OS 서비스가 제공되지는\n않는다. 임베디드·Arduino·FPGA·QNX 대상에 데스크톱 창을 광고하지 않는다. 제공하지\n않는 기능은 `unsupported`, 권한·세션·서비스 부재는 실패 결과로 돌려준다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 10,
+      "raw": "Core를 GUI에 의존시키지 않는다. iiGUI가 Core Runtime을 참조하고\n`attach_application`이 Core 소유 EventLoop와 Application 수명에 호스트를 연결한다.\n기존 C++23 Host/UiExecutor/WidgetBuilder와 LVUI AOT 계약을 공유한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "heading",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "## 대상별 계약\n",
+      "level": 2,
+      "title": "대상별 계약"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "table",
+      "start_line": 14,
+      "end_line": 22,
+      "raw": "| 대상 | 호스트 | 자체 위젯 출력 | 프레임 공급원 |\n| --- | --- | --- | --- |\n| macOS | Cocoa | Metal, 선택적 Vulkan | 창 display link |\n| Windows | Win32 | D3D11, 선택적 Vulkan | 기존 명시적 cadence |\n| Linux/Wayland | wl_compositor + xdg-shell | VK_KHR_wayland_surface | wl_surface.frame |\n| Linux/X11 | Xlib + XI2 | VK_KHR_xlib_surface | 기존 명시적 cadence |\n| Android | NativeActivity/native_app_glue/ALooper | VK_KHR_android_surface | AChoreographer |\n| iOS/iPadOS | UIKit 장면 | Metal, 선택적 MoltenVK | 기존 display link |\n| Web | WASM application pthread + canvas | WebGL2/OffscreenCanvas | worker requestAnimationFrame |\n",
+      "columns": [
+        "대상",
+        "호스트",
+        "자체 위젯 출력",
+        "프레임 공급원"
+      ],
+      "rows": [
+        [
+          "macOS",
+          "Cocoa",
+          "Metal, 선택적 Vulkan",
+          "창 display link"
+        ],
+        [
+          "Windows",
+          "Win32",
+          "D3D11, 선택적 Vulkan",
+          "기존 명시적 cadence"
+        ],
+        [
+          "Linux/Wayland",
+          "wl_compositor + xdg-shell",
+          "VK_KHR_wayland_surface",
+          "wl_surface.frame"
+        ],
+        [
+          "Linux/X11",
+          "Xlib + XI2",
+          "VK_KHR_xlib_surface",
+          "기존 명시적 cadence"
+        ],
+        [
+          "Android",
+          "NativeActivity/native_app_glue/ALooper",
+          "VK_KHR_android_surface",
+          "AChoreographer"
+        ],
+        [
+          "iOS/iPadOS",
+          "UIKit 장면",
+          "Metal, 선택적 MoltenVK",
+          "기존 display link"
+        ],
+        [
+          "Web",
+          "WASM application pthread + canvas",
+          "WebGL2/OffscreenCanvas",
+          "worker requestAnimationFrame"
+        ]
+      ]
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 24,
+      "end_line": 27,
+      "raw": "OS 버튼·레이블·레이아웃 엔진으로 위젯을 교체하지 않는다. 공통 WidgetState가\n레이아웃, 입력 대상, 포커스, 상태와 표시 순서를 소유한다. Web도 DOM 위젯 트리를\n생성하지 않는다. canvas는 한 개의 입력·출력 표면이며 문자 shaping/raster만 Canvas\n2D 글꼴 서비스에 연결한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 32,
+      "raw": "`host_capabilities()`는 **빌드에 구현된 계약**을 반환한다. 실제 권한이나 compositor,\n세션 서비스의 존재를 보장하지 않으므로 각 작업의 Result를 계속 확인해야 한다.\n`display_frames`는 디스플레이/compositor callback 경로를 뜻한다. 실제 scanout 시각을\n측정했다는 뜻이 아니다. 고정 주기 타이머를 `display_synced`로 보고하지 않는다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "## Linux 직접 Wayland\n",
+      "level": 2,
+      "title": "Linux 직접 Wayland"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "fenced_code",
+      "start_line": 36,
+      "end_line": 42,
+      "raw": "```sh\ncmake -S . -B build/wayland -G Ninja \\\n  -DIIGUI_LINUX_BACKEND=WAYLAND \\\n  -DCMAKE_PREFIX_PATH=\"/path/to/target/sdk-prefix\"\ncmake --build build/wayland\ncmake --install build/wayland --prefix \"$PWD/build/wayland-prefix\"\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build/wayland -G Ninja \\\n  -DIIGUI_LINUX_BACKEND=WAYLAND \\\n  -DCMAKE_PREFIX_PATH=\"/path/to/target/sdk-prefix\"\ncmake --build build/wayland\ncmake --install build/wayland --prefix \"$PWD/build/wayland-prefix\"\n",
+      "closed": true
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 43,
+      "end_line": 43,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 44,
+      "end_line": 50,
+      "raw": "`IIGUI_LINUX_BACKEND`는 AUTO/WAYLAND/X11이다. AUTO는 wayland-client/wayland-cursor 1.20 이상과 xkbcommon 1.0 이상 개발\n패키지가 있으면 Wayland, 없으면 X11을 선택한다. WAYLAND를 명시했는데 의존성이\n없으면 구성에서 실패한다. 실행 중 실패를 XWayland 전환으로 숨기지 않는다. 한 설치\n패키지는 한 창 시스템을 선택하므로 둘을 배포하려면 별도 prefix/kit를 사용한다.\nWayland 빌드는 X11/Xi를 필수로 찾지 않고 X11 호스트·위젯·Vulkan 창 소스를 제외한다.\nPango/Cairo, Fontconfig, GIO는 텍스트·글꼴·포털 서비스에 사용한다. 이 라이브러리의\n배포판별 간접 의존성과 창 호스트 선택은 구분한다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "list",
+      "start_line": 52,
+      "end_line": 67,
+      "raw": "- xdg-shell configure를 ack한 뒤 앱 attachment와 GPU 표시를 시작한다. 0 크기는\n  기존 크기를 유지하고 음수·좌표 예산 초과는 GPU 할당에 반영하지 않는다.\n- 출력 진입·이탈, 정수 buffer scale, 크기 변경을 논리 좌표와 물리 픽셀로 구분한다.\n- prepare_read/read_events/cancel_read와 poll로 compositor 소켓, Core eventfd,\n  데드라인을 함께 기다린다. 막힌 출력에는 POLLOUT을 사용한다.\n- 정수 DPI에 맞는 시스템 커서와 seat 포인터·키보드·수정 키·키 반복을 C++ 입력 값으로 변환한다. XKB keymap 크기를\n  제한하며 keymap/state를 교체할 때 이전 소유권을 해제한다.\n- 필요한 동안에만 프레임 callback을 요청한다. compositor 프레임이 멈춰도 Core\n  타이머는 처리하며 임의 16ms 타이머를 디스플레이 프레임으로 가장하지 않는다.\n- 클립보드는 실제 wl_data_device offer/source/pipe를 사용한다. 쓰기에는 seat 입력\n  serial이 필요하다. 읽기는 UTF-8·1MiB·2초로 제한한다. 전송 pipe는 nonblocking이고\n  수신자가 끊어도 SIGPIPE로 프로세스가 종료되지 않는다.\n- 파일 선택은 XDG Desktop Portal을 사용하며 결과를 UiExecutor에 전달한다. 현재\n  Wayland parent export가 없어 parent 문자열은 비어 있다. 파일 선택은 파일 생성이\n  아니다. 실제 파일 접근·생성·제공은 iiFileProvider가 맡는다.\n- 외부 URL은 OS의 기본 처리기로 전달한다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "xdg-shell configure를 ack한 뒤 앱 attachment와 GPU 표시를 시작한다. 0 크기는",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "출력 진입·이탈, 정수 buffer scale, 크기 변경을 논리 좌표와 물리 픽셀로 구분한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "prepare_read/read_events/cancel_read와 poll로 compositor 소켓, Core eventfd,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "정수 DPI에 맞는 시스템 커서와 seat 포인터·키보드·수정 키·키 반복을 C++ 입력 값으로 변환한다. XKB keymap 크기를",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "필요한 동안에만 프레임 callback을 요청한다. compositor 프레임이 멈춰도 Core",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "클립보드는 실제 wl_data_device offer/source/pipe를 사용한다. 쓰기에는 seat 입력",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "파일 선택은 XDG Desktop Portal을 사용하며 결과를 UiExecutor에 전달한다. 현재",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "외부 URL은 OS의 기본 처리기로 전달한다.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 72,
+      "raw": "현재 Wayland에 text-input-v3/IME preedit, 접근성, tablet/touch, DnD, 보조 창,\nfractional-scale, xdg-activation token은 없다. 직접 키보드 UTF-8 입력과 Pango\nshaping을 이 기능들의 완성으로 간주하지 않는다. 프로토콜 없는 글로벌 메뉴나\ntoken 없는 raise는 성공으로 가장하지 않는다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 73,
+      "end_line": 73,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 74,
+      "end_line": 76,
+      "raw": "xdg-shell은 wayland-protocols 1.44 XML에서 wayland-scanner 1.23.1로 생성했다.\nXML·private 생성 코드·SHA-256·MIT 고지를 src/third_party/wayland에 유지한다.\n교차 빌드와 설치 소비자는 타겟 scanner를 실행하지 않는다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 78,
+      "end_line": 80,
+      "raw": "Android·Wayland·Web의 단일 OS 표면은 약한 GPU registry를 사용한다. 위젯 세대가\n교체 중 잠시 겹쳐도 같은 창에 두 swapchain/context를 만들지 않는다. 실패한 마운트는\n이전 세대를 다시 표시하고, 마지막 소유자가 사라지면 GPU 자원을 해제한다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 82,
+      "end_line": 84,
+      "raw": "Android·Wayland·Web의 raw `set_canvas`는 현재 창 전체 viewport만 받는다. 부분\nviewport를 억지로 늘려 그리지 않으며 `unsupported`를 반환한다. 부분 화면 구성은\n공통 C++ 위젯·레이어·클립을 사용한다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "heading",
+      "start_line": 86,
+      "end_line": 86,
+      "raw": "## Android 호스트와 OS 연결\n",
+      "level": 2,
+      "title": "Android 호스트와 OS 연결"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 87,
+      "end_line": 87,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 88,
+      "end_line": 91,
+      "raw": "진입점은 `run_android_application`이다. Core Application을 native_app_glue 스레드에서\n생성·실행·정리하고 Activity 수명과 창 재생성은 ALooper 명령으로 처리한다. 앱 동작과\n위젯은 C++23이다. 시스템 Activity/ClipboardManager/Intent 접속에만 C++ JNI를\n사용하며 Java/Kotlin 위젯이나 LVUI 인터프리터를 넣지 않는다.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 93,
+      "end_line": 97,
+      "raw": "read_clipboard/write_clipboard/open_external_url을 실제 Android 서비스로 연결했다.\n내부 RAII 객체가 JNI attach/detach, local reference frame, 예외 정리와 Core의\nUTF-8↔UTF-16 변환을 맡는다. modified UTF-8을 공개 문자열로 오인하지 않는다.\n클립보드 텍스트·URL을 지원하고 이미지·파일 payload는 명시적으로 거부한다. OS의\n포커스·권한 정책이나 URL 처리기 부재는 실패가 될 수 있다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 98,
+      "end_line": 98,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 99,
+      "end_line": 104,
+      "raw": "API 29+ AChoreographer_postFrameCallback64가 프레임을 공급한다. 앱 FrameLoop나\n위젯 모션이 있을 때만 다음 callback을 요청한다. pause/창 해제에서는 GPU와 다음\n프레임을 멈추고 resume에서 Core 시계를 재설정한다. 이미 요청된 callback은 소유권\ngate를 통해 종료된 Host를 참조하지 않는다. 미리 할당한 callback 슬롯을 재사용하고\nLooper 스레드가 끝나면 OS가 전달하지 않은 슬롯도 정리하므로 매 프레임 ticket을\n새로 할당하지 않는다.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 105,
+      "end_line": 105,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 106,
+      "end_line": 109,
+      "raw": "Android 문자 출력은 기존 ASCII 레이블 범위이다. Unicode shaping/IME, 문서 선택,\n접근성, 보조 창은 아직 별도 구현이 필요하다. OS 연결로 이 범위까지 완성했다고\n간주하지 않는다. NDK 빌드와 실제 휴대폰 실행은 별도로 기록한다. 재현 도구는\ntools/android_hello.py이다.\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 110,
+      "end_line": 110,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "heading",
+      "start_line": 111,
+      "end_line": 111,
+      "raw": "## Web 실행 계약\n",
+      "level": 2,
+      "title": "Web 실행 계약"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 112,
+      "end_line": 112,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 113,
+      "end_line": 115,
+      "raw": "Web은 OS 실행 파일과 구별되는 **AOT WebAssembly 대상**이다. 브라우저의 JS glue와\nAPI bridge는 존재한다. LVUI 소스 해석, Qt/QML, 공통 바이트코드 VM은 추가하지 않는다.\nWeb 결과를 OS 머신 코드 바이너리라고 부르지 않는다.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 116,
+      "end_line": 116,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "fenced_code",
+      "start_line": 117,
+      "end_line": 122,
+      "raw": "```sh\niisdk-builder build --manifest examples/HelloHosts/iiSDKBuilder.json\npython3 -B tools/serve_web.py build/hosts/kits/web/Release/app/build\n# http://127.0.0.1:8765/HelloHosts.html\n# 자동 종료 검증: HelloHosts.html?self-test\n```\n",
+      "language": "sh",
+      "code": "iisdk-builder build --manifest examples/HelloHosts/iiSDKBuilder.json\npython3 -B tools/serve_web.py build/hosts/kits/web/Release/app/build\n# http://127.0.0.1:8765/HelloHosts.html\n# 자동 종료 검증: HelloHosts.html?self-test\n",
+      "closed": true
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 124,
+      "end_line": 130,
+      "raw": "교차 빌드에서 LVUI_HOST_COMPILER에 호스트용 lvui-compile을 지정한다. HelloHosts의\n뷰는 빌드 시 C++로 생성하며 최종 산출물에 .lvui나 컴파일러를 넣지 않는다. 설치한\n예제도 별도 소비자에서 다시 빌드할 수 있다. Emscripten 배포본에 clang-scan-deps가\n없는 경우 일반 C++23 소비자에는 CMAKE_CXX_SCAN_FOR_MODULES=OFF를 지정한다.\nHelloHosts는 언어 module 단위를 사용하지 않으므로 네이티브 kit에서도 이 값을\n기본으로 둬 불필요한 전체 헤더 스캔을 피한다. 소비자가 명시한 설정은 보존한다.\niiSDKBuilder와 설치 소비자 검증 도구는 이 값을 설정하며 C++ 언어/ABI 검사는 유지한다.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 131,
+      "end_line": 131,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 132,
+      "end_line": 137,
+      "raw": "Core가 브라우저 UI 스레드에서 worker 생성/join을 거부하는 기존 계약을 유지한다.\n설치된 Core Runtime이 공개 CMake 계약에 -pthread를 내보내지 않으면 iiGUI 구성에서\n즉시 거부한다. 스레드 없는 Core와 GUI 호스트를 섞은 패키지를 성공으로 보고하지 않는다.\nPROXY_TO_PTHREAD로 앱을 pthread에서 실행하고 Core 상시 worker pool을 사용한다.\nOffscreenCanvas도 앱 스레드가 소유하며 DOM/클립보드/URL 호출만 메인 스레드로\n전달한다. OS I/O readiness waiter는 만들지 않고 HostLoop wake 계약을 사용한다.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 138,
+      "end_line": 138,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 139,
+      "end_line": 149,
+      "raw": "Asyncify는 C++ 스택을 보존하면서 브라우저에 제어를 돌려주는 빌드 변환이다. 위젯\n소스를 해석하거나 JavaScript로 위젯 로직을 재작성하지 않는다. 외부 입력 callback은\nAsyncify 대기 중 사용자 코드를 호출하지 않고 제한된 C++ 큐에 복사한다. 대기 복귀\n뒤에만 처리해 비동기 OS 요청의 중첩 unwind를 방지한다. 연속 이동만 병합하고\npress/release/key 경계는 보존한다. 포화 시 입력을 조용히 버리지 않고 오류를 남긴다.\nPromise에서 C++ 스택을 복귀할 때는 Emscripten의 callUserCallback 경계를 사용한다.\n정상 pthread 종료의 ExitStatus/unwind와 실제 오류를 구분하며 전역 오류를 숨기지 않는다.\n설치 소비자의 실제 브라우저 검사도 정상 종료 로그 이후 console 오류가 없는지 확인한다.\ntools/verify_web_runtime.py는 브라우저 개발 도구에서 수집한 JSON 로그를 검사한다.\nREADY/OK/CLOSED 순서, 모든 기능 검사와 양수 프레임 수를 요구하며 CLOSED 뒤 오류도\n실패로 판정한다. 검증기의 단위 테스트는 실제 브라우저 실행 증거와 구분한다.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 150,
+      "end_line": 150,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 151,
+      "end_line": 156,
+      "raw": "유휴 대기는 Atomics.waitAsync와 Core 데드라인으로 구성한다. 모션/FrameLoop가 있을\n때만 worker requestAnimationFrame을 요청한다. Core wake가 와도 이미 요청한 프레임을 취소하지\n않고, MessageChannel task yield를 통해 연속 wake가 브라우저 프레임을 굶기지 않게 한다.\n자체 검사에서는 1ms 간격 background wake 중에도 프레임이 진행되는지 확인한다. 숨겨진 페이지에서도 Core 데드라인을\n처리하고 GPU 표시는 멈춘다. context loss에는 표시를 정지하고 restore에서 자원을\n재구축한다. readback은 명시적 capture에서만 사용한다.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 157,
+      "end_line": 157,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 158,
+      "end_line": 164,
+      "raw": "WebGL2는 선형 target에 premultiplied 합성 후 최종 패스에서 sRGB로 변환한다.\n지원되는 경우 RGBA16F, 그 외에는 RGBA8 선형 target을 사용한다. 문자·이미지 texture는\nsRGB로 읽고 내용·크기·DPI가 같은 foreground는 재래스터하지 않는다. 문자·이미지의\n실제 잉크 영역만 texture로 올리며 overlay마다 창 전체 bitmap을 만들지 않는다. 브라우저 GPU\nmasking 때문에 GraphicsInfo.hardware를 추측해 참으로 만들지 않는다.\nrequire_hardware는 거부한다. srgb_attachment=false는 shader가 최종 인코딩을\n수행한다는 뜻이며 화면에 sRGB 변환이 없다는 뜻이 아니다.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 165,
+      "end_line": 165,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 166,
+      "end_line": 168,
+      "raw": "클립보드와 외부 URL은 HTTPS/localhost 및 사용자 활성화·권한 정책을 따른다.\n파일 handle을 가짜 로컬 경로로 돌려주지 않는다. 문서 선택/FileProvider handle,\nIME/텍스트 편집, 접근성, 보조 canvas/window는 현재 계약 밖이다.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 169,
+      "end_line": 169,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 170,
+      "end_line": 173,
+      "raw": "필요 조건은 Emscripten pthread, SharedArrayBuffer, OffscreenCanvas/WebGL2,\nworker requestAnimationFrame, Atomics.waitAsync, Worker FontFace/FontFaceSet이다.\n서버에 COOP same-origin, COEP require-corp가 필요하다. tools/serve_web.py는\n127.0.0.1에 이 헤더들을 제공하며 공개 서버나 자동 시작 작업을 등록하지 않는다.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 174,
+      "end_line": 174,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "heading",
+      "start_line": 175,
+      "end_line": 175,
+      "raw": "## 검증 기록\n",
+      "level": 2,
+      "title": "검증 기록"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 176,
+      "end_line": 176,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "paragraph",
+      "start_line": 177,
+      "end_line": 180,
+      "raw": "결과는 build/host-expansion-20261027/verification.json과 플랫폼 로그에 기록한다.\n교차 빌드·설치 소비자 링크·실제 브라우저/장치 실행을 구분한다. Windows/Linux의\n실제 실행을 생략하라는 사용자 지침을 유지하고 실행 보증으로 승격하지 않는다.\nmacOS 창 실행 검증은 마지막 묶음에서만 진행한다.\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 181,
+      "end_line": 181,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 182,
+      "end_line": 183,
+      "raw": "2026-10-27 검증에서는 독립 prefix 설치 후 경로를 옮긴 소비자로 다음 결과를 얻었다.\n이 prefix들은 build/ 아래의 검증 설치본이며 사용자 ~/.local 설치본을 교체한 것은 아니다.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 184,
+      "end_line": 184,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "table",
+      "start_line": 185,
+      "end_line": 192,
+      "raw": "| 호스트 | 빌드·설치 소비자 | 실제 실행 |\n| --- | --- | --- |\n| macOS/Cocoa, arm64 | 라이브러리·AOT 앱·설치 소비자 통과 | Metal 창, 타이머, worker 결과 42, resize, 디스플레이 프레임, capture, 정상 종료 통과 |\n| Web/Wasm pthread | 라이브러리·AOT 앱·설치 소비자 통과 | Chrome에서 타이머, worker 결과 42, resize, 프레임 60회, capture, 오류 없는 종료와 실제 Close 버튼 입력 통과 |\n| Linux/Wayland, aarch64 | 직접 Wayland 호스트·AOT ELF·설치 소비자 통과 | 사용자 지시에 따라 생략 |\n| Linux/X11, aarch64 | 회귀 라이브러리·AOT ELF·설치 소비자 통과 | 사용자 지시에 따라 생략 |\n| Windows/Win32, x86_64 | 회귀 라이브러리·AOT PE32+·설치 소비자 통과 | 사용자 지시에 따라 생략 |\n| Android, arm64-v8a | NDK 빌드·의존성 폐쇄·NativeActivity APK 정렬·서명 검사 통과 | 기존 Hello World 성공에 따라 이번 재실행은 생략 |\n",
+      "columns": [
+        "호스트",
+        "빌드·설치 소비자",
+        "실제 실행"
+      ],
+      "rows": [
+        [
+          "macOS/Cocoa, arm64",
+          "라이브러리·AOT 앱·설치 소비자 통과",
+          "Metal 창, 타이머, worker 결과 42, resize, 디스플레이 프레임, capture, 정상 종료 통과"
+        ],
+        [
+          "Web/Wasm pthread",
+          "라이브러리·AOT 앱·설치 소비자 통과",
+          "Chrome에서 타이머, worker 결과 42, resize, 프레임 60회, capture, 오류 없는 종료와 실제 Close 버튼 입력 통과"
+        ],
+        [
+          "Linux/Wayland, aarch64",
+          "직접 Wayland 호스트·AOT ELF·설치 소비자 통과",
+          "사용자 지시에 따라 생략"
+        ],
+        [
+          "Linux/X11, aarch64",
+          "회귀 라이브러리·AOT ELF·설치 소비자 통과",
+          "사용자 지시에 따라 생략"
+        ],
+        [
+          "Windows/Win32, x86_64",
+          "회귀 라이브러리·AOT PE32+·설치 소비자 통과",
+          "사용자 지시에 따라 생략"
+        ],
+        [
+          "Android, arm64-v8a",
+          "NDK 빌드·의존성 폐쇄·NativeActivity APK 정렬·서명 검사 통과",
+          "기존 Hello World 성공에 따라 이번 재실행은 생략"
+        ]
+      ]
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 193,
+      "end_line": 193,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "paragraph",
+      "start_line": 194,
+      "end_line": 199,
+      "raw": "창을 열지 않는 CTest 34/34, ASan+UBSan 계약 검사 7/7, Python 검사 25/25가\n통과했다. Python 수치는 CTest에서 호출한 일부 검사와 중복되므로 이들을 합산하지 않는다.\npthread 공개 계약을 제거한 Core 패키지를 실제 구성에서 거부하는 부정 구성 검사도 통과했다.\nWindows/Linux/macOS 최종 앱의 Qt·LVUI 파서·인터프리터 부재, Core 최종 진입점과\n설치 헤더 사용을 확인했다. Wayland 앱에 XOpenDisplay/XCreateWindow 경로가 없음을\n확인했으며 배포판 라이브러리의 모든 간접 의존성 부재까지 주장하지 않는다.\n"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 200,
+      "end_line": 200,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "paragraph",
+      "start_line": 201,
+      "end_line": 204,
+      "raw": "브라우저 첫 실행에서 발견한 정상 종료의 unhandled unwind는 수정 후 같은 소비자를\n재빌드해 해소했다. 최초 실패 로그와 수정 후 실행 로그를 모두 보존했다. macOS 창은\n최종 검증 단계에서만 실행했다. 위 결과는 전체 GUI 테스트나 모든 OS 기능의 동등성을\n의미하지 않으며 각 대상의 남은 기능 제한은 앞 절을 따른다.\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 205,
+      "end_line": 205,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "paragraph",
+      "start_line": 206,
+      "end_line": 208,
+      "raw": "참고 계약: [Wayland client API](https://wayland.freedesktop.org/docs/html/apb.html),\n[Emscripten HTML5 API](https://emscripten.org/docs/api_reference/html5.h.html),\n[Android JNI 지침](https://developer.android.com/ndk/guides/jni-tips).\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 209,
+      "end_line": 209,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "paragraph",
+      "start_line": 210,
+      "end_line": 213,
+      "raw": "종료 요청은 즉시 작업 접수를 닫고 Core 루프를 정지시키되, 실행 중인 입력/프레임\ncallback이 반환한 뒤 OS/GPU 자원을 해제한다. Wayland의 protocol callback은 입력,\nconfigure, 프레임, 닫기 통지만 저장하며 사용자 코드는 바깥 Core pump에서 실행한다.\n이 규칙은 클립보드 전송 중 들어온 새 프로토콜 이벤트의 재진입에도 적용된다.\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 214,
+      "end_line": 214,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "paragraph",
+      "start_line": 215,
+      "end_line": 219,
+      "raw": "물리 Android OS fixture는 빌드 시 IIGUI_ANDROID_OS_SMOKE=ON으로 선택한다.\n활성 창과 잠금 해제 상태를 먼저 확인하고 원본 ClipData를 보관한 뒤 한국어/보조 평면\n문자 클립보드 왕복을 검사·복원한다. 지원하지 않는 레이블로 마운트를 실패시킨 뒤\n기존 GPU capture가 동일한지도 검사한다. 정상 Activity 종료는 HELLO_ANDROID_EXIT로\n관찰할 수 있으며, 기본 샘플은 OS fixture 없이 빌드된다.\n"
+    },
+    {
+      "id": "b000078",
+      "kind": "blank",
+      "start_line": 220,
+      "end_line": 220,
+      "raw": "\n"
+    },
+    {
+      "id": "b000079",
+      "kind": "paragraph",
+      "start_line": 221,
+      "end_line": 225,
+      "raw": "Windows 회귀 빌드에서는 DirectWrite의 파일 객체용 CreateFontFaceReference가\nMSVC 헤더의 overload와 MinGW IDL 헤더의 underscore 이름으로 다르게 선언되는\n경계를 검사한다. C++23 requires로 해당 시그니처를 선택해 동일 COM 슬롯을 호출하며,\n이미 분석한 파일 객체를 경로로 다시 열지 않는다. 모의 양쪽 헤더 계약 검사와 실제\nWindows 교차 빌드를 분리해 검증한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Core 대상과 GUI 호스트의 연결",
+      "anchor": "core-대상과-gui-호스트의-연결",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000007",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "대상별 계약",
+      "anchor": "대상별-계약",
+      "start_line": 12
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Linux 직접 Wayland",
+      "anchor": "linux-직접-wayland",
+      "start_line": 34
+    },
+    {
+      "block_id": "b000031",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Android 호스트와 OS 연결",
+      "anchor": "android-호스트와-os-연결",
+      "start_line": 86
+    },
+    {
+      "block_id": "b000041",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Web 실행 계약",
+      "anchor": "web-실행-계약",
+      "start_line": 111
+    },
+    {
+      "block_id": "b000061",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "검증 기록",
+      "anchor": "검증-기록",
+      "start_line": 175
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "않는다. 임베디드·Arduino·FPGA·QNX 대상에 데스크톱 창을 광고하지 않는다. 제공하지",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 24,
+        "text": "OS 버튼·레이블·레이아웃 엔진으로 위젯을 교체하지 않는다. 공통 WidgetState가",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 26,
+        "text": "생성하지 않는다. canvas는 한 개의 입력·출력 표면이며 문자 shaping/raster만 Canvas",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 30,
+        "text": "세션 서비스의 존재를 보장하지 않으므로 각 작업의 Result를 계속 확인해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 32,
+        "text": "측정했다는 뜻이 아니다. 고정 주기 타이머를 `display_synced`로 보고하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 48,
+        "text": "Wayland 빌드는 X11/Xi를 필수로 찾지 않고 X11 호스트·위젯·Vulkan 창 소스를 제외한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 53,
+        "text": "기존 크기를 유지하고 음수·좌표 예산 초과는 GPU 할당에 반영하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000021",
+        "line": 60,
+        "text": "타이머는 처리하며 임의 16ms 타이머를 디스플레이 프레임으로 가장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000023",
+        "line": 71,
+        "text": "shaping을 이 기능들의 완성으로 간주하지 않는다. 프로토콜 없는 글로벌 메뉴나",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 72,
+        "text": "token 없는 raise는 성공으로 가장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 76,
+        "text": "교차 빌드와 설치 소비자는 타겟 scanner를 실행하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000035",
+        "line": 95,
+        "text": "UTF-8↔UTF-16 변환을 맡는다. modified UTF-8을 공개 문자열로 오인하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 102,
+        "text": "gate를 통해 종료된 Host를 참조하지 않는다. 미리 할당한 callback 슬롯을 재사용하고",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 104,
+        "text": "새로 할당하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000039",
+        "line": 108,
+        "text": "간주하지 않는다. NDK 빌드와 실제 휴대폰 실행은 별도로 기록한다. 재현 도구는",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000043",
+        "line": 114,
+        "text": "API bridge는 존재한다. LVUI 소스 해석, Qt/QML, 공통 바이트코드 VM은 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000049",
+        "line": 134,
+        "text": "즉시 거부한다. 스레드 없는 Core와 GUI 호스트를 섞은 패키지를 성공으로 보고하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000051",
+        "line": 140,
+        "text": "소스를 해석하거나 JavaScript로 위젯 로직을 재작성하지 않는다. 외부 입력 callback은",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000055",
+        "line": 160,
+        "text": "sRGB로 읽고 내용·크기·DPI가 같은 foreground는 재래스터하지 않는다. 문자·이미지의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000059",
+        "line": 173,
+        "text": "127.0.0.1에 이 헤더들을 제공하며 공개 서버나 자동 시작 작업을 등록하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000063",
+        "line": 179,
+        "text": "실제 실행을 생략하라는 사용자 지침을 유지하고 실행 보증으로 승격하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000069",
+        "line": 195,
+        "text": "통과했다. Python 수치는 CTest에서 호출한 일부 검사와 중복되므로 이들을 합산하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000069",
+        "line": 199,
+        "text": "확인했으며 배포판 라이브러리의 모든 간접 의존성 부재까지 주장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000017",
+        "language": "sh",
+        "code": "cmake -S . -B build/wayland -G Ninja \\\n  -DIIGUI_LINUX_BACKEND=WAYLAND \\\n  -DCMAKE_PREFIX_PATH=\"/path/to/target/sdk-prefix\"\ncmake --build build/wayland\ncmake --install build/wayland --prefix \"$PWD/build/wayland-prefix\"\n"
+      },
+      {
+        "block_id": "b000045",
+        "language": "sh",
+        "code": "iisdk-builder build --manifest examples/HelloHosts/iiSDKBuilder.json\npython3 -B tools/serve_web.py build/hosts/kits/web/Release/app/build\n# http://127.0.0.1:8765/HelloHosts.html\n# 자동 종료 검증: HelloHosts.html?self-test\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000073",
+        "label": "Wayland client API",
+        "target": "https://wayland.freedesktop.org/docs/html/apb.html",
+        "kind": "external",
+        "line": 206
+      },
+      {
+        "block_id": "b000073",
+        "label": "Emscripten HTML5 API",
+        "target": "https://emscripten.org/docs/api_reference/html5.h.html",
+        "kind": "external",
+        "line": 207
+      },
+      {
+        "block_id": "b000073",
+        "label": "Android JNI 지침",
+        "target": "https://developer.android.com/ndk/guides/jni-tips",
+        "kind": "external",
+        "line": 208
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000009",
+        "columns": [
+          "대상",
+          "호스트",
+          "자체 위젯 출력",
+          "프레임 공급원"
+        ],
+        "rows": [
+          [
+            "macOS",
+            "Cocoa",
+            "Metal, 선택적 Vulkan",
+            "창 display link"
+          ],
+          [
+            "Windows",
+            "Win32",
+            "D3D11, 선택적 Vulkan",
+            "기존 명시적 cadence"
+          ],
+          [
+            "Linux/Wayland",
+            "wl_compositor + xdg-shell",
+            "VK_KHR_wayland_surface",
+            "wl_surface.frame"
+          ],
+          [
+            "Linux/X11",
+            "Xlib + XI2",
+            "VK_KHR_xlib_surface",
+            "기존 명시적 cadence"
+          ],
+          [
+            "Android",
+            "NativeActivity/native_app_glue/ALooper",
+            "VK_KHR_android_surface",
+            "AChoreographer"
+          ],
+          [
+            "iOS/iPadOS",
+            "UIKit 장면",
+            "Metal, 선택적 MoltenVK",
+            "기존 display link"
+          ],
+          [
+            "Web",
+            "WASM application pthread + canvas",
+            "WebGL2/OffscreenCanvas",
+            "worker requestAnimationFrame"
+          ]
+        ]
+      },
+      {
+        "block_id": "b000067",
+        "columns": [
+          "호스트",
+          "빌드·설치 소비자",
+          "실제 실행"
+        ],
+        "rows": [
+          [
+            "macOS/Cocoa, arm64",
+            "라이브러리·AOT 앱·설치 소비자 통과",
+            "Metal 창, 타이머, worker 결과 42, resize, 디스플레이 프레임, capture, 정상 종료 통과"
+          ],
+          [
+            "Web/Wasm pthread",
+            "라이브러리·AOT 앱·설치 소비자 통과",
+            "Chrome에서 타이머, worker 결과 42, resize, 프레임 60회, capture, 오류 없는 종료와 실제 Close 버튼 입력 통과"
+          ],
+          [
+            "Linux/Wayland, aarch64",
+            "직접 Wayland 호스트·AOT ELF·설치 소비자 통과",
+            "사용자 지시에 따라 생략"
+          ],
+          [
+            "Linux/X11, aarch64",
+            "회귀 라이브러리·AOT ELF·설치 소비자 통과",
+            "사용자 지시에 따라 생략"
+          ],
+          [
+            "Windows/Win32, x86_64",
+            "회귀 라이브러리·AOT PE32+·설치 소비자 통과",
+            "사용자 지시에 따라 생략"
+          ],
+          [
+            "Android, arm64-v8a",
+            "NDK 빌드·의존성 폐쇄·NativeActivity APK 정렬·서명 검사 통과",
+            "기존 Hello World 성공에 따라 이번 재실행은 생략"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

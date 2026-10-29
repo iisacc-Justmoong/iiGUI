@@ -104,6 +104,7 @@ struct Host::Impl {
     HMENU app_menu=nullptr;HACCEL shortcuts=nullptr;std::map<UINT,runtime::Task> menu_actions;bool fullscreen=false;LONG_PTR saved_style=0;RECT saved_bounds{};
     HostOptions options;
     std::shared_ptr<detail::DispatchState> dispatch;
+    std::shared_ptr<PresentationStream> presentations=std::make_shared<PresentationStream>([this](runtime::Task task){return dispatch->loop.post(std::move(task));});
     std::shared_ptr<WakeGate> gate;
     const std::thread::id owner = std::this_thread::get_id();
     Phase phase = Phase::created;
@@ -162,7 +163,7 @@ struct Host::Impl {
         dialog.reset();auto closing=children;for(auto* child:closing){child->force_close();child->cleanup();}
         canvas.clear();
         state.visible = false;
-        state.closed = true;
+        state.closed = true;presentations->close();
         phase = Phase::closed;
         guard([&] { if (callbacks.closed) callbacks.closed(); });
     }
@@ -202,7 +203,7 @@ struct Host::Impl {
         auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{if(frames())(void)frames()->step();if(widgets)widgets->present();auto active=children;for(auto* child:active)if(child->phase==Phase::running)child->drain();});});}));
         if(!scheduled)throw std::runtime_error("Cannot admit native frame cadence");cadence=scheduled.token;
     }
-    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;}};}
+    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations};}
     void drain() noexcept {
         if (phase != Phase::running || draining) return;
         if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;if(callbacks.opened)callbacks.opened();}if(widgets)widgets->present();});return;}
@@ -255,7 +256,7 @@ struct Host::Impl {
         const auto result=drawing->EndDraw();
         if (result==D2DERR_RECREATE_TARGET) {
             text_brush.Reset(); drawing.Reset(); InvalidateRect(window,nullptr,FALSE);
-        } else checked(result,"Cannot paint DirectWrite text");
+        } else {checked(result,"Cannot paint DirectWrite text");if(presentations->has_observers())(void)presentations->queued(runtime::Clock::now(),GraphicsApi::none);}
     }
     void make_font_if_needed() { if (!text_format) make_font(); }
     static LRESULT CALLBACK procedure(HWND handle, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
@@ -266,7 +267,7 @@ struct Host::Impl {
             self->window = handle;
         }
         if (!self) return DefWindowProcW(handle, message, wparam, lparam);
-        if(self->widgets){MSG event{handle,message,wparam,lparam,GetMessageTime(),{}};if(self->widgets->native_event(&event))return 0;}
+        if(self->widgets){MSG event{handle,message,wparam,lparam,static_cast<DWORD>(GetMessageTime()),{}};if(self->widgets->native_event(&event))return 0;}
         if(message==WM_COMMAND){auto found=self->menu_actions.find(LOWORD(wparam));if(found!=self->menu_actions.end()){self->guard([&]{if(found->second){auto task=found->second;(void)self->dispatch->track(self->dispatch->loop.post([weak=std::weak_ptr<detail::DispatchState>(self->dispatch),task=std::move(task)]{if(auto endpoint=weak.lock();endpoint&&endpoint->accepting.load())(void)endpoint->tasks.run(task);}));}});return 0;}}
         bool handled = true;
         LRESULT result = 0;
@@ -400,16 +401,20 @@ struct Host::Impl {
         if(shortcuts){DestroyAcceleratorTable(shortcuts);shortcuts=nullptr;}if(app_menu){DestroyMenu(app_menu);app_menu=nullptr;}menu_actions.clear();
         callbacks = {};
         state.visible = false;
-        state.closed = true;
+        state.closed = true;presentations->close();
         phase = Phase::closed;
     }
 };
 
+core::Result<std::shared_ptr<PresentationSource>> Host::presentation_source() const {
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Presentation source requires host owner");
+    return std::static_pointer_cast<PresentationSource>(impl_->presentations);
+}
 Host::Host(HostOptions options) : impl_(std::make_unique<Impl>(std::move(options))) {}
 Host::~Host() {
     if (!is_ui_thread() || impl_->phase == Impl::Phase::running || impl_->phase == Impl::Phase::closing)
         std::terminate();
-    impl_->dispatch->retire();
+    impl_->presentations->close();impl_->dispatch->retire();
     if (impl_->dispatch->owned_loop) impl_->dispatch->loop.request_stop();
     impl_->gate->detach();
 }
@@ -466,6 +471,23 @@ core::Result<void> Host::set_content_size(Size size) {
     impl_->update_snapshot();
     return {};
 }
+core::Result<void> Host::set_window_geometry(const WindowGeometry& update) {
+    if(auto ready=impl_->ready();!ready)return ready;
+    impl_->update_snapshot();
+    const WindowGeometryValue previous{impl_->state.title,impl_->state.size,impl_->options.minimum_size};
+    auto next=resolve_window_geometry(previous,update);if(!next)return std::unexpected(next.error());
+    const auto title=native_text(next->title),old_title=native_text(previous.title);
+    const auto rectangle=impl_->frame(next->size);
+    if(next->title!=previous.title&&!SetWindowTextW(impl_->window,title.c_str()))
+        return core::fail(core::ErrorCode::failed,"Cannot set native window title");
+    impl_->options.minimum_size=next->minimum_size;
+    if(next->size!=previous.size&&!SetWindowPos(impl_->window,nullptr,0,0,rectangle.right-rectangle.left,rectangle.bottom-rectangle.top,SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE)){
+        impl_->options.minimum_size=previous.minimum_size;
+        if(next->title!=previous.title)SetWindowTextW(impl_->window,old_title.c_str());
+        return core::fail(core::ErrorCode::failed,"Cannot resize native window");
+    }
+    impl_->state.title=next->title;impl_->update_snapshot();return {};
+}
 core::Result<void> Host::request_close() {
     if (auto ready = impl_->ready(); !ready) return ready;
     SendMessageW(impl_->window, WM_CLOSE, 0, 0);
@@ -476,7 +498,7 @@ core::Result<void> Host::set_canvas(CanvasFrame frame) {
     if(frame.renderer==Renderer::automatic)frame.renderer=impl_->options.renderer;
     if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
     if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}
-    auto result = impl_->canvas.set(std::move(frame), impl_->window, nullptr, impl_->state.backing_scale);
+    auto result = impl_->canvas.set(std::move(frame), impl_->window, nullptr, impl_->state.backing_scale,impl_->presentations);
     if (result) impl_->gate->signal();
     return result;
 }
@@ -527,10 +549,12 @@ core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory){return moun
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const WidgetAppearance& appearance){
     if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());if(!factory)return core::fail(core::ErrorCode::invalid_argument,"Native widget factory is empty");if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
     struct Reset final{bool& value;~Reset(){value=false;}}reset{impl_->mounting};impl_->mounting=true;
-    try{auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,impl_->frame_hooks());WidgetBuilder builder(replacement);if(auto built=factory(builder);!built)return std::unexpected(built.error());
+    try{
+            auto hooks=impl_->frame_hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,std::move(hooks));if(auto built=replacement->construct(std::move(factory));!built)return std::unexpected(built.error());
         if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());
         if(auto attached=replacement->attach(impl_->window);!attached)return std::unexpected(attached.error());
-        impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);return WidgetMount(impl_->widgets);
+        if(auto committed=replacement->commit_window_properties();!committed)return std::unexpected(committed.error());
+            impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);auto published=impl_->widgets;published->commit_publication();if(auto alive=published->ready();!alive)return std::unexpected(alive.error());return WidgetMount(published);
     }catch(...){return core::fail(core::ErrorCode::failed,"Native widget factory failed",std::current_exception());}
 }
 core::Result<void> Host::unmount_widgets(){if(auto ready=impl_->ready();!ready)return ready;if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}return {};}

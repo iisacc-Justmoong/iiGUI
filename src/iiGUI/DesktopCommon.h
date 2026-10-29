@@ -6,6 +6,9 @@ namespace ii::gui::detail {
 #ifdef __APPLE__
 core::Result<ClipboardContent> read_pasteboard(void*);
 #endif
+inline bool valid_external_url(std::string_view value){
+    return valid_title(value)&&value.size()<=8192&&(value.starts_with("https://")||value.starts_with("http://")||value.starts_with("mailto:")||value=="society://account");
+}
 inline bool valid_clipboard(const ClipboardContent& value){
     if(value.image.size()>64*1024*1024||value.files.size()>256||value.text.size()>1024*1024||value.url.size()>8192||!valid_title(value.text)||!valid_title(value.url))return false;
     if(!value.image.empty()&&value.image_mime!="image/png"&&value.image_mime!="image/tiff"&&value.image_mime!="image/jpeg"&&value.image_mime!="image/bmp")return false;

@@ -1,0 +1,235 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:3bd9f6003e50e8257f2aa43b00733914b310e1eda92de961bee6942e5d1e11a2",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/NativeView.md",
+    "sha256": "970c28ddd8966fd1d033263bbad8be4a1b42dc2207db6c323baa9b2faff1c1f3",
+    "bytes": 3723,
+    "line_count": 40,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "사용자 C++ 뷰의 네이티브 삽입",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 사용자 C++ 뷰의 네이티브 삽입\n",
+      "level": 1,
+      "title": "사용자 C++ 뷰의 네이티브 삽입"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "NativeView는 C++가 만든 위젯 트리를 다른 네이티브 뷰 안에 삽입하는 표시 전용 접점이다.\n새 렌더러·이벤트 루프·소스 해석기를 만들지 않는다. Canvas·타임라인·프레임 표시처럼\n사용자 C++가 그리기와 입력을 소유하는 영역도 일반 컨트롤과 같은 창 안에서 구성한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "NativeViewSource의 build는 WidgetBuilder로 루트 하나를 만든다. 빌더를 호출 이후까지\n보관하지 않는다. 뷰별 상태는 builder.retain으로 유지하며, 구독·작업의 접수 차단은\nbuilder.on_retire에서 수행한다. 기본 그리기·paint/input/frame handler와 텍스트 서비스는\n기존 Widget API를 그대로 사용한다. 파일·생성 모델은 이 삽입 계층이 소유하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "list",
+      "start_line": 12,
+      "end_line": 23,
+      "raw": "- 같은 shared source를 다시 적용하면 재구성하지 않는다. 너비·높이 변경도 기존 입력과\n  포커스를 유지한다. 사용자가 명시적으로 enabled를 끄는 경우에는 일반 비활성화 규칙을 따른다.\n- 새 source는 content_host의 독립 후보 세대에서 구성한다. 반환 오류·예외·빈 루트는\n  이전 화면·포커스를 보존한다. 정상 후보만 게시하고 이전 세대를 퇴역시킨다.\n- 원천을 null로 설정하면 콘텐츠만 제거한다. 바깥 호스트와 해당 옵션은 유지한다.\n- 원천 하나를 여러 위치에서 사용해도 각 위치의 위젯과 뷰 상태는 독립적이다. 원천이\n  가변 상태를 공유하려면 애플리케이션이 공유 범위를 명시해야 한다.\n- 부모 퇴역 시 접점을 닫고 source를 해제한다. 외부에 남은 NativeView 값은 약한 접점이며\n  자원을 붙잡거나 다음 활성화의 위젯을 가리키지 않는다.\n- 변경은 소유 스레드에서 수행한다. 후보 구성 중 재진입과 부모 종료도 별도 오류로 반환한다.\n- 크기는 유한한 0..8192 범위이다. 0은 자연 크기를 사용한다. 클리핑은 바깥 ZStack에\n  적용하며 원천의 레이아웃·좌표·그리기·포인터 캡처는 기존 iiGUI 계약을 따른다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "같은 shared source를 다시 적용하면 재구성하지 않는다. 너비·높이 변경도 기존 입력과",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "새 source는 content_host의 독립 후보 세대에서 구성한다. 반환 오류·예외·빈 루트는",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "원천을 null로 설정하면 콘텐츠만 제거한다. 바깥 호스트와 해당 옵션은 유지한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "원천 하나를 여러 위치에서 사용해도 각 위치의 위젯과 뷰 상태는 독립적이다. 원천이",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "부모 퇴역 시 접점을 닫고 source를 해제한다. 외부에 남은 NativeView 값은 약한 접점이며",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "변경은 소유 스레드에서 수행한다. 후보 구성 중 재진입과 부모 종료도 별도 오류로 반환한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "크기는 유한한 0..8192 범위이다. 0은 자연 크기를 사용한다. 클리핑은 바깥 ZStack에",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 28,
+      "raw": "후보 트리의 교체는 트랜잭션이지만 원천이 외부 모델·파일에 일으킨 부수 효과까지 되돌리지\n않는다. 업무 상태 변경을 build에 넣지 않는다. 옵션을 검증하고 후보 구성을 성공시킨 뒤\n일반 위젯의 크기·활성화·클리핑을 갱신한다. 사용자 레이아웃 콜백이 부모를 제거하는 상황은\n종료 오류로 처리하며 이미 발생한 외부 부수 효과의 롤백을 약속하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 33,
+      "raw": "`tests/native_view.cpp`는 실제 네이티브 입력과 그리기 데이터, 독립 활성화·동일 원천 유지·\n실패 보존·중첩·해제·종료·재진입·스레드 규칙을 창 없이 검사한다. 이 검사와 실제 창·GPU·\n다른 플랫폼 실행은 구분한다. LVUI AOT 연결과 Dreamscapes 요구 기반 작업 흐름은 추가\n검증 대상이며, 접점 추가만으로 제품 변환이나 시스템 설치가 끝났다고 표시하지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 37,
+      "raw": "추가 프레임 데이터 검사는 같은 제공자·위젯 트리에서 RGBA 프레임 24개를 순차 게시하고,\n다음 프레임을 기다리는 표시에서도 마지막 이미지를 유지하는지 확인한다. 원천 재구성·\n노드 증감·파일 revision 변경이 없어야 한다. 실제 장치의 FPS 측정과 구분한다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 40,
+      "raw": "잘못된 paint 결과의 오류에는 실제 위젯 ID·배정 크기·패널/텍스트/이미지 수를 포함한다.\n다른 합성 컨트롤의 오류를 사용자 정의 원천의 문제로 추정하지 않고 실제 소유자를 식별한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "사용자 C++ 뷰의 네이티브 삽입",
+      "anchor": "사용자-c-뷰의-네이티브-삽입",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 8,
+        "text": "보관하지 않는다. 뷰별 상태는 builder.retain으로 유지하며, 구독·작업의 접수 차단은",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "기존 Widget API를 그대로 사용한다. 파일·생성 모델은 이 삽입 계층이 소유하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 12,
+        "text": "- 같은 shared source를 다시 적용하면 재구성하지 않는다. 너비·높이 변경도 기존 입력과",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000007",
+        "line": 18,
+        "text": "가변 상태를 공유하려면 애플리케이션이 공유 범위를 명시해야 한다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000009",
+        "line": 28,
+        "text": "종료 오류로 처리하며 이미 발생한 외부 부수 효과의 롤백을 약속하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 33,
+        "text": "검증 대상이며, 접점 추가만으로 제품 변환이나 시스템 설치가 끝났다고 표시하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -1,0 +1,397 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:6fc509abe552dec7b07c14e9c1f054b7308985d05b6359c4d9ae398340b126a3",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/NativeWidgets.md",
+    "sha256": "ba5c938a6b6a37e4670ce82e75aacdc0748280fdf88895cbf03dfb410d2686df",
+    "bytes": 5996,
+    "line_count": 105,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Compiled native widgets and LVUI AOT",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Compiled native widgets and LVUI AOT\n",
+      "level": 1,
+      "title": "Compiled native widgets and LVUI AOT"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 4,
+      "raw": "Composed transparent text editors, explicit option replacement and native\nellipsis are described in [CellEditors](CellEditors.md).\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 6,
+      "end_line": 8,
+      "raw": "Retained vertical viewports, nested hardware clips, focus reveal and linear-stack\nheight allocation are described in [ScrollViews](ScrollViews.md). LVRS Sheet\nuses this C++ path for a fixed header and a separately scrolling body.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "quote",
+      "start_line": 10,
+      "end_line": 12,
+      "raw": "> Implementation update: the earlier AppKit-control path described below is\n> superseded by [iiGUI's self-rendered C++ widgets](SelfRenderedWidgets.md).\n> Core ownership and attachment lifetimes remain; OS controls/layout do not.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 16,
+      "raw": "The current application path is [CoreApplication.md](CoreApplication.md): generated\nC++ widget instances, LVRS appearance and Core-owned app/entrypoint/attachment.\nThe direct factory API described below remains available for standalone hosts.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 22,
+      "raw": "The working tree adds a C++23 native widget mount API in `iiGUI/NativeWidgets.h`.\nThe initial backend is macOS/AppKit. It directly creates `NSStackView`,\n`NSTextField` and `NSButton` under the existing `NSWindow`. No Qt, source\ninterpreter, bytecode or GPU-painted imitation of these controls is involved.\nThe existing cross-platform window and GPU canvas APIs remain available.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 24,
+      "end_line": 29,
+      "raw": "`Host::mount_widgets(WidgetFactory)` runs a synchronous construction transaction\non the open host's main thread. A `WidgetBuilder` constructs `vstack`, `hstack`,\n`label` and `button` immediately. An empty parent creates the unique root; only\nstacks accept children. Every widget has a unique UTF-8 ID. Propagate builder\nerrors from the factory. Only a successful factory replaces existing content.\nConstruction exceptions become failed Results and preserve the old tree.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 36,
+      "raw": "The returned weak `WidgetMount` finds controls by ID and snapshots actual native\nclasses, attached state and logical sizes. `Widget` updates text/button enabled\nstate or invokes the native control action. All operations require the owner\nthread. Worker code delivers results through `UiExecutor`, never AppKit calls.\nAuto Layout follows content width, native font metrics and stack spacing/padding;\nroot height is the natural content height. This API does not add scrolling.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 38,
+      "end_line": 44,
+      "raw": "Unmount, replacement and window close detach action targets, revoke handles and\nrelease scope owners. Already-running callbacks retain their current action until\nthey return; they can unmount their own tree. Late handles cannot mutate a new\ngeneration. Native callback exceptions pass through the existing host failure\nbarrier and return from `Host::run`. `WidgetBuilder::retain` keeps ordinary C++\nscope owners alive even when no control captures them. User-owned asynchronous\nwork must still be cancelled/joined by its owner; it is not automatically tracked.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 46,
+      "end_line": 52,
+      "raw": "A successful native mount replaces a canvas. A successful `set_canvas` replaces\nnative widgets; rejected canvas input leaves them intact. `set_text` returns\nbusy while widgets are mounted; update the intended Widget instead.\n`unmount_widgets` restores the host's basic label. Widget-only apps allocate no\nMetal/Vulkan canvas, although this iiGUI package still links its renderer libraries.\nWindows/Linux return unsupported for the new mount API. Their existing hosts\nand renderers are not replaced by an unverified native widget implementation.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "heading",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "## Build the actual LVUI Hello World\n",
+      "level": 2,
+      "title": "Build the actual LVUI Hello World"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 55,
+      "end_line": 55,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "Build/install the updated LVUI package into `LVUI/build/install` first, then:\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "fenced_code",
+      "start_line": 58,
+      "end_line": 68,
+      "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\nopen build/examples/HelloWorld/HelloWorld.app\n```\n",
+      "language": "sh",
+      "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\nopen build/examples/HelloWorld/HelloWorld.app\n",
+      "closed": true
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 76,
+      "raw": "`examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`\nat build time into `HelloWorld.generated.h`. C++23 then compiles the generated\nnative construction calls and scoped backend callbacks. The app binary does\nnot call or contain the LVUI parser/compiler, and needs neither the source file\nnor the build tool to run. The `.app` is also runnable directly with `--self-test`.\nIts timer, background result 42, resize, two native button actions and normal\nclose are verified, including one backend construction/destruction per mount.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 78,
+      "end_line": 79,
+      "raw": "The legacy `examples/HelloLVUI` remains an explicitly separate runtime-parsed\nGPU canvas demonstration. Embedding that earlier markup is not the AOT route.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "heading",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "## Installed-only consumer\n",
+      "level": 2,
+      "title": "Installed-only consumer"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 82,
+      "end_line": 82,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "fenced_code",
+      "start_line": 83,
+      "end_line": 88,
+      "raw": "```sh\ncmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n```\n",
+      "language": "sh",
+      "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n",
+      "closed": true
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 89,
+      "end_line": 89,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 90,
+      "end_line": 98,
+      "raw": "Use a fresh destination under `build/`. This stages the installed Core plus\nupdated LVUI/iiGUI, relocates the prefix, copies the installed example and builds\nit using exported targets only. It audits Qt linkage and absence of LVUI parser\nsymbols, removes access to consumer sources and `lvui-compile` during execution,\nthen restores those test-owned paths. Loader override variables are cleared.\nThe Vulkan SDK/loader remains the same external native kit used by iiGUI.\nThe script writes logs, JUnit results and `verification.json` under BUILD_ROOT.\nThis is package consumption validation, not a fully self-contained distribution\nbundle or a replacement of the user's default installed SDKs.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 99,
+      "end_line": 99,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 100,
+      "end_line": 105,
+      "raw": "Verified on macOS arm64 / AppleClang 21 on 2026-10-22: LVUI 20/20,\niiGUI regression 35/35, focused ASan/UBSan 7/7 and relocated installed consumer\n1/1. The actual app was also opened and its native Say Hello button was clicked\nthrough the macOS accessibility interface; the label changed to Hello World · Cocoa!.\nEvidence is in `build/aot-regression-tests.xml`,\n`build/aot-sanitizer/build/aot-sanitizer-tests.xml` and `build/aot-consumer/`.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Compiled native widgets and LVUI AOT",
+      "anchor": "compiled-native-widgets-and-lvui-aot",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Build the actual LVUI Hello World",
+      "anchor": "build-the-actual-lvui-hello-world",
+      "start_line": 54
+    },
+    {
+      "block_id": "b000031",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Installed-only consumer",
+      "anchor": "installed-only-consumer",
+      "start_line": 81
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 12,
+        "text": "> Core ownership and attachment lifetimes remain; OS controls/layout do not.",
+        "basis": "lexical_match",
+        "context": "quote"
+      },
+      {
+        "block_id": "b000015",
+        "line": 34,
+        "text": "thread. Worker code delivers results through `UiExecutor`, never AppKit calls.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000017",
+        "line": 44,
+        "text": "work must still be cancelled/joined by its owner; it is not automatically tracked.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000025",
+        "language": "sh",
+        "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\nopen build/examples/HelloWorld/HelloWorld.app\n"
+      },
+      {
+        "block_id": "b000033",
+        "language": "sh",
+        "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "CellEditors",
+        "target": "CellEditors.md",
+        "kind": "relative",
+        "line": 4
+      },
+      {
+        "block_id": "b000005",
+        "label": "ScrollViews",
+        "target": "ScrollViews.md",
+        "kind": "relative",
+        "line": 7
+      },
+      {
+        "block_id": "b000007",
+        "label": "iiGUI's self-rendered C++ widgets",
+        "target": "SelfRenderedWidgets.md",
+        "kind": "relative",
+        "line": 11
+      },
+      {
+        "block_id": "b000009",
+        "label": "CoreApplication.md",
+        "target": "CoreApplication.md",
+        "kind": "relative",
+        "line": 14
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

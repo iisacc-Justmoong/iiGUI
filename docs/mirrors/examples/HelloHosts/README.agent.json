@@ -1,0 +1,71 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:f8c888567df1cf73457c3263ddaf99c43381a30c0d0fd2462ac241852f480aef",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "examples/HelloHosts/README.md",
+    "sha256": "cbdf4fb694b81a72f9b6cdd244fdee2f77a8475e77bf1e6606d998c8c3013426",
+    "bytes": 574,
+    "line_count": 9,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "HelloHosts",
+    "role": "overview",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# HelloHosts\n",
+      "level": 1,
+      "title": "HelloHosts"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 9,
+      "raw": "The same LVUI view and C++23 application exercise iiGUI's host, Core timer,\npersistent background pool, display frames, resize, capture and orderly shutdown.\nBuild with iiSDKBuilder. `--self-test` (browser query `?self-test`) runs the bounded\nfive-second lifecycle check. The Web target is AOT WebAssembly with a pthread\napplication and an OffscreenCanvas/WebGL2 renderer; it requires cross-origin\nisolation and a secure browser context. No LVUI source interpreter or DOM widget\ntree is deployed. See `docs/HostPlatforms.md` for platform contracts and limits.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "HelloHosts",
+      "anchor": "hellohosts",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

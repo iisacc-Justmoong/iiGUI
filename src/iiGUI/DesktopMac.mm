@@ -38,7 +38,7 @@ core::Result<void> write_clipboard(const ClipboardContent& value){
 }
 core::Result<void> open_external_url(std::string_view value){
     if(auto ready=main_thread();!ready)return ready;
-    if(!detail::valid_title(value)||value.size()>8192||!(value.starts_with("https://")||value.starts_with("http://")||value.starts_with("mailto:")))return core::fail(core::ErrorCode::invalid_argument,"Expected an HTTP(S) or mailto URL");
+    if(!detail::valid_external_url(value))return core::fail(core::ErrorCode::invalid_argument,"Expected a web, mail, or Society account URL");
     if(![NSWorkspace.sharedWorkspace openURL:[NSURL URLWithString:native(value)]])return core::fail(core::ErrorCode::failed,"Cannot open external URL");return {};
 }
 }

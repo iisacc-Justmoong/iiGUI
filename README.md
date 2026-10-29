@@ -1,9 +1,50 @@
 # iiGUI
 
+Custom-drawn containers can expose [accessibility semantics](docs/AccessibilitySemantics.md)
+including an adjustable slider range without giving iiGUI ownership of the
+application's component model.
+The host package does not depend on LVUI. Applications can compose it with
+LVUI's [document adapter](../LVUI/docs/NativeDocument.md) when needed.
+
+The latest [native authoring verification record](../LVUI/docs/NativeReadinessVerification.md) distinguishes executed checks, installed-package proof, and platform limits from the historical implementation notes below.
+
+[Host platform contracts](docs/HostPlatforms.md) cover a direct
+Wayland/xdg-shell/Vulkan host, Android OS clipboard/URL services and Choreographer
+frames, and an AOT WebAssembly pthread host with self-rendered WebGL2 widgets.
+`host_capabilities()` exposes the implemented host contract. Core build targets
+and GUI host availability are distinct; embedded support does not imply a window
+system. [HelloHosts](examples/HelloHosts) exercises the common C++23/LVUI path.
+Native builds and browser/device execution have separate verification evidence.
+
+The minimal [Android LVUI Hello World](examples/HelloAndroid) uses NDK
+NativeActivity, iiSDKCore and self-rendered Vulkan labels. The
+[Android guide](docs/AndroidHello.md) states its supported label subset and the
+separate build, installation, physical-device and emulator evidence. Emulator
+installation requires an explicit `--device-kind emulator --serial emulator-NNNN`.
+
+The AOT [Hello World](examples/HelloWorld) uses one LVUI source and one C++23
+application on macOS, Windows and Linux. Its [desktop verification guide](docs/AOTDesktop.md)
+covers native cross compilation, binary audits and relocated installed consumers
+without launching a GUI or implying device runtime validation.
+
+[Inferred LVUI values](docs/InferredValues.md) connect C++-typed values and functions
+to retained widgets, reactive aliases and native replacement without a runtime parser.
+
+[iPadOS hosts](docs/IPADOS.md) use UIKit scenes, a self-rendered C++ widget
+surface, shared Metal/CoreText rendering, touch and Pencil input, and an optional
+Vulkan surface through MoltenVK. The Congregation device build exercises Metal
+and forced Vulkan independently. Full marked-text input and external drag and
+drop remain outside this adapter's current support.
+
 Native [container layout](docs/ContainerLayout.md) now supports minimum implicit
 metrics, independent implicit/content insets and construction-time default slots.
 Ordinary container disabling cancels descendant input, and native button option
 replacement preserves callbacks and identity. Runtime verification is deferred.
+
+[Retained stack layout](docs/StackLayout.md) validates and applies options,
+extent and flex atomically, with independent overlay axes and owner-domain access.
+LVUI-generated dynamic layouts reuse native measurement and preserve local editing
+state; constant layouts are folded before the application runs.
 
 [Action surfaces](docs/ActionSurfaces.md) add a transparent native child container
 with text fallback, state foreground colors, keyboard actions and link semantics.
@@ -55,10 +96,11 @@ path and Core's final-executable/resource helper.
 
 The working tree now also implements [compiled self-rendered widgets and LVUI AOT](docs/SelfRenderedWidgets.md):
 `examples/HelloWorld/HelloWorld.lvui` generates C++23 during the build and mounts
-iiGUI C++ stacks, labels and buttons on a single Cocoa/Metal surface. The macOS Hello World
+iiGUI C++ stacks, labels and buttons on the native desktop GPU surface. Hello World
 uses Core timers/workers, follows resize and closes normally. This AOT route does
-not embed or parse LVUI source at runtime. The initial native widget backend is
-macOS; the existing Windows/Linux hosts and GPU canvases remain separate.
+not embed or parse LVUI source at runtime. The shared desktop sample targets
+macOS, Windows and Linux; see the separate build and execution evidence in
+[AOT desktop verification](docs/AOTDesktop.md).
 
 [Windows build and execution](docs/WindowsBuildAndRun.md)
 
@@ -66,10 +108,10 @@ Package release: **0.4.1** (2026-10-19). This patch packages the current
 source snapshot; build, test and installation evidence is recorded in the SDK
 patch-release report. Earlier versioned feature notes remain historical.
 
-The working tree additionally implements [LVUI 0.1](docs/LVUI.md): an independent
-HTML-shaped view language with inline styles. iiGUI parses through the LVUI
-package, lays out native boxes/text and renders them into its GPU canvas.
-The new source requires `LVUI::LVUI` and Vulkan 1.1+. [Native rendering](docs/Renderers.md)
+Applications can additionally compose [LVUI 0.1](docs/LVUI.md) with iiGUI.
+LVUI owns parsing and document layout; iiGUI provides text measurement and a GPU canvas.
+The iiGUI package does not require `LVUI::LVUI`; OS hosts use Vulkan 1.1+ where selected and
+the Web target uses WebGL2 without a Vulkan SDK. [Native rendering](docs/Renderers.md)
 uses Metal/Direct3D first and Vulkan as the default fallback; Linux uses Vulkan.
 Released 0.4.1 binaries do not include these additions until rebuilt. The version above is the last package release.
 
@@ -111,8 +153,8 @@ points. A cross build or binary inspection does not prove desktop execution.
 - Native close, close veto, exception-to-Result propagation and a close barrier
   rejecting late work. Normal shutdown returns through C++ main.
 - Installed target `iiGUI::iiGUI`, a common HelloGUI source and a three-kit
-  iiSDKBuilder manifest. Existing `find_package(iiGUI 0.1)` consumers remain
-  source compatible with the existing host API.
+  iiSDKBuilder manifest. LVUI document users include the LVUI adapter and link
+  LVUI separately; iiGUI-only consumers need no LVUI package.
 - Optional native GPU canvas with instanced rounded gradient panels, analytic
   antialiasing, linear-light alpha blending and sRGB attachments. Updates
   coalesce at the end of a Core dispatch; identical scenes reuse GPU storage.
@@ -122,10 +164,10 @@ points. A cross build or binary inspection does not prove desktop execution.
   unverified/software device. Explicit in-memory capture supports pixel tests.
 - Native Unicode shaping and font fallback: AppKit/CoreText, DirectWrite, and
   Pango/Cairo. Linux no longer wraps text by repeatedly measuring UTF-8 prefixes.
-- LVUI document parsing, inline styles, bounded row/column layout, inherited
-  typography and native text composited into the captured GPU attachment.
-  `Host::set_view` accepts a parsed document; `layout_view` exposes logical ID
-  bounds. The common HelloLVUI example embeds a real `.lvui` source at build time.
+- An optional application-side LVUI adapter owns document parsing and bounded
+  row/column layout. `Host::set_view` accepts an app-supplied view extension;
+  `lvui::native::layout_document` exposes logical ID bounds. HelloLVUI embeds
+  a real `.lvui` source at build time.
 
 Mobile/web hosts, direct Wayland, editable text/IME, general input, a widget
 framework, custom-control accessibility, arbitrary vector/image drawing,
@@ -166,9 +208,9 @@ iisdk-builder build --manifest examples/HelloGUI/iiSDKBuilder.json --platform ho
 
 The manifest contains Windows, macOS and Linux kits. `--platform host` selects
 the native host. Without it all three are requested; foreign desktop kits need
-explicit toolchains. Core is built/installed first, then LVUI, iiGUI and the common
-HelloGUI source. Builder uses FileProvider for its own manifests and logs;
-HelloGUI links Core, LVUI, iiGUI, Vulkan and native system libraries.
+explicit toolchains. Core and iiGUI are built before the common HelloGUI source.
+Builder uses FileProvider for its own manifests and logs; HelloGUI links Core,
+iiGUI, Vulkan and native system libraries. LVUI-based examples add LVUI explicitly.
 See [renderer selection and deployment](docs/Renderers.md) for Vulkan SDK paths.
 
 HelloGUI displays a 250 ms Core timer, a worker's computed result of 42, content
@@ -282,3 +324,32 @@ popup frames and input regions support a painted bubble tail while preserving
 the origin's focus, click and pointer capture. Runtime checks remain deferred.
 
 Related implementation contracts: [Retained popup effects](docs/RetainedPopupEffects.md).
+
+[Retained Window properties](docs/WindowProperties.md) update native geometry and
+base appearance through an owner-thread weak endpoint, stage candidate settings,
+preserve user resizing and local edits, and isolate embedded content from window ownership.
+
+Generated readonly C++ projections are covered by `iiGUI.native_readonly.*`,
+including selection changes, native references, record state, retirement and preserved input.
+Generated typed C++ View inputs are covered by `iiGUI.native_object_inputs.*`,
+including shared computations, object replacement, null recovery, failed candidate
+preservation, keyed rows, and editing state. See [native input contracts](docs/ObjectInputs.md).
+
+Generated C++ getter dependencies are covered by `iiGUI.native_method_queries.*`,
+including private observable state, nested and indexed receivers, conditional
+dependency changes, failure recovery and reentrant selection replacement.
+See [native method query contracts](docs/MethodQueries.md).
+
+Native C++ visual providers can be composed with [NativeView](docs/NativeView.md).
+Source identity retains edits and focus; candidate failures preserve the previous
+view, and parent retirement closes weak endpoints. Existing native drawing,
+input capture and frame data APIs remain the rendering path.
+
+<!-- workspace-docs:readme:start -->
+## Documentation entry points
+
+- Human overview: this English `README.md`.
+- Agent instructions: [AGENT.md](AGENT.md).
+- Human documentation: [documentation index](docs/README.md).
+- Structured agent documentation: [agent index](docs/agent-index.json).
+<!-- workspace-docs:readme:end -->

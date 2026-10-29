@@ -1,0 +1,7 @@
+import class LayoutRecord
+import vm LayoutModel
+let Details(item: LayoutRecord, again: LayoutRecord = item): View = VStack {
+    Label(text: item.title)
+    Label(text: again.count)
+}
+Window { Details(item: vm.record) }

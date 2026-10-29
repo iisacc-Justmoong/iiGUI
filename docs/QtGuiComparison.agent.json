@@ -1,0 +1,409 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:48d019963bc9fad993f9f830655f6ccf592fb83006b80fcf4719cb359f3daf6e",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/QtGuiComparison.md",
+    "sha256": "476c66c3ebd7fb488d6f93924376bba5a65f0c4d07d85a3b79cd61b376a88146",
+    "bytes": 4235,
+    "line_count": 49,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Qt GUI comparison and implemented response",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Qt GUI comparison and implemented response\n",
+      "level": 1,
+      "title": "Qt GUI comparison and implemented response"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "This audit compares the pre-0.3 iiGUI desktop text host to Qt's public GUI\ncontracts. Qt is a conceptual reference only: no Qt code, packages, types,\nruntime, platform plugin or RHI dependency is added to iiGUI/Core/HelloGUI.\nThe inspected references are the official Qt 6 documentation on 2026-10-16.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 11,
+      "raw": "Qt GUI supplies window-system integration, input/events, fonts/text, raster\npainting and graphics interfaces. Qt Quick's retained scene graph is a\nseparate layer built above it; its batching/resource techniques are useful\nreferences but must not be attributed to Qt GUI alone.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "table",
+      "start_line": 13,
+      "end_line": 19,
+      "raw": "| Area | Identified iiGUI limitation | Current source (0.3 base plus working-tree updates) | Remaining difference |\n|---|---|---|---|\n| Platform coverage | Three desktop hosts only; Linux X11 pixel scale fixed at 1 | Same C++23 GPU/host API and HelloGUI source on three desktops; live Xft.dpi logical scale on Linux | Qt supports more targets; direct Wayland, Android, iOS and WASM GUI hosts are absent |\n| Text quality | Windows GDI text; Linux manual UTF-8-prefix wrapping lacked shaping/fallback | DirectWrite/Direct2D and Pango/Cairo retained text layouts; native fallback, bidi, complex-script shaping | Editable text/IME, selection on Windows/Linux, custom-control accessibility and complete input remain absent |\n| Graphic quality | No graphics surface or GPU drawing path | Native sRGB GPU canvas, linear-light gradients and alpha, analytic rounded-edge AA, device-pixel sizing | General paths, images/codecs, rich painting, ICC content, wide gamut/HDR and 3D/compute remain absent |\n| Hardware/resource use | CPU text-only paint, repeated Linux measurement/repaint | Metal, D3D11 or Vulkan native drivers; instanced drawing; retained pipeline/attachment; equal-state suppression; Core-turn coalescing; on-demand GPU allocation | No arbitrary scene graph, partial GPU damage, texture atlas, compute scheduler, threaded renderer or guaranteed device-loss recovery |\n| Observability | No graphics/device information or pixel test path | Selected adapter/API, conservative hardware policy, actual storage/counters, explicit readback quality tests | No Qt-vs-iiGUI benchmark or claimed general performance superiority |\n",
+      "columns": [
+        "Area",
+        "Identified iiGUI limitation",
+        "Current source (0.3 base plus working-tree updates)",
+        "Remaining difference"
+      ],
+      "rows": [
+        [
+          "Platform coverage",
+          "Three desktop hosts only; Linux X11 pixel scale fixed at 1",
+          "Same C++23 GPU/host API and HelloGUI source on three desktops; live Xft.dpi logical scale on Linux",
+          "Qt supports more targets; direct Wayland, Android, iOS and WASM GUI hosts are absent"
+        ],
+        [
+          "Text quality",
+          "Windows GDI text; Linux manual UTF-8-prefix wrapping lacked shaping/fallback",
+          "DirectWrite/Direct2D and Pango/Cairo retained text layouts; native fallback, bidi, complex-script shaping",
+          "Editable text/IME, selection on Windows/Linux, custom-control accessibility and complete input remain absent"
+        ],
+        [
+          "Graphic quality",
+          "No graphics surface or GPU drawing path",
+          "Native sRGB GPU canvas, linear-light gradients and alpha, analytic rounded-edge AA, device-pixel sizing",
+          "General paths, images/codecs, rich painting, ICC content, wide gamut/HDR and 3D/compute remain absent"
+        ],
+        [
+          "Hardware/resource use",
+          "CPU text-only paint, repeated Linux measurement/repaint",
+          "Metal, D3D11 or Vulkan native drivers; instanced drawing; retained pipeline/attachment; equal-state suppression; Core-turn coalescing; on-demand GPU allocation",
+          "No arbitrary scene graph, partial GPU damage, texture atlas, compute scheduler, threaded renderer or guaranteed device-loss recovery"
+        ],
+        [
+          "Observability",
+          "No graphics/device information or pixel test path",
+          "Selected adapter/API, conservative hardware policy, actual storage/counters, explicit readback quality tests",
+          "No Qt-vs-iiGUI benchmark or claimed general performance superiority"
+        ]
+      ]
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 29,
+      "raw": "The desktop GPU backends deliberately match their platforms' broadly available\nnative interfaces. Metal is the maintained Apple path. D3D11 provides mature\nnative Windows support with flip-model presentation; adding D3D12 command\nmanagement is not required for this small instanced UI workload. The current\nsource uses Vulkan as the common fallback and the Linux default, with checked-in\nSPIR-V and explicit swapchain/fence/semaphore ownership. The narrow\nNativeCanvas boundary allows each implementation to be replaced without native\ntypes entering the public API. New hardware capabilities should be added when\nconcrete drawing requirements justify them.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 35,
+      "raw": "This is a real graphics/resource extension, not a claim that iiGUI replaces\nall of Qt GUI or Qt Quick. It closes the absence of a GPU path and modern text\nlayout on the existing desktop scope. Windows/Linux executable and shader\nexecution must be confirmed on those desktops; cross compilation alone does\nnot establish image quality, DPI behavior or driver compatibility.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "heading",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "## Primary references\n",
+      "level": 2,
+      "title": "Primary references"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "list",
+      "start_line": 39,
+      "end_line": 49,
+      "raw": "- [Qt GUI overview](https://doc.qt.io/qt-6/qtgui-overview.html)\n- [Qt supported platforms](https://doc.qt.io/qt-6/supported-platforms.html)\n- [Qt high DPI](https://doc.qt.io/qt-6/highdpi.html)\n- [Qt GUI RHI window example](https://doc.qt.io/qt-6/qtgui-rhiwindow-example.html)\n- [Qt Quick scene graph](https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html)\n- [Qt backing store](https://doc.qt.io/qt-6/qbackingstore.html)\n- [Apple CAMetalLayer](https://developer.apple.com/documentation/quartzcore/cametallayer)\n- [Direct2D resource/render targets](https://learn.microsoft.com/en-us/windows/win32/direct2d/render-targets-overview)\n- [DXGI sRGB resource/view conversion](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/converting-data-color-space)\n- [Pango architecture](https://www.gtk.org/docs/architecture/pango/)\n- [OpenGL ES 3 specification](https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf)\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "[Qt GUI overview](https://doc.qt.io/qt-6/qtgui-overview.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Qt supported platforms](https://doc.qt.io/qt-6/supported-platforms.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Qt high DPI](https://doc.qt.io/qt-6/highdpi.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Qt GUI RHI window example](https://doc.qt.io/qt-6/qtgui-rhiwindow-example.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Qt Quick scene graph](https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Qt backing store](https://doc.qt.io/qt-6/qbackingstore.html)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Apple CAMetalLayer](https://developer.apple.com/documentation/quartzcore/cametallayer)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Direct2D resource/render targets](https://learn.microsoft.com/en-us/windows/win32/direct2d/render-targets-overview)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[DXGI sRGB resource/view conversion](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/converting-data-color-space)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[Pango architecture](https://www.gtk.org/docs/architecture/pango/)",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "[OpenGL ES 3 specification](https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf)",
+          "checked": null
+        }
+      ]
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Qt GUI comparison and implemented response",
+      "anchor": "qt-gui-comparison-and-implemented-response",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000013",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Primary references",
+      "anchor": "primary-references",
+      "start_line": 37
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 11,
+        "text": "references but must not be attributed to Qt GUI alone.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 24,
+        "text": "management is not required for this small instanced UI workload. The current",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 28,
+        "text": "types entering the public API. New hardware capabilities should be added when",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 34,
+        "text": "execution must be confirmed on those desktops; cross compilation alone does",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000015",
+        "label": "Qt GUI overview",
+        "target": "https://doc.qt.io/qt-6/qtgui-overview.html",
+        "kind": "external",
+        "line": 39
+      },
+      {
+        "block_id": "b000015",
+        "label": "Qt supported platforms",
+        "target": "https://doc.qt.io/qt-6/supported-platforms.html",
+        "kind": "external",
+        "line": 40
+      },
+      {
+        "block_id": "b000015",
+        "label": "Qt high DPI",
+        "target": "https://doc.qt.io/qt-6/highdpi.html",
+        "kind": "external",
+        "line": 41
+      },
+      {
+        "block_id": "b000015",
+        "label": "Qt GUI RHI window example",
+        "target": "https://doc.qt.io/qt-6/qtgui-rhiwindow-example.html",
+        "kind": "external",
+        "line": 42
+      },
+      {
+        "block_id": "b000015",
+        "label": "Qt Quick scene graph",
+        "target": "https://doc.qt.io/qt-6/qtquick-visualcanvas-scenegraph.html",
+        "kind": "external",
+        "line": 43
+      },
+      {
+        "block_id": "b000015",
+        "label": "Qt backing store",
+        "target": "https://doc.qt.io/qt-6/qbackingstore.html",
+        "kind": "external",
+        "line": 44
+      },
+      {
+        "block_id": "b000015",
+        "label": "Apple CAMetalLayer",
+        "target": "https://developer.apple.com/documentation/quartzcore/cametallayer",
+        "kind": "external",
+        "line": 45
+      },
+      {
+        "block_id": "b000015",
+        "label": "Direct2D resource/render targets",
+        "target": "https://learn.microsoft.com/en-us/windows/win32/direct2d/render-targets-overview",
+        "kind": "external",
+        "line": 46
+      },
+      {
+        "block_id": "b000015",
+        "label": "DXGI sRGB resource/view conversion",
+        "target": "https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/converting-data-color-space",
+        "kind": "external",
+        "line": 47
+      },
+      {
+        "block_id": "b000015",
+        "label": "Pango architecture",
+        "target": "https://www.gtk.org/docs/architecture/pango/",
+        "kind": "external",
+        "line": 48
+      },
+      {
+        "block_id": "b000015",
+        "label": "OpenGL ES 3 specification",
+        "target": "https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf",
+        "kind": "external",
+        "line": 49
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000007",
+        "columns": [
+          "Area",
+          "Identified iiGUI limitation",
+          "Current source (0.3 base plus working-tree updates)",
+          "Remaining difference"
+        ],
+        "rows": [
+          [
+            "Platform coverage",
+            "Three desktop hosts only; Linux X11 pixel scale fixed at 1",
+            "Same C++23 GPU/host API and HelloGUI source on three desktops; live Xft.dpi logical scale on Linux",
+            "Qt supports more targets; direct Wayland, Android, iOS and WASM GUI hosts are absent"
+          ],
+          [
+            "Text quality",
+            "Windows GDI text; Linux manual UTF-8-prefix wrapping lacked shaping/fallback",
+            "DirectWrite/Direct2D and Pango/Cairo retained text layouts; native fallback, bidi, complex-script shaping",
+            "Editable text/IME, selection on Windows/Linux, custom-control accessibility and complete input remain absent"
+          ],
+          [
+            "Graphic quality",
+            "No graphics surface or GPU drawing path",
+            "Native sRGB GPU canvas, linear-light gradients and alpha, analytic rounded-edge AA, device-pixel sizing",
+            "General paths, images/codecs, rich painting, ICC content, wide gamut/HDR and 3D/compute remain absent"
+          ],
+          [
+            "Hardware/resource use",
+            "CPU text-only paint, repeated Linux measurement/repaint",
+            "Metal, D3D11 or Vulkan native drivers; instanced drawing; retained pipeline/attachment; equal-state suppression; Core-turn coalescing; on-demand GPU allocation",
+            "No arbitrary scene graph, partial GPU damage, texture atlas, compute scheduler, threaded renderer or guaranteed device-loss recovery"
+          ],
+          [
+            "Observability",
+            "No graphics/device information or pixel test path",
+            "Selected adapter/API, conservative hardware policy, actual storage/counters, explicit readback quality tests",
+            "No Qt-vs-iiGUI benchmark or claimed general performance superiority"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

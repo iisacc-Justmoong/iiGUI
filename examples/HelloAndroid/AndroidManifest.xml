@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.iisacc.lvui.helloandroid" android:versionCode="1" android:versionName="0.0.1">
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35" />
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="4198400" android:required="true" />
+    <application android:label="iiSDK LVUI Hello" android:hasCode="false" android:debuggable="true" android:extractNativeLibs="true" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name="android.app.NativeActivity" android:exported="true" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|keyboardHidden|uiMode">
+            <meta-data android:name="android.app.lib_name" android:value="hello_lvui" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

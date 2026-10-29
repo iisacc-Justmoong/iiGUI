@@ -2,17 +2,19 @@
 
 #include <iiGUI/Export.h>
 #include <iiGUI/Graphics.h>
+#include <iiGUI/Presentation.h>
 #include <iiGUI/Desktop.h>
 #include <iiSDKCore/Core/Result/Result.h>
 #include <iiSDKCore/Runtime/EventLoop.h>
 #include <iiSDKCore/Runtime/HostLoop.h>
 #include <iiSDKCore/Runtime/FrameLoop.h>
+#include <concepts>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
-namespace lvui { class Document; }
 namespace ii::gui {
 class WidgetBuilder;
 class WidgetMount;
@@ -23,6 +25,13 @@ struct Size final {
     double width = 0;
     double height = 0;
     friend bool operator==(const Size&, const Size&) = default;
+};
+// A declaration update owns only present fields. Unchanged declarations never
+// restore an old size after a user resizes the window.
+struct WindowGeometry final {
+    std::optional<std::string> title;
+    std::optional<double> width,height,minimum_width,minimum_height;
+    friend bool operator==(const WindowGeometry&,const WindowGeometry&)=default;
 };
 struct HostOptions final {
     std::string title = "iiGUI";
@@ -52,6 +61,17 @@ struct WindowSnapshot final {
     std::string title;
     std::string text;
 };
+// Reports the compiled host contract; OS permissions/session services may still
+// deny an individual request. Core targets without a window system have no GUI host.
+enum class HostBackend { cocoa, win32, x11, wayland, android, uikit, web, none };
+struct HostCapabilities final {
+    HostBackend backend=HostBackend::none;
+    bool clipboard_text=false,external_urls=false,file_dialogs=false;
+    bool secondary_windows=false,display_frames=false;
+    bool shaped_text=false,text_input=false,accessibility=false;
+};
+[[nodiscard]] IIGUI_EXPORT HostCapabilities host_capabilities() noexcept;
+
 struct HostStats final {
     std::uint64_t dispatches = 0;
     std::uint64_t timer_wakes = 0;
@@ -112,6 +132,7 @@ public:
     [[nodiscard]] core::Result<void> set_title(std::string_view title);
     [[nodiscard]] core::Result<void> set_text(std::string_view text);
     [[nodiscard]] core::Result<void> set_content_size(Size size);
+    [[nodiscard]] core::Result<void> set_window_geometry(const WindowGeometry&);
     [[nodiscard]] core::Result<void> request_close();
     // Borrow only while Host is alive. Core enforces the bound UI dispatch
     // thread; use executor() for lifetime-safe cross-thread delivery.
@@ -123,14 +144,22 @@ public:
     [[nodiscard]] core::Result<WidgetMount> mount_widgets(std::function<core::Result<void>(WidgetBuilder&)> factory, const WidgetAppearance&);
     [[nodiscard]] core::Result<void> unmount_widgets();
     [[nodiscard]] core::Result<void> unmount_widgets(const WidgetMount& expected);
-    // Parse separately; rejected layouts preserve the current canvas. Re-submit on resize.
-    [[nodiscard]] core::Result<void> set_view(const lvui::Document&, Renderer renderer = Renderer::automatic);
+    // A higher-level view supplies render_view(host, view, renderer) through
+    // argument-dependent lookup. The host does not depend on that view type.
+    template<class View>
+        requires requires(Host& host, const View& view, Renderer renderer) {
+            { render_view(host, view, renderer) } -> std::same_as<core::Result<void>>;
+        }
+    [[nodiscard]] core::Result<void> set_view(const View& view, Renderer renderer = Renderer::automatic) {
+        return render_view(*this, view, renderer);
+    }
     [[nodiscard]] core::Result<void> clear_canvas();
     [[nodiscard]] core::Result<GraphicsInfo> graphics_info() const;
     // Explicit synchronous GPU readback; normal presentation never reads back.
     [[nodiscard]] core::Result<PixelBuffer> capture_canvas();
     [[nodiscard]] core::Result<WindowSnapshot> snapshot() const;
     [[nodiscard]] core::Result<HostStats> stats() const;
+    [[nodiscard]] core::Result<std::shared_ptr<PresentationSource>> presentation_source() const;
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

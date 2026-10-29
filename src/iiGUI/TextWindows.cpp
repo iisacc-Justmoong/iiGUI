@@ -4,6 +4,7 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 #include "NativeText.h"
+#include "FontNative.h"
 
 namespace ii::gui::detail {
 namespace {
@@ -26,8 +27,9 @@ std::wstring wide(std::string_view value) {
 }
 ComPtr<IDWriteTextLayout> layout(IDWriteFactory* factory,const TextRun& run) {
     ComPtr<IDWriteTextFormat> format;
-    auto family=run.font_family.empty() ? std::wstring(L"Segoe UI") : wide(run.font_family);
-    checked(factory->CreateTextFormat(family.c_str(),nullptr,static_cast<DWRITE_FONT_WEIGHT>(run.font_weight),
+    auto family=wide(run.font_family.empty()?FontDatabase::application()->resolve_family(""):run.font_family);
+    auto collection=native_font_collection();
+    checked(factory->CreateTextFormat(family.c_str(),collection.Get(),static_cast<DWRITE_FONT_WEIGHT>(run.font_weight),
         DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,run.font_size,L"",&format),"Cannot create native text format");
     checked(format->SetTextAlignment(run.alignment==TextAlignment::center?DWRITE_TEXT_ALIGNMENT_CENTER:
         run.alignment==TextAlignment::right?DWRITE_TEXT_ALIGNMENT_TRAILING:DWRITE_TEXT_ALIGNMENT_LEADING),"Cannot align native text");

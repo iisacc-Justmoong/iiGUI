@@ -17,8 +17,8 @@ struct DispatchState final {
     std::vector<runtime::TaskToken> tokens;
     std::unique_ptr<runtime::HostLoop> host;
     runtime::HostLoopStats last_host_stats;
-    template<class Wake> void connect(Wake wake) {
-        host=std::make_unique<runtime::HostLoop>(loop,std::move(wake));
+    template<class Wake> void connect(Wake wake,runtime::HostLoopOptions options={}) {
+        host=std::make_unique<runtime::HostLoop>(loop,std::move(wake),options);
     }
     core::Result<void> disconnect() {
         if (!host) return {};

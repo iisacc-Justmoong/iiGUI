@@ -39,8 +39,14 @@ does not turn a closed popup's content into a new activation. A callback may ret
 the tree; no remaining callback or captured press then reaches that retired tree.
 Reopening in a close callback protects the new activation from the old press.
 
-The default close policies are Escape and a press outside all open popups. A
-focused descendant's Escape handler runs first. This allows a ColorPicker to
+The default close policies are Escape and a press outside all open popups.
+The `dismiss_on_context_request` override can distinguish a secondary outside press
+from an ordinary outside press. When it is absent, both follow
+`dismiss_on_outside_press`, preserving the default behavior.
+A context request inside a descendant popup is also inside each of its popup
+ancestors for dismissal purposes, even when the descendant lies outside their
+visual rectangles.
+A focused descendant's Escape handler runs first. This allows a ColorPicker to
 restore its model and notify its owner before the owner closes the popup. Tab
 wraps through eligible content; text editing, sliders and color dragging retain
 their normal behavior. Captured drag releases outside do not become outside

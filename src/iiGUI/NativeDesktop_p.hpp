@@ -7,6 +7,7 @@ struct NativeDialog final {
     std::function<void()> cancel;
     ~NativeDialog(){if(cancel)cancel();}
 };
+core::Result<std::shared_ptr<NativeDialog>> portal_file_dialog(std::string parent,FileDialogOptions,UiExecutor,FileDialogCompletion);
 core::Result<std::shared_ptr<NativeDialog>> native_file_dialog(void* parent,FileDialogOptions,UiExecutor,FileDialogCompletion);
 #if defined(__linux__)
 void bind_desktop(void* display,std::uintptr_t window);

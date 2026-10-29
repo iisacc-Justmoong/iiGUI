@@ -6,12 +6,18 @@
 
 namespace ii::gui {
 core::Result<std::shared_ptr<const RasterImage>> rgba_image(std::uint32_t w,std::uint32_t h,std::vector<std::uint8_t> pixels) {
-    if(!w || !h || w>maximum_image_dimension || h>maximum_image_dimension || std::uint64_t(w)*h>maximum_image_pixels || pixels.size()!=std::size_t(w)*h*4)
-        return core::fail(core::ErrorCode::invalid_argument,"Image requires 1..8192 dimensions, at most 16 Mi pixels, and exactly width*height*4 RGBA8 bytes");
+    return rgba_image(w,h,std::move(pixels),ImageBudget{});
+}
+core::Result<std::shared_ptr<const RasterImage>> rgba_image(std::uint32_t w,std::uint32_t h,std::vector<std::uint8_t> pixels,ImageBudget budget) {
+    if(!budget.maximum_pixels || budget.maximum_pixels>std::uint64_t(maximum_image_dimension)*maximum_image_dimension || !w || !h || w>maximum_image_dimension || h>maximum_image_dimension || std::uint64_t(w)*h>budget.maximum_pixels || pixels.size()!=std::size_t(w)*h*4)
+        return core::fail(core::ErrorCode::invalid_argument,"Image exceeds its 1..8192 dimensions, explicit pixel budget, or exact RGBA8 byte count");
     return std::shared_ptr<const RasterImage>(new RasterImage(w,h,std::move(pixels)));
 }
 core::Result<std::shared_ptr<const RasterImage>> svg_image(std::string_view svg,std::uint32_t w,std::uint32_t h) {
-    if(svg.empty() || svg.size()>1024*1024 || !core::valid_utf8(svg) || svg.find('\0')!=svg.npos || !w || !h || w>maximum_image_dimension || h>maximum_image_dimension || std::uint64_t(w)*h>maximum_image_pixels)
+    return svg_image(svg,w,h,ImageBudget{});
+}
+core::Result<std::shared_ptr<const RasterImage>> svg_image(std::string_view svg,std::uint32_t w,std::uint32_t h,ImageBudget budget) {
+    if(!budget.maximum_pixels || budget.maximum_pixels>std::uint64_t(maximum_image_dimension)*maximum_image_dimension || svg.empty() || svg.size()>1024*1024 || !core::valid_utf8(svg) || svg.find('\0')!=svg.npos || !w || !h || w>maximum_image_dimension || h>maximum_image_dimension || std::uint64_t(w)*h>budget.maximum_pixels)
         return core::fail(core::ErrorCode::invalid_argument,"Invalid SVG byte or output size limit");
     // Detect unsupported document elements before the codec could ignore them.
     // Quoted attributes/comments are skipped so path data is never treated as UI.
@@ -34,7 +40,7 @@ core::Result<std::shared_ptr<const RasterImage>> svg_image(std::string_view svg,
         if(bitmap.isNull()) return core::fail(core::ErrorCode::failed,"SVG rasterization failed");
         bitmap.convertToRGBA(); std::vector<std::uint8_t> pixels(std::size_t(w)*h*4);
         for(std::size_t y=0;y<h;++y) std::copy_n(bitmap.data()+y*bitmap.stride(),std::size_t(w)*4,pixels.data()+y*w*4);
-        return rgba_image(w,h,std::move(pixels));
+        return rgba_image(w,h,std::move(pixels),budget);
     } catch(...) { return core::fail(core::ErrorCode::failed,"Native SVG decoder failed",std::current_exception()); }
 }
 } // namespace ii::gui

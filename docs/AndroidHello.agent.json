@@ -1,0 +1,814 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:429187e5dfbfe6321d8b50e13d2ad2588d962e4183f8883a00cfa48c822f7d5c",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/AndroidHello.md",
+    "sha256": "cc41e1708e04e6a69428053cba3aa68dc4d296f5669decc11b2ccc7b0515a546",
+    "bytes": 14003,
+    "line_count": 195,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "Android 최소 네이티브 LVUI 앱",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Android 최소 네이티브 LVUI 앱\n",
+      "level": 1,
+      "title": "Android 최소 네이티브 LVUI 앱"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "호스트의 클립보드·외부 URL·AChoreographer 확장과 기존 최소 레이블 범위의 구분은\n[HostPlatforms.md](HostPlatforms.md)를 따른다. 아래의 이전 장치 실행 기록과 새\n호스트 확장의 검증 기록은 구분한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "`examples/HelloAndroid`는 Android 10/API 29 이상에서 실행하는 최소 Hello World이다.\nLVUI의 `ApplicationWindow`, `VStack`, `Label`을 빌드 호스트의 `lvui-compile`로\nC++23 코드에 변환하고 Android NDK로 컴파일한다. 앱 런타임은 iiSDKCore의\n`Application`·이벤트 루프·타이머이며, iiGUI의 C++ 위젯을 Vulkan으로 표시한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "heading",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "## 네이티브 진입과 표시\n",
+      "level": 2,
+      "title": "네이티브 진입과 표시"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 17,
+      "raw": "Android OS에 내장된 `android.app.NativeActivity`가 NDK `native_app_glue`의\n`android_main`을 부른다. `run_android_application`은 이 네이티브 Looper 스레드에\nAndroid 문맥을 빌리고 Core 앱을 구성한다. Core와 GUI 첨부가 정리된 뒤 Activity\n종료를 마친다. Core 자체에는 Android GUI나 iiGUI 의존성을 추가하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 21,
+      "raw": "APK의 `hasCode=false`이며 Java·Kotlin 앱 클래스나 DEX를 생성하지 않는다.\nOS의 NativeActivity 연결을 제외한 앱·위젯·렌더링·폰트 처리는 네이티브 코드이다.\nQt·WebView·LVUI 소스·컴파일러·인터프리터를 APK에 포함하지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 27,
+      "raw": "Core의 Observation은 모듈 사이에서 같은 관찰 문맥을 사용하도록 공유 라이브러리로\n제공된다. APK 생성기는 앱의 ELF `DT_NEEDED`를 재귀 탐색하여 이 SDK 런타임과\nNDK의 `libc++_shared.so`를 함께 담는다. Android의 공개 시스템 라이브러리만 기기에\n위임하고 나머지 의존성이 없으면 설치 전에 실패한다. 여러 SDK 공유 라이브러리가\n같은 C++ 런타임을 사용하며 Core의 Observation 소유·연결 계약을 바꾸지 않는다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 28,
+      "end_line": 28,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 29,
+      "end_line": 33,
+      "raw": "`HostAndroid.cpp`가 Looper 깨우기, Core 마감 시간, Activity 및 ANativeWindow 수명을\n연결한다. 창이 사라지면 GPU 표면을 해제하고 다시 생기면 재구성한다. 일시정지 시\n화면 제출을 멈춘다. 크기와 dp 배율은 Android가 관리한다. 위젯은 `NativeWidgetsAndroid.cpp`,\nVulkan surface는 `VulkanWindowAndroid.cpp`가 제공한다. 네이티브 뒤로 가기는 Core\n앱과 위젯 수명을 정리한다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 38,
+      "raw": "초기 창이 준비되기 전에는 Core의 대기 작업 때문에 native Looper를 0 ms로 반복하지\n않는다. 최초 시작 후에는 창이 일시적으로 없어져도 Core의 만료된 작업을 처리하며,\nGPU와 모션 cadence는 별도로 중단한다. 따라서 백그라운드 타이머가 만료된 채 남아\n반복 폴링하는 상태와 화면 밖에서 모션 타이머가 계속 도는 상태를 방지한다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "heading",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "## 의도적으로 제한한 범위\n",
+      "level": 2,
+      "title": "의도적으로 제한한 범위"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 51,
+      "raw": "이번 경로는 정적 스택·출력 가능한 ASCII 레이블과 Core 타이머를 실제 기기에 표시하기 위한\n최소 구현이다. 폰트는 APK의 Pretendard Regular를 메모리에서 읽고, 기존 PlutoVG에\n고정된 stb_truetype 소스를 독립 C++ 글리프 어댑터로 사용한다. 폰트 바이트와 비트맵은\n소유 값이며 텍스트 호출은 C++ mutex로 직렬화한다. `iiGUI.android_label_font`는\n운영체제 창 없이 실제 폰트의 폭·2배 배율·잉크·잘못된 크기 거부를 검사한다.\n글자 크기·색상·기본 정렬·명시적 줄바꿈을 처리하지만\n복잡한 스크립트 조합, 자동 줄 감기, 말줄임·밑줄·weight별 폰트 선택과 텍스트 편집기는\n완전한 Android 텍스트 구현이 아니다. 복잡한 문자와 편집기 요청은 명시적으로 거부한다.\nIME, TalkBack 접근성 연결, 클립보드, 외부 URL, 파일 선택기, 다중 창은 미구현이다.\n모션의 선택적 Core cadence는 16 ms이며 디스플레이 vsync 지원으로 보고하지 않는다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "heading",
+      "start_line": 53,
+      "end_line": 53,
+      "raw": "## 빌드와 기기 실행\n",
+      "level": 2,
+      "title": "빌드와 기기 실행"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 57,
+      "raw": "빌드 도구에는 CMake, Ninja, iiSDKBuilder, 빌드 호스트용 LVUI 컴파일러, Android NDK,\nAndroid SDK의 API 35/build-tools/platform-tools, JDK가 필요하다. 모든 결과물과 개발용\n서명 키는 iiGUI의 `build/` 안에 둔다. 다른 앱·사용자 데이터는 변경하지 않는다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 58,
+      "end_line": 58,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "fenced_code",
+      "start_line": 59,
+      "end_line": 67,
+      "raw": "```sh\npython3 tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n```\n",
+      "language": "sh",
+      "code": "python3 tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n",
+      "closed": true
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 74,
+      "raw": "`--install`을 생략하면 빌드·APK 검사만 수행한다. 승인된 실기기를 명시하며 여러\n기기가 있을 때 임의의 첫 기기에 설치하지 않는다. 기본 ABI는 `arm64-v8a`이다.\n기본 `--device-kind physical`은 에뮬레이터를 선택하지 않는다. 에뮬레이터 실행에는\n`--device-kind emulator --serial emulator-5580`처럼 종류와 serial을 명시한다.\n설치 직전 `ro.kernel.qemu`도 확인하여 요청한 종류와 다르면 설치를 거부한다.\n64비트 x86 Android 대상도 빌드할 수 있으나 에뮬레이터를 실기기 검증으로 대체하지 않는다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 75,
+      "end_line": 75,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 76,
+      "end_line": 79,
+      "raw": "도구는 iiSDKBuilder로 같은 대상의 iiSDKCore·iiColorManager·LVUI·iiGUI와 앱을\n빌드·스테이징한다. ELF ABI, NativeActivity 진입 심벌, Core와 자체 위젯 링크,\nQt·인터프리터·LVUI 파서의 부재를 검사하고 폰트와 라이선스를 패키징한다. 개발용 키로\n서명한 `iiSDK-LVUI-HelloWorld.apk`는 배포용 릴리스 서명을 대신하지 않는다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 81,
+      "end_line": 88,
+      "raw": "설치 후 한 번 실행하여 `HELLO_ANDROID_READY`, 2회 Core 타이머의\n`HELLO_ANDROID_TIMER_OK`, 살아 있는 앱 PID와 화면을 수집한다.\n`verification.json`의 빌드·설치·실기기·에뮬레이터 실행 상태는 별도 필드이다.\n에뮬레이터 성공은 `native_emulator_verified`, `emulatorDeviceTested=true`,\n`physicalDeviceTested=false`로 기록한다. 캡처 화면을 실제로\n검토한 뒤 화면 표시 성공을 판단하며, 빌드 결과로 미구현 기능의 동작을 보증하지 않는다.\n실행 로그의 시작 시각은 Android의 `date`에서 얻는다. 호스트와 에뮬레이터의 시간대가\n달라도 시작·타이머 로그를 누락하지 않으며 기존 실행 후 관찰 시간 4초를 늘리지 않는다.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 89,
+      "end_line": 89,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "heading",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "## 에뮬레이터 실행\n",
+      "level": 2,
+      "title": "에뮬레이터 실행"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 91,
+      "end_line": 91,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 92,
+      "end_line": 95,
+      "raw": "Apple Silicon 호스트에서는 ARM64 시스템 이미지와 `--abi arm64-v8a`를 사용한다.\n가상 기기의 OS가 에뮬레이터에서 동작하는 것이며, 앱은 동일한 LVUI 소스에서 AOT\n생성한 네이티브 C++23 ELF이다. 에뮬레이터를 위한 Qt·DEX·LVUI 인터프리터를 앱에\n추가하지 않는다. 에뮬레이터 자체의 호스트 UI 구현은 APK 의존성과 별개이다.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 97,
+      "end_line": 100,
+      "raw": "SDK 이미지·AVD·사용자 설정·서명 키·실행 증거는 `build/` 아래에서 관리한다.\n기존 Android SDK의 build-tools·platform-tools·platforms는 읽기 전용으로 재사용할\n수 있다. AVD는 `ANDROID_USER_HOME`, `ANDROID_AVD_HOME`으로 분리하고 앱 설치·실행은\n명시한 serial에만 수행한다. 실기기를 연결한 상태에서도 선택을 바꾸지 않는다.\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 101,
+      "end_line": 101,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "fenced_code",
+      "start_line": 102,
+      "end_line": 111,
+      "raw": "```sh\npython3 tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n```\n",
+      "language": "sh",
+      "code": "python3 tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n",
+      "closed": true
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 112,
+      "end_line": 112,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "heading",
+      "start_line": 113,
+      "end_line": 113,
+      "raw": "### macOS 에뮬레이터 패키지의 서명 메타데이터\n",
+      "level": 3,
+      "title": "macOS 에뮬레이터 패키지의 서명 메타데이터"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 114,
+      "end_line": 114,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 115,
+      "end_line": 120,
+      "raw": "2026-10-27의 로컬 SDK Manager 설치에서는 Emulator 37.2.12의 일부 텍스트 리소스에\n서명 확장 속성이 없었으며 `codesign --verify --strict`가 `NOTICE.csv`에서 실패했다.\n공식 배포 ZIP의 `._NOTICE.csv` 등 AppleDouble 항목에는 원래의 `com.apple.cs.*`\n서명 데이터가 있었다. 공식 아카이브의 SHA-256과 다운로드 파일이 일치하는지 확인한 뒤\nmacOS `ditto -x -k`로 별도 경로에 풀어 원본 메타데이터를 복원했다. 이 패키지는\n`valid on disk`, `satisfies its Designated Requirement` 검사를 통과했다.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 121,
+      "end_line": 121,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 122,
+      "end_line": 125,
+      "raw": "서명 검증과 에뮬레이터 부팅 성공은 서로 다른 증거이다. 복원한 패키지를 실행하기\n전에 추출 완료를 확인하며, Gatekeeper 비활성화나 임의 재서명으로 검사를 대체하지 않는다.\n로컬 증거는 `build/android-emulator-20261027/archive-provenance.json`,\n`archive-resource-metadata.json`, `emulator-ditto-signature.log`에 있다.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 126,
+      "end_line": 126,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "heading",
+      "start_line": 127,
+      "end_line": 127,
+      "raw": "## 2026-10-26 실제 검증\n",
+      "level": 2,
+      "title": "2026-10-26 실제 검증"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 128,
+      "end_line": 128,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 129,
+      "end_line": 132,
+      "raw": "Samsung SM-S918N, Android 16/API 36, arm64-v8a에 USB 디버깅으로 설치·실행하였다.\n1440×3088 실기기 화면에서 Hello World, iiSDKCore + LVUI + Vulkan, 증가하는 초 단위\n표시를 확인하였다. 로그의 GPU는 `Adreno (TM) 740`이며 `HELLO_ANDROID_READY`와\n`HELLO_ANDROID_TIMER_OK ticks=2`가 모두 기록되었다.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 133,
+      "end_line": 133,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 134,
+      "end_line": 137,
+      "raw": "최종 APK는 약 2 MB이다. 앱 라이브러리, Core Observation, libc++ 공유 라이브러리와\n폰트·라이선스를 포함하고 DEX·LVUI 소스·Qt 라이브러리는 포함하지 않는다. 최초 패키지의\nObservation 누락은 ELF 의존성 폐쇄 검사로 수정하였다. 초기 글꼴 캐시 잠금에서 마운트가\n정지한 문제는 실제 네이티브 스택을 확인한 뒤 독립 글리프 어댑터로 분리하여 해결하였다.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 138,
+      "end_line": 138,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "paragraph",
+      "start_line": 139,
+      "end_line": 143,
+      "raw": "패키징·기기 선택 회귀 검사 6개, 창 없는 실제 폰트 C++ 검사 1개,\n동일 폰트 검사의 ASan·UBSan 구성 1개가 통과하였다. 홈 화면 전환 후 기존 Activity를\n복귀시켜 같은 PID와 화면·초 단위 갱신을 확인하였다. 백그라운드 약 2.07초의 측정 구간에서\n프로세스 CPU 시간은 0.01초였다. 이는 짧은 동작 확인이며 일반적인 성능 벤치마크 수치로\n확대 해석하지 않는다.\n"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 144,
+      "end_line": 144,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 145,
+      "end_line": 148,
+      "raw": "증거는 `build/android-hello-20261026/final/verification.json`, `device-log.log`,\n`lifecycle.json`, `device-screen-resumed.png`에 있다. SDK 설치 소비 경로는 같은 빌드의\n`builder/kits/android/Release/prefix`이며, 빌드 호스트의 macOS SDK를 Android에 링크하지\n않았다. 앱을 기기에서 계속 실행한 상태로 두었다.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 149,
+      "end_line": 149,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "heading",
+      "start_line": 150,
+      "end_line": 150,
+      "raw": "## 2026-10-27 에뮬레이터 실행 검증\n",
+      "level": 2,
+      "title": "2026-10-27 에뮬레이터 실행 검증"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 151,
+      "end_line": 151,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 152,
+      "end_line": 156,
+      "raw": "Android Emulator 37.2.12와 AOSP Android 15/API 35 ARM64 이미지를 사용했다.\nAVD는 `iiSDK_LVUI_API35_ARM64`, serial은 `emulator-5580`이며 720×1280 화면,\n2개 vCPU, 2048 MB 게스트 RAM으로 구성했다. CPU는 macOS HVF를 사용하고 Vulkan은\n`SwiftShader Device (LLVM 10.0.0)`의 소프트웨어 장치를 사용했다. 따라서 이 기록은\n에뮬레이터에서의 실제 실행 증거이며 실기기나 물리 GPU의 성능 검증으로 해석하지 않는다.\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 157,
+      "end_line": 157,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "paragraph",
+      "start_line": 158,
+      "end_line": 161,
+      "raw": "iiSDKBuilder로 Android용 Core·ColorManager·LVUI·iiGUI를 빌드·설치 스테이징하고,\n같은 설치 경로를 소비한 HelloAndroid를 개발용 키로 서명하여 설치했다. Qt·DEX·LVUI\n소스가 없는 APK의 ELF ABI와 네이티브 의존성 폐쇄를 검사했다. 설치 대상은 명시한\n에뮬레이터 하나이며 연결된 실제 휴대전화에는 설치하거나 실행하지 않았다.\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 162,
+      "end_line": 162,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 163,
+      "end_line": 167,
+      "raw": "실행 로그에서 `HELLO_ANDROID_READY widget=iiGUI.Label renderer=Vulkan`,\n`runtime=iiSDKCore qt=false aot=true`, `HELLO_ANDROID_TIMER_OK ticks=2`를 확인했다.\n캡처 화면에는 Hello World, iiSDKCore + LVUI + Vulkan, Native C++23 - 3 s가 표시되어\n자체 C++ 위젯의 실제 렌더링과 Core 타이머에 따른 텍스트 변경을 확인했다.\n기존 실행 후 4초 관찰 조건을 유지했으며 앱을 반복 실행하지 않았다.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 168,
+      "end_line": 168,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "paragraph",
+      "start_line": 169,
+      "end_line": 172,
+      "raw": "호스트의 Android 전달 도구 단위 검사 10개와 관련 CTest 4개가 통과했다. CTest에는\n같은 도구 단위 검사가 포함되므로 두 수치를 합산하지 않는다. Markdown·agent JSON·색인도\n별도로 검증한다. 에뮬레이터의 최초 로딩·서명 메타데이터 복원·이미지 I/O 준비 과정과\n앱 실행 검증 결과는 구분하며, 첫 가상 기기 부팅 시간을 앱의 시작 성능으로 보고하지 않는다.\n"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 173,
+      "end_line": 173,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "paragraph",
+      "start_line": 174,
+      "end_line": 180,
+      "raw": "최종 APK·화면·로그·빌드 및 설치 결과는\n`build/android-emulator-20261027/app/verification.json`, `app/device-screen.png`,\n`app/device-log.log`에 있고 전체 증거 색인은 같은 상위 폴더의 `verification.json`이다.\n재실행용 `StartAndroidEmulator.command`는 준비된 AVD만 시작한다. AVD가 이미 실행\n중이면 현재 창을 사용한다. 앱 재설치에는 위의 `--device-kind emulator`와\n`--serial emulator-5580 --install` 명령을 사용한다. 검증 종료 시 앱과 가상 기기를\n실행 상태로 유지했다.\n"
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 181,
+      "end_line": 181,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "heading",
+      "start_line": 182,
+      "end_line": 182,
+      "raw": "### 지속 표시 검사\n",
+      "level": 3,
+      "title": "지속 표시 검사"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 183,
+      "end_line": 183,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "paragraph",
+      "start_line": 184,
+      "end_line": 189,
+      "raw": "초기 장시간 화면 캡처에서는 고정 문구가 누락된 결과가 관찰되었다. 장면에 정적 레이블이\n남는지 확인하는 `iiGUI.retained_labels`를 추가해 0·1·2·9·10·99·100·135·999·1000\n갱신과 반복 프레임을 검사했다. 앱의 설명 레이블에는 `description` ID를 명시했다.\n`IIGUI_ANDROID_RENDER_SMOKE=ON`은 같은 창에서 자리 수를 바꿔가며 GPU readback의\n정적 레이블 픽셀을 비교하는 선택적 검사를 실행하고 `ANDROID_RETAINED_LABELS_OK`를\n기록한다. 이 검사는 기본값 OFF이며 일반 최소 앱에 주기적 GPU readback을 추가하지 않는다.\n"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 190,
+      "end_line": 190,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "paragraph",
+      "start_line": 191,
+      "end_line": 195,
+      "raw": "최종 일반 모드에서는 같은 PID를 유지하면서 0·15·45·90초 화면을 비교했다. 네 번의\n캡처 모두 제목·설명 영역이 초기 화면과 바이트 단위로 일치했다. 타이머 갱신과 임시\n진단 코드·GPU readback fixture의 최종 최소 APK 제외도 별도로 확인했다.\n원본 결과는 `build/android-emulator-20261027/final-screen-stability.json`에 있다.\n픽셀 비교 검사의 통과만으로 초기 캡처 이상에 대한 보편적인 렌더러 원인을 단정하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Android 최소 네이티브 LVUI 앱",
+      "anchor": "android-최소-네이티브-lvui-앱",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000007",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "네이티브 진입과 표시",
+      "anchor": "네이티브-진입과-표시",
+      "start_line": 12
+    },
+    {
+      "block_id": "b000019",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "의도적으로 제한한 범위",
+      "anchor": "의도적으로-제한한-범위",
+      "start_line": 40
+    },
+    {
+      "block_id": "b000023",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "빌드와 기기 실행",
+      "anchor": "빌드와-기기-실행",
+      "start_line": 53
+    },
+    {
+      "block_id": "b000035",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "에뮬레이터 실행",
+      "anchor": "에뮬레이터-실행",
+      "start_line": 90
+    },
+    {
+      "block_id": "b000043",
+      "parent_id": "b000035",
+      "level": 3,
+      "title": "macOS 에뮬레이터 패키지의 서명 메타데이터",
+      "anchor": "macos-에뮬레이터-패키지의-서명-메타데이터",
+      "start_line": 113
+    },
+    {
+      "block_id": "b000049",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "2026-10-26 실제 검증",
+      "anchor": "2026-10-26-실제-검증",
+      "start_line": 127
+    },
+    {
+      "block_id": "b000059",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "2026-10-27 에뮬레이터 실행 검증",
+      "anchor": "2026-10-27-에뮬레이터-실행-검증",
+      "start_line": 150
+    },
+    {
+      "block_id": "b000071",
+      "parent_id": "b000059",
+      "level": 3,
+      "title": "지속 표시 검사",
+      "anchor": "지속-표시-검사",
+      "start_line": 182
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000009",
+        "line": 17,
+        "text": "종료를 마친다. Core 자체에는 Android GUI나 iiGUI 의존성을 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 19,
+        "text": "APK의 `hasCode=false`이며 Java·Kotlin 앱 클래스나 DEX를 생성하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 21,
+        "text": "Qt·WebView·LVUI 소스·컴파일러·인터프리터를 APK에 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 51,
+        "text": "모션의 선택적 Core cadence는 16 ms이며 디스플레이 vsync 지원으로 보고하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 57,
+        "text": "서명 키는 iiGUI의 `build/` 안에 둔다. 다른 앱·사용자 데이터는 변경하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 70,
+        "text": "기기가 있을 때 임의의 첫 기기에 설치하지 않는다. 기본 ABI는 `arm64-v8a`이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 71,
+        "text": "기본 `--device-kind physical`은 에뮬레이터를 선택하지 않는다. 에뮬레이터 실행에는",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000029",
+        "line": 74,
+        "text": "64비트 x86 Android 대상도 빌드할 수 있으나 에뮬레이터를 실기기 검증으로 대체하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 79,
+        "text": "서명한 `iiSDK-LVUI-HelloWorld.apk`는 배포용 릴리스 서명을 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000033",
+        "line": 86,
+        "text": "검토한 뒤 화면 표시 성공을 판단하며, 빌드 결과로 미구현 기능의 동작을 보증하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 95,
+        "text": "추가하지 않는다. 에뮬레이터 자체의 호스트 UI 구현은 APK 의존성과 별개이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000047",
+        "line": 123,
+        "text": "전에 추출 완료를 확인하며, Gatekeeper 비활성화나 임의 재서명으로 검사를 대체하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000053",
+        "line": 135,
+        "text": "폰트·라이선스를 포함하고 DEX·LVUI 소스·Qt 라이브러리는 포함하지 않는다. 최초 패키지의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000055",
+        "line": 143,
+        "text": "확대 해석하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000061",
+        "line": 156,
+        "text": "에뮬레이터에서의 실제 실행 증거이며 실기기나 물리 GPU의 성능 검증으로 해석하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000067",
+        "line": 170,
+        "text": "같은 도구 단위 검사가 포함되므로 두 수치를 합산하지 않는다. Markdown·agent JSON·색인도",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000067",
+        "line": 172,
+        "text": "앱 실행 검증 결과는 구분하며, 첫 가상 기기 부팅 시간을 앱의 시작 성능으로 보고하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000073",
+        "line": 189,
+        "text": "기록한다. 이 검사는 기본값 OFF이며 일반 최소 앱에 주기적 GPU readback을 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000075",
+        "line": 195,
+        "text": "픽셀 비교 검사의 통과만으로 초기 캡처 이상에 대한 보편적인 렌더러 원인을 단정하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [
+      {
+        "block_id": "b000027",
+        "language": "sh",
+        "code": "python3 tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n"
+      },
+      {
+        "block_id": "b000041",
+        "language": "sh",
+        "code": "python3 tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n"
+      }
+    ],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "HostPlatforms.md",
+        "target": "HostPlatforms.md",
+        "kind": "relative",
+        "line": 4
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}
