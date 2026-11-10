@@ -1,4 +1,9 @@
 include(FetchContent)
+include("${CMAKE_CURRENT_LIST_DIR}/SvgSource.cmake")
+iigui_svg_source(_iigui_svg_source "${CMAKE_CURRENT_SOURCE_DIR}")
+if(_iigui_svg_source)
+    set(FETCHCONTENT_SOURCE_DIR_LUNASVG "${_iigui_svg_source}")
+endif()
 # Pinned native codec for SVG and bounded in-memory PNG, never UI source or scripts.
 set(LUNASVG_BUILD_EXAMPLES OFF CACHE BOOL "No asset-codec examples" FORCE)
 set(LUNASVG_DISABLE_LOAD_SYSTEM_FONTS ON CACHE BOOL "No implicit SVG font file access" FORCE)
@@ -9,9 +14,27 @@ FetchContent_Declare(lunasvg
     GIT_TAG 83c58df8103dc7dca423dfd824992af94d49bed6
     GIT_SUBMODULES_RECURSE TRUE
     UPDATE_DISCONNECTED TRUE
-    SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/dependencies/lunasvg/source"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources/dependencies/lunasvg"
     BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/dependencies/lunasvg/build")
+# SVG is an internal implementation detail, not an independently shipped SDK
+# module. Keep it position-independent when embedding it in shared iiGUI.
+set(_iigui_svg_saved_shared "${BUILD_SHARED_LIBS}")
+if(DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+    set(_iigui_svg_saved_pic "${CMAKE_POSITION_INDEPENDENT_CODE}")
+    set(_iigui_svg_had_pic TRUE)
+endif()
+set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 FetchContent_MakeAvailable(lunasvg)
+set(BUILD_SHARED_LIBS "${_iigui_svg_saved_shared}")
+if(_iigui_svg_had_pic)
+    set(CMAKE_POSITION_INDEPENDENT_CODE "${_iigui_svg_saved_pic}")
+else()
+    unset(CMAKE_POSITION_INDEPENDENT_CODE)
+endif()
+unset(_iigui_svg_had_pic)
+unset(_iigui_svg_saved_pic)
+unset(_iigui_svg_saved_shared)
 target_compile_features(lunasvg PRIVATE cxx_std_23)
 target_compile_definitions(lunasvg PRIVATE LUNASVG_DISABLE_LOAD_SYSTEM_FONTS LUNASVG_DISABLE_EXTERNAL_RESOURCES)
 install(FILES "${lunasvg_SOURCE_DIR}/LICENSE" DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI/licenses RENAME LunaSVG-LICENSE)

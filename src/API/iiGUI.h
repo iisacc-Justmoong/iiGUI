@@ -4,6 +4,8 @@
 #include <iiGUI/Motion.h>
 #include <iiGUI/Host.h>
 #include <iiGUI/NativeWidgets.h>
+#include <iiGUI/Painter.h>
+#include <iiGUI/PaintView.h>
 #include <iiGUI/NativeView.h>
 #include <iiGUI/Application.h>
 #include <iiGUI/FontDatabase.h>

@@ -19,9 +19,10 @@ struct CanvasState final {
             (void)canvas_pixels(value, backing_scale);
             if (!native || frame->acceleration != value.acceleration || frame->renderer!=value.renderer) {
                 auto replacement = std::make_unique<NativeCanvas>(parent, display, value.acceleration,value.renderer,std::move(presentations));
+                replacement->prepare(value);
                 native = std::move(replacement);
                 dirty = true;
-            }
+            } else native->prepare(value);
             ++requests;
             if (!frame || *frame != value) { frame = std::move(value); dirty = true; }
             return {};

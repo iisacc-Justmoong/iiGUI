@@ -4,6 +4,10 @@
 #include <stdexcept>
 #include <thread>
 
+#if !defined(IIGUI_ACCESSIBILITY_VALUE_HANDLER_API)
+#error "The public iiGUI header must expose accessible value handler support"
+#endif
+
 namespace {
 void require(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
 template<class T> T take(ii::core::Result<T> result) {
@@ -27,6 +31,34 @@ void reentrant_action(){
     good(action.set_action_options(outer));
     const auto final=take(action.snapshot());const auto options=take(action.action_options());
     require(final.enabled&&final.text=="Nested"&&options.enabled,"Reentrant accessibility update was overwritten by an older action update");
+    tree->close();
+}
+void label_text_notifications(){
+    namespace gui=ii::gui;
+    unsigned notifications=0;bool reenter=false;gui::Widget label;
+    gui::detail::WidgetFrameHooks hooks;
+    hooks.accessibility_changed=[&]{
+        ++notifications;
+        if(reenter){reenter=false;good(label.set_text("Newest"));}
+    };
+    auto tree=std::make_shared<gui::detail::WidgetState>([](ii::runtime::Task task){task();},gui::WidgetAppearance{},hooks);
+    auto host=take(tree->content_host({},"label-host",{200,80}));
+    gui::LabelOptions initial{.text="Initial"};
+    good(host.set_content([&](gui::WidgetBuilder& builder)->ii::core::Result<void>{
+        auto created=builder.label({},"label",initial);if(!created)return std::unexpected(created.error());label=*created;return {};
+    }));
+    auto before=notifications;good(label.set_label_options(initial));
+    require(notifications==before,"Unchanged label options published an accessibility update");
+    auto styled=initial;styled.font_size=18;good(label.set_label_options(styled));
+    require(notifications==before,"A visual-only label change published an accessibility update");
+    styled.text="Older";reenter=true;good(label.set_label_options(styled));
+    require(!reenter&&notifications==before+2&&take(label.snapshot()).text=="Newest",
+            "Label text accessibility notification lost or overwrote a reentrant update");
+    before=notifications;good(label.set_text("Newest"));
+    require(notifications==before,"Unchanged label text published an accessibility update");
+    good(label.set_text("Changed"));
+    require(notifications==before+1&&take(label.snapshot()).text=="Changed",
+            "Direct label text mutation did not publish an accessibility update");
     tree->close();
 }
 void secure_text_provider(){
@@ -60,6 +92,40 @@ void secure_text_provider(){
     good(editor.set_text_input_provider(nullptr));
     require(!editor.notify_text_input_changed(),"A widget without a text provider published text changes");
     tree->close();
+}
+void accessibility_value_delivery(){
+    namespace gui=ii::gui;unsigned changed=0,calls=0;double delivered=0;
+    gui::detail::WidgetFrameHooks hooks;hooks.accessibility_value_changed=[&]{++changed;};
+    auto tree=std::make_shared<gui::detail::WidgetState>([](ii::runtime::Task task){task();},gui::WidgetAppearance{},hooks);
+    auto host=take(tree->content_host({},"value-host",{200,80}));gui::Widget slider,custom,progress;
+    good(host.set_content([&](gui::WidgetBuilder& builder)->ii::core::Result<void>{
+        auto root=builder.vstack({},"value-root");if(!root)return std::unexpected(root.error());
+        auto native=builder.slider(*root,"native",{.minimum=0,.maximum=10,.value=2,.step=2},[&](double value){++calls;delivered=value;});
+        if(!native)return std::unexpected(native.error());slider=*native;
+        auto surface=builder.action_surface(*root,"custom",{});if(!surface)return std::unexpected(surface.error());custom=*surface;
+        if(auto r=custom.set_accessibility_semantics(gui::AccessibilitySemantics{.role=gui::AccessibilityRole::slider,.range=gui::AccessibilityRange{0,10,2}});!r)return r;
+        auto bar=builder.progress(*root,"progress",{});if(!bar)return std::unexpected(bar.error());progress=*bar;
+        return {};
+    }));
+    const auto native_id=take(slider.snapshot()).id,custom_id=take(custom.snapshot()).id,progress_id=take(progress.snapshot()).id;
+    require(take(tree->can_set_accessibility_value(native_id,7)),"Native slider rejected an accessible value");
+    const auto previous=changed;good(tree->set_accessibility_value(native_id,7));
+    require(calls==1&&delivered==8&&take(slider.snapshot()).value==8&&changed>previous,"Native slider lost step, callback or value notification");
+    require(!take(tree->can_set_accessibility_value(custom_id,4)),"Custom slider without a setter accepted a value");
+    good(custom.set_accessibility_value_handler([&](double value)->ii::core::Result<void>{
+        ++calls;delivered=value;auto state=custom.snapshot();if(!state)return std::unexpected(state.error());
+        auto semantics=*state->accessibility_semantics;semantics.range->value=value;return custom.set_accessibility_semantics(semantics);
+    }));
+    const auto before_custom=changed;good(tree->set_accessibility_value(custom_id,4));
+    require(calls==2&&delivered==4&&changed>before_custom&&take(custom.snapshot()).value==4,"Custom slider setter lost the requested value or notification");
+    require(!take(tree->can_set_accessibility_value(progress_id,.5)),"Progress unexpectedly accepted a value");
+    require(!take(tree->can_set_accessibility_value(custom_id,11))&&!take(tree->can_set_accessibility_value(custom_id,std::numeric_limits<double>::quiet_NaN())),"Out-of-range or nonfinite value was accepted");
+    good(custom.set_enabled(false));require(!take(tree->can_set_accessibility_value(custom_id,4)),"Disabled slider accepted a value");
+    require(!tree->set_accessibility_value(custom_id,4)&&calls==2,"Disabled slider delivered a value");
+    good(custom.set_enabled(true));good(custom.set_accessibility_value_handler([](double)->ii::core::Result<void>{throw std::runtime_error("value handler failed");}));
+    auto thrown=tree->set_accessibility_value(custom_id,4);require(!thrown&&bool(thrown.error().cause),"Value handler exception lost its cause");
+    good(custom.set_accessibility_value_handler([&](double)->ii::core::Result<void>{return host.clear_content();}));
+    good(tree->set_accessibility_value(custom_id,5));require(!tree->can_set_accessibility_value(native_id,4),"Retired slider remained addressable");tree->close();
 }
 }
 
@@ -206,5 +272,7 @@ int main() {
     require(!custom.set_accessibility_semantics(progress), "Retired semantics remained writable");
     tree->close();
     reentrant_action();
+    label_text_notifications();
     secure_text_provider();
+    accessibility_value_delivery();
 }

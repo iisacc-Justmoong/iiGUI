@@ -1,5 +1,5 @@
 #pragma once
-#include <iiGUI/Host.h>
+#include <iiGUI/WindowGeometry.h>
 #include <iiGUI/Appearance.h>
 #include <iiSDKCore/Core/Text/Utf8.h>
 #include <algorithm>
@@ -40,12 +40,20 @@ struct WindowGeometryValue final {
         return core::fail(core::ErrorCode::invalid_argument,"Window size must be at least its minimum size");
     return current;
 }
+[[nodiscard]] inline bool valid_text_weight_rules(const std::optional<std::vector<TextWeightRule>>& rules) noexcept {
+    if(!rules)return true;
+    if(rules->size()>256)return false;
+    for(const auto& rule:*rules)
+        if(!std::isfinite(rule.font_size)||rule.font_size<1||rule.font_size>256||
+           (rule.weight!=400&&rule.weight!=500&&rule.weight!=600&&rule.weight!=700))return false;
+    return true;
+}
 [[nodiscard]] inline bool valid_widget_appearance(const WidgetAppearance& value) {
     for(auto c:{value.window,value.primary,value.hover,value.pressed,value.disabled_background})
         for(auto channel:{c.red,c.green,c.blue,c.alpha})if(!std::isfinite(channel)||channel<0||channel>1)return false;
     for(auto alpha:value.text_alpha)if(!std::isfinite(alpha)||alpha<0||alpha>1)return false;
     for(auto number:{value.button_height,value.button_padding,value.button_radius})if(!std::isfinite(number)||number<0||number>32767)return false;
-    return value.button_height>0&&!value.font_family.empty()&&value.font_family.size()<=4096&&
+    return valid_text_weight_rules(value.text_weight_rules)&&value.button_height>0&&!value.font_family.empty()&&value.font_family.size()<=4096&&
         core::valid_utf8(value.font_family)&&value.font_family.find('\0')==value.font_family.npos;
 }
 [[nodiscard]] inline core::Result<void> validate_window_properties(const WindowProperties& value) {

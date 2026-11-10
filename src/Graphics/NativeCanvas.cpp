@@ -39,7 +39,16 @@ NativeCanvas::NativeCanvas(void* p,void* d,Acceleration a,Renderer r,std::shared
 #endif
 }
 NativeCanvas::~NativeCanvas()=default;
-void NativeCanvas::draw(const CanvasFrame& f,double s,double h) {if(std::ranges::any_of(f.overlays,[](const auto& l){return bool(l.backdrop);})&&!impl_->renderer.info().backdrop_supported)throw std::runtime_error("GPU backdrop materials require the native Metal backend");if(std::ranges::any_of(f.overlays,[](const auto& l){return bool(l.shadow);})&&!impl_->renderer.info().shadow_supported)throw std::runtime_error("GPU box shadows require the native Metal backend");if(std::ranges::any_of(f.overlays,[](const auto& l){return !l.content_transform.identity();})&&!impl_->renderer.info().content_transform_supported)throw std::runtime_error("GPU content transforms require the native Metal backend");auto state=impl_;auto source=presentations_;draw_with_presentation(source,[&]{state->renderer.draw(f,s,h);},[&]{return state->renderer.info();},[]{return runtime::Clock::now();}); }
+void NativeCanvas::prepare(const CanvasFrame& frame) {
+#if defined(__EMSCRIPTEN__)
+    const auto plan=plan_canvas_scenes(frame);
+    if(!plan)throw std::invalid_argument("Invalid GPU source scene graph");
+    if(plan->count&&!impl_->renderer.info().scene_sources_supported)throw std::runtime_error("GPU source scenes are not supported by this renderer");
+#else
+    impl_->renderer.prepare(frame);
+#endif
+}
+void NativeCanvas::draw(const CanvasFrame& f,double s,double h) {prepare(f);if(std::ranges::any_of(f.overlays,[](const auto& l){return bool(l.backdrop);})&&!impl_->renderer.info().backdrop_supported)throw std::runtime_error("GPU backdrop materials require a supported accelerator");if(std::ranges::any_of(f.overlays,[](const auto& l){return bool(l.shadow);})&&!impl_->renderer.info().shadow_supported)throw std::runtime_error("GPU box shadows require a supported accelerator");if(std::ranges::any_of(f.overlays,[](const auto& l){return !l.content_transform.identity();})&&!impl_->renderer.info().content_transform_supported)throw std::runtime_error("GPU content transforms require a supported accelerator");auto state=impl_;auto source=presentations_;draw_with_presentation(source,[&]{state->renderer.draw(f,s,h);},[&]{return state->renderer.info();},[]{return runtime::Clock::now();}); }
 PixelBuffer NativeCanvas::capture() { return impl_->renderer.capture(); }
 GraphicsInfo NativeCanvas::info() const { return impl_->renderer.info(); }
 bool NativeCanvas::native_event(const void* e) { return impl_->renderer.native_event(e); }

@@ -10,7 +10,10 @@ namespace ii::gui::detail {
 struct AndroidLabelFont::Impl final {
     std::vector<std::uint8_t> bytes;
     stbtt_fontinfo font{};
-    explicit Impl(std::vector<std::uint8_t> data,unsigned index):bytes(std::move(data)){
+    AndroidFontSource source;
+    unsigned collection_index;
+    explicit Impl(std::vector<std::uint8_t> data,unsigned index,AndroidFontSource input)
+        :bytes(std::move(data)),source(std::move(input)),collection_index(index){
         if(bytes.size()<12||bytes.size()>16*1024*1024)throw std::invalid_argument("Invalid pinned label font size");
         if(index>4095)throw std::invalid_argument("Font collection index exceeds the supported bound");
         const auto offset=stbtt_GetFontOffsetForIndex(bytes.data(),int(index));
@@ -19,8 +22,11 @@ struct AndroidLabelFont::Impl final {
     }
     float scale(float pixels)const{if(!std::isfinite(pixels)||pixels<=0||pixels>2048)throw std::invalid_argument("Native label font size must be in (0,2048]");return stbtt_ScaleForPixelHeight(&font,pixels);}
 };
-AndroidLabelFont::AndroidLabelFont(std::vector<std::uint8_t> bytes,unsigned index):impl_(std::make_unique<Impl>(std::move(bytes),index)){}
+AndroidLabelFont::AndroidLabelFont(std::vector<std::uint8_t> bytes,unsigned index,AndroidFontSource source)
+    :impl_(std::make_unique<Impl>(std::move(bytes),index,std::move(source))){}
 AndroidLabelFont::~AndroidLabelFont()=default;
+const AndroidFontSource& AndroidLabelFont::source()const noexcept{return impl_->source;}
+unsigned AndroidLabelFont::collection_index()const noexcept{return impl_->collection_index;}
 float AndroidLabelFont::width(float pixels,std::string_view text)const{
     const auto scale=impl_->scale(pixels);float width=0;unsigned previous=0;
     for(unsigned char c:text){if(c<32||c>126)throw std::invalid_argument("The minimal Android label font supports printable ASCII");int advance=0;stbtt_GetCodepointHMetrics(&impl_->font,c,&advance,nullptr);if(previous)width+=stbtt_GetCodepointKernAdvance(&impl_->font,int(previous),c)*scale;width+=advance*scale;previous=c;}return width;

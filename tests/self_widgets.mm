@@ -113,6 +113,9 @@ void native_events() {
         }
         check(calls==2,"OS key did not reach C++ widget action");
         auto peers=view.accessibilityChildren; check(peers.count==3 && [peers[0] isKindOfClass:NSAccessibilityElement.class],"Virtual accessibility peers unavailable");
+        check([[peers[0] accessibilityLabel] isEqualToString:@"OS input"] &&
+              [[peers[1] accessibilityLabel] isEqualToString:@"input"] &&
+              [[peers[2] accessibilityLabel] isEqualToString:@"Read only"],"Native accessibility names differ");
         check([peers[0] accessibilityPerformPress] && calls==3,"Virtual accessibility action failed");
         check(![peers[0] isAccessibilitySelectorAllowed:@selector(setAccessibilityValue:)] && ![peers[2] isAccessibilitySelectorAllowed:@selector(setAccessibilityValue:)],"Read-only virtual controls advertised value editing");
         check([peers[1] isAccessibilitySelectorAllowed:@selector(setAccessibilityValue:)],"Input did not advertise editing");

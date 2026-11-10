@@ -67,7 +67,10 @@ public:
     FontLoadReport load(std::span<const FontResource> resources)override{
         auto& state=registry();std::lock_guard guard(state.mutex);system_fonts(state);FontLoadReport result;
         for(const auto& resource:resources){FontLoad loaded{std::string(resource.file)};
-            try{auto bytes=directory_.empty()?read_asset(resource.file):read_file(std::filesystem::path(directory_)/std::string(resource.file));auto font=std::make_shared<AndroidLabelFont>(std::move(bytes));
+            try{auto path=directory_.empty()?std::string(resource.file):(std::filesystem::path(directory_)/std::string(resource.file)).string();
+                auto bytes=directory_.empty()?read_asset(path):read_file(path);
+                auto source=AndroidFontSource{directory_.empty()?AndroidFontSource::Kind::asset:AndroidFontSource::Kind::file,std::move(path)};
+                auto font=std::make_shared<AndroidLabelFont>(std::move(bytes),0,std::move(source));
                 auto found=std::find_if(state.faces.begin(),state.faces.end(),[&](const auto& entry){return entry.family==resource.family&&entry.weight==resource.weight;});Face face{std::string(resource.family),resource.weight,{},std::move(font)};
                 if(found==state.faces.end())state.faces.push_back(std::move(face));else *found=std::move(face);state.index_dirty=true;loaded.loaded=true;
             }catch(const std::exception& error){loaded.error=error.what();}result.resources.push_back(std::move(loaded));}return result;
@@ -78,7 +81,7 @@ std::shared_ptr<AndroidLabelFont> native_android_font(std::string_view family,in
     auto& state=registry();std::lock_guard guard(state.mutex);system_fonts(state);Face* selected=nullptr;const auto key=FontDatabase::fold_name(family);
     if(state.index_dirty){std::map<std::string,std::vector<std::size_t>,std::less<>> index;for(std::size_t i=0;i<state.faces.size();++i)index[FontDatabase::fold_name(state.faces[i].family)].push_back(i);state.index=std::move(index);state.index_dirty=false;}
     if(const auto found=state.index.find(key);found!=state.index.end())for(auto i:found->second){auto& face=state.faces[i];if(!selected||std::abs(face.weight-weight)<std::abs(selected->weight-weight))selected=&face;}
-    if(!selected)throw std::runtime_error("The selected native font is unavailable");if(!selected->loaded)selected->loaded=std::make_shared<AndroidLabelFont>(read_file(selected->file),selected->collection_index);
+    if(!selected)throw std::runtime_error("The selected native font is unavailable");if(!selected->loaded)selected->loaded=std::make_shared<AndroidLabelFont>(read_file(selected->file),selected->collection_index,AndroidFontSource{AndroidFontSource::Kind::file,selected->file.string()});
     if(!selected->file.empty()){const auto index=std::size_t(selected-state.faces.data());std::erase(state.recent_system,index);state.recent_system.push_back(index);while(state.recent_system.size()>8){auto old=state.recent_system.front();state.recent_system.pop_front();if(!state.faces[old].file.empty())state.faces[old].loaded.reset();}}
     return selected->loaded;
 }

@@ -1,7 +1,11 @@
 #include <iiGUI/HostCommon.h>
+#include <iiGUI/HostActivity.h>
+#include "HostFailure.h"
+#include "HostCallback.h"
 #include <iiGUI/DispatchState.h>
 #include <iiGUI/CanvasState.h>
 #include <iiGUI/WidgetState.h>
+#include <iiGUI/WidgetSurfaceNative.h>
 #include <iiGUI/MountTransaction.h>
 #include <iiGUI/WebSurface.h>
 #include <iiGUI/WebAsync.h>
@@ -52,8 +56,8 @@ struct Host::Impl final {
     // Wake storage stays alive until HostLoop disconnect has barred workers.
     std::shared_ptr<std::atomic<std::int32_t>> wake=std::make_shared<std::atomic<std::int32_t>>(0);
     const std::thread::id owner=std::this_thread::get_id();
-    detail::WebSurfaceParent surface;HostCallbacks callbacks;WindowSnapshot state;HostStats statistics;
-    Phase phase=Phase::created;std::optional<core::Error> failure;detail::CanvasState canvas;
+    detail::WebSurfaceParent surface;HostCallbacks callbacks;detail::HostActivity activity,foreground;WindowSnapshot state;HostStats statistics;
+    Phase phase=Phase::created;detail::HostFailure failure;detail::CanvasState canvas;
     std::shared_ptr<detail::WidgetState> widgets;std::unique_ptr<runtime::FrameLoop> motion_frames;
     std::shared_ptr<MotionPreferences> preferences=std::make_shared<MotionPreferences>();
     detail::HostInputQueue inputs;bool resize_pending=false,visibility_pending=false,hidden=false,lost=false,lost_pending=false,restore_pending=false,mounting=false,opened=false,close_pending=false;
@@ -67,7 +71,7 @@ struct Host::Impl final {
     template<class F>void guard(F&& work)noexcept{try{work();}catch(...){if(!failure)failure=core::Error{core::ErrorCode::failed,"Web host callback failed",std::current_exception()};defer_close();}}
     void signal(){detail::web_wake(*wake);}
     void defer_close()noexcept{close_pending=true;dispatch->retire();dispatch->loop.request_stop();signal();}
-    void close()noexcept{if(phase!=Phase::running)return;phase=Phase::closed;dispatch->retire();canvas.clear();if(widgets){widgets->close();widgets.reset();}state.visible=false;state.closed=true;presentations->close();surface.visible=false;dispatch->loop.request_stop();if(callbacks.closed)try{callbacks.closed();}catch(...){if(!failure)failure=core::Error{core::ErrorCode::failed,"Web close callback failed",std::current_exception()};}signal();}
+    void close()noexcept{if(phase!=Phase::running)return;phase=Phase::closed;activity.close();foreground.close();dispatch->retire();canvas.clear();if(widgets){widgets->close();widgets.reset();}state.visible=false;state.closed=true;presentations->close();surface.visible=false;dispatch->loop.request_stop();if(callbacks.closed)try{callbacks.closed();}catch(...){if(!failure)failure=core::Error{core::ErrorCode::failed,"Web close callback failed",std::current_exception()};}signal();}
     void push(WidgetInput value)noexcept{
         try{if(phase!=Phase::running)return;if(!inputs.push(std::move(value)))throw std::runtime_error("Browser input queue is full");}
         catch(...){if(!failure)failure=core::Error{core::ErrorCode::full,"Browser input admission failed",std::current_exception()};}
@@ -81,7 +85,11 @@ struct Host::Impl final {
     void drain(double frame_time){guard([&]{
         if(failure||close_pending){defer_close();return;}
         if(resize_pending){resize_pending=false;resize();}
-        if(visibility_pending){visibility_pending=false;surface.visible=state.visible=!hidden;if(!hidden){last_frame=0;if(frames())frames()->reset_clock();}if(widgets){const detail::WebSurfaceEvent event{detail::WebSurfaceEventKind::resize};(void)widgets->native_event(&event);}}
+        if(visibility_pending){visibility_pending=false;surface.visible=state.visible=!hidden;activity.observe(!hidden);if(!hidden){last_frame=0;if(frames())frames()->reset_clock();}if(widgets){const detail::WebSurfaceEvent event{detail::WebSurfaceEventKind::resize};(void)widgets->native_event(&event);}}
+        if(opened)foreground.deliver();
+        if(close_pending||phase!=Phase::running)return;
+        if(opened)activity.deliver();
+        if(close_pending||phase!=Phase::running)return;
         if(restore_pending){restore_pending=false;lost=false;if(widgets){const detail::WebSurfaceEvent event{detail::WebSurfaceEventKind::restore};(void)widgets->native_event(&event);}if(canvas.frame){auto frame=*canvas.frame;auto result=canvas.set(std::move(frame),&surface,nullptr,surface.scale,presentations);if(!result)throw std::runtime_error(result.error().message);}}
         if(lost_pending){lost_pending=false;canvas.native.reset();if(widgets){const detail::WebSurfaceEvent event{detail::WebSurfaceEventKind::lost};(void)widgets->native_event(&event);}}
         while(!inputs.empty()&&phase==Phase::running&&!close_pending){auto input=*inputs.pop();if(widgets){const detail::WebSurfaceEvent event{detail::WebSurfaceEventKind::input,&input};(void)widgets->native_event(&event);}}
@@ -96,12 +104,48 @@ struct Host::Impl final {
         emscripten_set_keydown_callback("#canvas",this,EM_FALSE,&keyboard);emscripten_set_keyup_callback("#canvas",this,EM_FALSE,&keyboard);
         emscripten_set_wheel_callback("#canvas",this,EM_FALSE,+[](int,const EmscriptenWheelEvent* e,void* raw)->EM_BOOL{WidgetInput input;input.kind=WidgetInputKind::scroll;input.x=e->mouse.targetX;input.y=e->mouse.targetY;const auto multiplier=e->deltaMode==DOM_DELTA_PIXEL?1.:e->deltaMode==DOM_DELTA_LINE?20.:200.;input.scroll_x=-e->deltaX*multiplier;input.scroll_y=-e->deltaY*multiplier;input.precise_scroll=e->deltaMode==DOM_DELTA_PIXEL;static_cast<Impl*>(raw)->push(std::move(input));return EM_FALSE;});
         emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW,this,EM_FALSE,+[](int,const EmscriptenUiEvent*,void* raw)->EM_BOOL{auto& self=*static_cast<Impl*>(raw);self.resize_pending=true;self.signal();return EM_FALSE;});
+        // A browser can change devicePixelRatio when a window moves displays
+        // without changing its CSS size. Watch the current ratio, then re-arm.
+        MAIN_THREAD_EM_ASM({ (function() {
+            /* IIGUI_DPI_WATCH_BEGIN */
+            const previous = Module['iiGUIDpiWatch'];
+            if (previous) previous.dispose();
+            const state = {active: true, query: null, listener: null};
+            state.remove = () => {
+                if (!state.query || !state.listener) return;
+                if (state.query.removeEventListener) state.query.removeEventListener('change', state.listener);
+                else if (state.query.removeListener) state.query.removeListener(state.listener);
+                state.query = null;state.listener = null;
+            };
+            state.dispose = () => { state.active = false;state.remove(); };
+            state.arm = () => {
+                state.remove();
+                if (!state.active || typeof window.matchMedia !== 'function') return;
+                const query = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)');
+                const listener = () => {
+                    if (!state.active || state.query !== query) return;
+                    state.arm();window.dispatchEvent(new Event('resize'));
+                };
+                state.query = query;state.listener = listener;
+                if (query.addEventListener) query.addEventListener('change', listener);
+                else if (query.addListener) query.addListener(listener);
+            };
+            state.arm();Module['iiGUIDpiWatch'] = state;
+            /* IIGUI_DPI_WATCH_END */
+        })(); });
         emscripten_set_blur_callback("#canvas",this,EM_FALSE,+[](int,const EmscriptenFocusEvent*,void* raw)->EM_BOOL{static_cast<Impl*>(raw)->push({.kind=WidgetInputKind::focus_lost});return EM_FALSE;});
-        emscripten_set_visibilitychange_callback(this,EM_FALSE,+[](int,const EmscriptenVisibilityChangeEvent* e,void* raw)->EM_BOOL{auto& self=*static_cast<Impl*>(raw);self.hidden=e->hidden;self.visibility_pending=true;self.signal();return EM_FALSE;});
+        emscripten_set_visibilitychange_callback(this,EM_FALSE,+[](int,const EmscriptenVisibilityChangeEvent* e,void* raw)->EM_BOOL{auto& self=*static_cast<Impl*>(raw);self.hidden=e->hidden;self.foreground.observe(!e->hidden);self.visibility_pending=true;self.signal();return EM_FALSE;});
         emscripten_set_webglcontextlost_callback("#canvas",this,EM_FALSE,+[](int,const void*,void* raw)->EM_BOOL{auto& self=*static_cast<Impl*>(raw);self.lost=true;self.lost_pending=true;self.signal();return EM_TRUE;});
         emscripten_set_webglcontextrestored_callback("#canvas",this,EM_FALSE,+[](int,const void*,void* raw)->EM_BOOL{auto& self=*static_cast<Impl*>(raw);self.restore_pending=true;self.signal();return EM_TRUE;});
     }
-    void callbacks_remove(){emscripten_set_mousedown_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_mouseup_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_mousemove_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_mouseleave_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_keydown_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_keyup_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_wheel_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW,nullptr,EM_FALSE,nullptr);emscripten_set_blur_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_visibilitychange_callback(nullptr,EM_FALSE,nullptr);emscripten_set_webglcontextlost_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_webglcontextrestored_callback("#canvas",nullptr,EM_FALSE,nullptr);}
+    void callbacks_remove(){
+        MAIN_THREAD_EM_ASM({
+            /* IIGUI_DPI_UNWATCH_BEGIN */
+            const state = Module['iiGUIDpiWatch'];
+            if (state) { state.dispose();delete Module['iiGUIDpiWatch']; }
+            /* IIGUI_DPI_UNWATCH_END */
+        });
+        emscripten_set_mousedown_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_mouseup_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_mousemove_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_mouseleave_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_keydown_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_keyup_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_wheel_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW,nullptr,EM_FALSE,nullptr);emscripten_set_blur_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_visibilitychange_callback(nullptr,EM_FALSE,nullptr);emscripten_set_webglcontextlost_callback("#canvas",nullptr,EM_FALSE,nullptr);emscripten_set_webglcontextrestored_callback("#canvas",nullptr,EM_FALSE,nullptr);}
 };
 core::Result<std::shared_ptr<PresentationSource>> Host::presentation_source() const {
     if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Presentation source requires host owner");
@@ -111,14 +155,25 @@ Host::Host(HostOptions options):impl_(std::make_unique<Impl>(std::move(options))
 Host::~Host(){if(!is_ui_thread()||impl_->phase==Impl::Phase::running)std::terminate();impl_->presentations->close();impl_->dispatch->retire();}
 UiExecutor Host::executor()const noexcept{return UiExecutor(impl_->dispatch);}
 bool Host::is_ui_thread()const noexcept{return impl_->on_owner();}
+core::Result<void> Host::set_application_driver(bool enabled){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Application driver requires the owner thread");if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Application driver must be configured before run");if(enabled)return core::fail(core::ErrorCode::unsupported,"Web does not support an independent application driver");return {};}
+core::Result<void> Host::set_application_activity_handler(std::function<void(bool)> handler){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Application activity requires the host owner thread");if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Application activity must be configured before run");impl_->activity.set_handler(std::move(handler));return {};}
+core::Result<void> Host::set_application_foreground_handler(std::function<void(bool)> handler){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Application foreground requires the host owner thread");if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Application foreground must be configured before run");impl_->foreground.set_handler(std::move(handler));return {};}
+core::Result<void> Host::set_failure_handler(std::function<void(const core::Error&)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Host failure handling requires the owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Host failure handling must be configured before run or show");
+    impl_->failure.set_handler(std::move(handler));
+    return {};
+}
 core::Result<void> Host::run(HostCallbacks callbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Web Host requires its application pthread");if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Host is single use");if(!web_requirements())return core::fail(core::ErrorCode::unsupported,"Browser requires OffscreenCanvas, worker requestAnimationFrame and Atomics.waitAsync");
     impl_->callbacks=std::move(callbacks);impl_->phase=Impl::Phase::running;
     try{MAIN_THREAD_EM_ASM({const c=document.querySelector('#canvas');if(!c)throw new Error('iiGUI requires #canvas');c.tabIndex=0;c.style.touchAction='none';document.title=UTF8ToString($0);},impl_->state.title.c_str());
-        impl_->resize();impl_->state.visible=true;impl_->dispatch->connect([wake=impl_->wake]()noexcept{detail::web_wake(*wake);},{.monitor_io=false});impl_->callbacks_install();impl_->opened=true;if(impl_->callbacks.opened)impl_->callbacks.opened();double frame=-1;
+        impl_->resize();impl_->hidden=MAIN_THREAD_EM_ASM_INT({return document.hidden?1:0;});impl_->surface.visible=impl_->state.visible=!impl_->hidden;impl_->activity.observe(!impl_->hidden);impl_->foreground.observe(!impl_->hidden);impl_->dispatch->connect([wake=impl_->wake]()noexcept{detail::web_wake(*wake);},{.monitor_io=false});impl_->callbacks_install();impl_->opened=true;detail::deliver_host_opened(impl_->callbacks.opened);if(impl_->phase==Impl::Phase::running&&!impl_->close_pending){impl_->foreground.open();impl_->activity.open();}double frame=-1;
         while(impl_->phase==Impl::Phase::running){const auto expected=impl_->wake->load(std::memory_order_acquire);impl_->drain(frame);if(impl_->phase!=Impl::Phase::running)break;const auto timeout=detail::deadline_timeout(impl_->dispatch->loop.next_deadline());frame=web_wait(impl_->wake.get(),expected,timeout,!impl_->hidden&&!impl_->lost&&(impl_->motion_clients||impl_->options.frame_loop));}
     }catch(...){if(!impl_->failure)impl_->failure=core::Error{core::ErrorCode::failed,"Cannot run Web host",std::current_exception()};}
     impl_->close();web_wait_close();impl_->callbacks_remove();(void)impl_->dispatch->disconnect();if(impl_->failure)return std::unexpected(*impl_->failure);return {};
 }
+core::Result<void> Host::show_external(HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External event-loop hosting is not implemented on Web");}
+core::Result<void> Host::attach_external(void*,HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Web");}
 core::Result<void> Host::show(Host&,HostCallbacks){return core::fail(core::ErrorCode::unsupported,"Browser host owns one canvas; use iiGUI popovers");}
 core::Result<void> Host::choose_file(FileDialogOptions,FileDialogCompletion){return core::fail(core::ErrorCode::unsupported,"Browser file handles require a separate FileProvider adapter");}
 core::Result<void> Host::window_action(WindowAction){return core::fail(core::ErrorCode::unsupported,"Browser owns top-level window geometry");}
@@ -132,7 +187,7 @@ core::Result<void> Host::set_canvas(CanvasFrame frame){if(auto r=impl_->ready();
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory){return mount_widgets(std::move(factory),WidgetAppearance{});}
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const WidgetAppearance& appearance){if(auto r=impl_->ready();!r)return std::unexpected(r.error());if(!factory)return core::fail(core::ErrorCode::invalid_argument,"Empty widget factory");if(impl_->mounting)return core::fail(core::ErrorCode::busy,"Widget factory active");struct Reset{bool& value;~Reset(){value=false;}}reset{impl_->mounting};impl_->mounting=true;
     detail::MountTransaction transaction([this]()noexcept{if(impl_->phase!=Impl::Phase::running)return;impl_->guard([&]{if(impl_->widgets){const detail::WebSurfaceEvent event{detail::WebSurfaceEventKind::resize};(void)impl_->widgets->native_event(&event);impl_->widgets->present();}else if(impl_->canvas.frame){impl_->canvas.dirty=true;impl_->canvas.flush(impl_->surface.scale,impl_->surface.size.height);}});});
-    try{auto hooks=impl_->hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task task){host->guard([&]{if(host->phase==Impl::Phase::running&&!host->close_pending)task();});},appearance,std::move(hooks));if(auto r=replacement->construct(std::move(factory));!r)return std::unexpected(r.error());if(auto r=impl_->ready();!r)return std::unexpected(r.error());if(auto r=replacement->attach(&impl_->surface);!r)return std::unexpected(r.error());if(auto r=replacement->commit_window_properties();!r)return std::unexpected(r.error());if(auto r=impl_->ready();!r)return std::unexpected(r.error());impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);transaction.commit();auto published=impl_->widgets;published->commit_publication();if(auto alive=published->ready();!alive)return std::unexpected(alive.error());return WidgetMount(published);}catch(...){return core::fail(core::ErrorCode::failed,"Web widget mount failed",std::current_exception());}}
+    try{auto hooks=impl_->hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task task){host->guard([&]{if(host->phase==Impl::Phase::running&&!host->close_pending)task();});},appearance,std::move(hooks));if(auto r=replacement->construct(std::move(factory));!r)return std::unexpected(r.error());if(auto r=impl_->ready();!r)return std::unexpected(r.error());if(auto r=replacement->attach(&impl_->surface, detail::make_native_widget_surface);!r)return std::unexpected(r.error());if(auto r=replacement->commit_window_properties();!r)return std::unexpected(r.error());if(auto r=impl_->ready();!r)return std::unexpected(r.error());impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);transaction.commit();auto published=impl_->widgets;published->commit_publication();if(auto alive=published->ready();!alive)return std::unexpected(alive.error());return WidgetMount(published);}catch(...){return core::fail(core::ErrorCode::failed,"Web widget mount failed",std::current_exception());}}
 core::Result<void> Host::unmount_widgets(){if(auto r=impl_->ready();!r)return r;if(impl_->mounting)return core::fail(core::ErrorCode::busy,"Widget factory active");if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}return {};}
 core::Result<void> Host::unmount_widgets(const WidgetMount& expected){auto owner=expected.state_.lock();if(!owner)return core::fail(core::ErrorCode::closed,"Widget generation retired");if(owner!=impl_->widgets)return core::fail(core::ErrorCode::invalid_argument,"Widget generation belongs to another host");return unmount_widgets();}
 core::Result<void> Host::clear_canvas(){if(auto r=impl_->ready();!r)return r;impl_->canvas.clear();return {};}
@@ -140,5 +195,6 @@ core::Result<GraphicsInfo> Host::graphics_info()const{if(auto r=impl_->ready();!
 core::Result<PixelBuffer> Host::capture_canvas(){if(auto r=impl_->ready();!r)return std::unexpected(r.error());return impl_->widgets?impl_->widgets->capture():impl_->canvas.capture(impl_->surface.scale,impl_->surface.size.height);}
 core::Result<std::reference_wrapper<runtime::EventLoop>> Host::event_loop(){if(auto r=impl_->ready();!r)return std::unexpected(r.error());return std::ref(impl_->dispatch->loop);}
 core::Result<WindowSnapshot> Host::snapshot()const{if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Snapshot requires host owner");if(impl_->phase==Impl::Phase::created)return core::fail(core::ErrorCode::closed,"Host not started");return impl_->state;}
+core::Result<DisplayPixels> Host::display_pixels()const{if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());return core::fail(core::ErrorCode::unsupported,"The browser cannot reliably identify the physical display mode");}
 core::Result<HostStats> Host::stats()const{if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Stats require host owner");auto result=impl_->statistics;result.loop=impl_->dispatch->loop.stats();result.host=impl_->dispatch->host_stats();return result;}
 }

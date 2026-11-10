@@ -1,12 +1,20 @@
 #pragma once
 #include <iiGUI/Export.h>
+#include <iiGUI/PainterExport.h>
+#include <cstddef>
 #include <cstdint>
+#include <array>
 #include <string>
 #include <vector>
 #include <memory>
 #include <optional>
 
 namespace ii::gui {
+// Bounds both retained widget composition and renderer per-layer resources.
+inline constexpr std::size_t maximum_canvas_overlays = 512;
+// A bounded, acyclic set of separately rendered material sources per frame.
+inline constexpr std::size_t maximum_canvas_scenes = 64;
+inline constexpr std::size_t maximum_canvas_scene_layers = 4096;
 class RasterImage;
 // Linear-light sRGB components. GPU attachments encode to display sRGB.
 struct Color final {
@@ -79,6 +87,9 @@ struct BackdropMaterial final {
     bool capture=true;
     float inner_highlight_opacity=0,inner_highlight_offset_y=1;
     std::optional<Color> underlay_tint;
+    // Indices into CanvasFrame::scenes. A background is composited below the
+    // content scene, both above the base/capture and below the underlay.
+    std::optional<std::size_t> background_scene,content_scene;
     friend bool operator==(const BackdropMaterial&,const BackdropMaterial&)=default;
 };
 struct BoxShadow final {
@@ -107,6 +118,19 @@ struct CanvasLayer final {
     bool images_before_text=false;
     friend bool operator==(const CanvasLayer&,const CanvasLayer&)=default;
 };
+// A background-free drawing snapshot in window coordinates. Unlike CanvasFrame,
+// this is not a presentable window surface and has no implicit opaque clear.
+struct CanvasScene final {
+    Rect viewport;
+    std::vector<CanvasLayer> layers;
+    // Optional crop in viewport coordinates, after each layer's transform.
+    // An empty rectangle represents a source with no visible pixels.
+    std::optional<Rect> bounds;
+    // Preserve the ordinary frame's untransformed, un-clipped base drawing.
+    // Content backdrops sample this base before any later layers are drawn.
+    bool first_is_base=false;
+    friend bool operator==(const CanvasScene&,const CanvasScene&)=default;
+};
 struct CanvasFrame final {
     // Viewport is relative to the native window's logical content coordinates.
     // Panel coordinates are relative to this viewport. Later panels cover earlier ones.
@@ -122,7 +146,14 @@ struct CanvasFrame final {
     // This keeps popups above underlying glyphs as well as underlying panels.
     std::vector<CanvasLayer> overlays;
     bool images_before_text=false;
+    std::vector<CanvasScene> scenes;
     friend bool operator==(const CanvasFrame&, const CanvasFrame&) = default;
+};
+struct CanvasScenePlan final {
+    // Dependencies precede consumers; unreachable but valid scenes are omitted.
+    std::array<std::size_t,maximum_canvas_scenes> order{};
+    std::size_t count=0;
+    friend bool operator==(const CanvasScenePlan&,const CanvasScenePlan&)=default;
 };
 struct GraphicsInfo final {
     GraphicsApi api = GraphicsApi::none;
@@ -142,7 +173,13 @@ struct GraphicsInfo final {
     bool shadow_supported=false;
     std::uint64_t shadow_masks=0,shadow_blurs=0,shadow_texture_bytes=0;
     bool content_transform_supported=false;
+    bool scene_sources_supported=false;
     std::uint64_t effect_image_uploads=0,effect_image_texture_bytes=0,effect_texture_budget_bytes=0;
+    std::uint64_t scene_texture_bytes=0;
+    // Cumulative panel geometry uploads and instanced panel draw calls.
+    std::uint64_t geometry_uploads=0,geometry_draw_batches=0;
+    // Metal retained-window partial recompositions and their physical pixel area.
+    std::uint64_t partial_scene_renders=0,partial_scene_pixels=0;
 };
 struct PixelBuffer final {
     std::uint32_t width = 0, height = 0;
@@ -150,5 +187,8 @@ struct PixelBuffer final {
     std::vector<std::uint8_t> rgba;
 };
 // Pure validation is available before creating a native window or GPU device.
-[[nodiscard]] IIGUI_EXPORT bool valid_canvas(const CanvasFrame&) noexcept;
+[[nodiscard]] IIGUI_PAINTER_EXPORT bool valid_canvas(const CanvasFrame&) noexcept;
+// Checks indices and cycles, including unused scenes. This does not validate
+// the drawing geometry; valid_canvas must still be called before rendering.
+[[nodiscard]] IIGUI_PAINTER_EXPORT std::optional<CanvasScenePlan> plan_canvas_scenes(const CanvasFrame&) noexcept;
 } // namespace ii::gui

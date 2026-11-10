@@ -1,0 +1,9 @@
+Application {
+    var count: Int = 0
+    Window(title: "External application", width: 800, height: 480, minimumWidth: 320, minimumHeight: 220) {
+        VStack {
+            Label(id: "counter", text: count)
+            PushButton(id: "increment", text: "Add", onClick: { count = count + 1 })
+        }
+    }
+}

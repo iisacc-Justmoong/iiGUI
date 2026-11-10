@@ -1,5 +1,9 @@
 #pragma once
 #include <iiGUI/NativeWidgets.h>
+#include <iiGUI/Presentation.h>
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
 
 namespace ii::gui::detail {
 #if defined(__linux__)
@@ -17,28 +21,38 @@ struct WidgetSurfaceCallbacks final {
     std::function<core::Result<std::size_t>(std::string_view,double,double)> text_position;
     Renderer renderer=Renderer::automatic;
     std::shared_ptr<PresentationStream> presentations;
+    std::function<core::Result<void>(WidgetInput)> text_service;
+    std::function<core::Result<TextInputGeometry>(std::string_view,TextRange)> text_geometry;
+    std::function<core::Result<void>(std::string_view,const TextInputRevision&,std::string)> accessibility_text;
+    // The focused text editor only; avoids materializing unrelated accessibility nodes.
+    std::function<std::optional<WidgetSnapshot>()> focused_editor;
+    // Synchronous owner-thread probe without accessibility snapshots.
+    std::function<bool(double,double)> touch_scrollable;
+    // Platform samples enter here; kinetic behavior remains in the shared runtime.
+    std::function<void(double)> touch_begin,touch_end;
+    std::function<void()> touch_cancel;
 };
-class WidgetSurface final {
+// Implemented by a host adapter. Widget state only retains this interface;
+// it never constructs an operating-system surface itself.
+class WidgetSurface {
 public:
-    WidgetSurface(void* parent, WidgetSurfaceCallbacks);
-    ~WidgetSurface();
-    WidgetSurface(const WidgetSurface&)=delete;
-    WidgetSurface& operator=(const WidgetSurface&)=delete;
-    void invalidate();
-    void accessibility_changed();
-    void accessibility_value_changed(std::string_view);
-    void set_frame_paced(bool);
-    void flush();
-    Size size() const;
-    double backing_scale() const;
-    std::string resolve_font_family(std::string_view) const;
-    GraphicsInfo info();
-    PixelBuffer capture();
-    bool native_event(const void*);
-private:
-    struct Impl;
-    // A native callback keeps this private state while an action can retire
-    // its wrapper/generation. It does not prolong the widget's admission.
-    std::shared_ptr<Impl> impl_;
+    virtual ~WidgetSurface() = default;
+    virtual void invalidate() = 0;
+    virtual void accessibility_changed() = 0;
+    virtual void accessibility_value_changed(std::string_view) = 0;
+    virtual runtime::Task begin_text_input_change(bool) { return {}; }
+    virtual bool reduced_motion() const { return false; }
+    virtual void set_frame_paced(bool) = 0;
+    virtual void flush() = 0;
+    virtual Size size() const = 0;
+    virtual double backing_scale() const = 0;
+    virtual std::string resolve_font_family(std::string_view) const = 0;
+    virtual GraphicsInfo info() = 0;
+    virtual PixelBuffer capture() = 0;
+    virtual bool native_event(const void*) = 0;
+#if defined(_WIN32)
+    virtual std::optional<std::intptr_t> native_result(const void*) = 0;
+#endif
 };
+using WidgetSurfaceFactory = std::function<std::unique_ptr<WidgetSurface>(void*, WidgetSurfaceCallbacks)>;
 } // namespace ii::gui::detail

@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Build-host tooling. Target applications contain no Python dependency."""
 import argparse
-import datetime
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+
+tool_directory = str(Path(__file__).resolve().parent)
+if tool_directory not in sys.path:
+    sys.path.insert(0, tool_directory)
+import verification_workspace
 
 
 def host_platform():
@@ -26,7 +30,7 @@ def validate_execution(platform, compile_only, host):
         raise ValueError('Foreign target execution is unavailable; explicitly select --compile-only')
 
 
-def make_manifest(source, output, platform, toolchain=None, cache=None):
+def make_manifest(source, output, platform, toolchain=None, cache=None, prefixes=()):
     example = source / 'examples/HelloGUI'
     data = json.loads((example / 'iiSDKBuilder.json').read_text(encoding='utf-8'))
     data['app']['source'] = example.as_posix()
@@ -40,8 +44,15 @@ def make_manifest(source, output, platform, toolchain=None, cache=None):
     if toolchain:
         data['kits'][0]['toolchain'] = Path(toolchain).resolve().as_posix()
         data['kits'][0]['environment']['PKG_CONFIG_PATH'] = ''
+    data['kits'][0]['prefixes'] = [Path(prefix).resolve().as_posix() for prefix in prefixes]
     data['kits'][0]['cache'].update(cache or {})
     return data
+
+
+def kit_builds(output, platform):
+    kit = output/'kits'/platform/'Release'
+    return {name: kit/'sdk'/name/'isolated/build' for name in ('iiSDKCore', 'LVUI', 'iiGUI')} | {
+        'app': kit/'app/isolated/build'}
 
 
 def build_environment(toolchain, original=None):
@@ -63,6 +74,8 @@ def main(argv=None):
     parser.add_argument('--toolchain', type=Path)
     parser.add_argument('--compile-only', action='store_true', help='Explicitly skip all target executable tests')
     parser.add_argument('--build-root', type=Path)
+    parser.add_argument('--prefix', action='append', default=[], type=Path,
+                        help='Explicit target package prefix; repeat for each required dependency')
     parser.add_argument('--cache', action='append', default=[], metavar='KEY=VALUE')
     args = parser.parse_args(argv)
     try:
@@ -73,6 +86,8 @@ def main(argv=None):
             raise ValueError('A foreign desktop target requires --toolchain')
         if args.toolchain and not args.toolchain.resolve().is_file():
             raise ValueError('Toolchain file does not exist')
+        if any(not prefix.resolve().is_dir() for prefix in args.prefix):
+            raise ValueError('Every explicit target prefix must be an existing directory')
         cache = {}
         for entry in args.cache:
             key, separator, value = entry.partition('=')
@@ -82,11 +97,16 @@ def main(argv=None):
         output = checked_build_root(source, args.build_root or source/'build/verify-desktop'/args.platform)
     except ValueError as error:
         parser.error(str(error))
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
-    run = output/'runs'/stamp
-    run.mkdir(parents=True, exist_ok=False)
+    with verification_workspace.temporary(source, 'desktop-') as run:
+        return run_verification(source, args, output, run, cache)
+
+
+def run_verification(source, args, output, run, cache):
+    consumer_build = output/'installed-consumer'/run.name
+    if consumer_build.exists() or consumer_build.is_symlink():
+        raise FileExistsError('Consumer build already exists: '+consumer_build.as_posix())
     manifest = run/'manifest.json'
-    manifest.write_text(json.dumps(make_manifest(source, output, args.platform, args.toolchain, cache),
+    manifest.write_text(json.dumps(make_manifest(source, output, args.platform, args.toolchain, cache, args.prefix),
                                    indent=2)+'\n', encoding='utf-8')
     report = {'platform': args.platform, 'buildHost': host_platform(), 'manifest': manifest.as_posix(),
               'compileOnly': args.compile_only, 'build': 'not_run', 'hostChecks': 'not_run',
@@ -99,20 +119,20 @@ def main(argv=None):
     def execute(label, command):
         command = [str(value) for value in command]
         log = run/(label+'.log')
-        print(label+': '+log.as_posix(), flush=True)
+        print(label, flush=True)
         with log.open('w', encoding='utf-8') as stream:
             result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT,
                                     env=environment, check=False)
-        report['commands'].append({'step': label, 'arguments': command,
-                                   'exitCode': result.returncode, 'log': log.as_posix()})
+        report['commands'].append({'step': label, 'arguments': command, 'exitCode': result.returncode})
         if result.returncode:
-            raise RuntimeError(label+' failed; inspect '+log.as_posix())
+            print(log.read_text(encoding='utf-8', errors='replace'), file=sys.stderr)
+            raise RuntimeError(label+' failed')
 
     try:
         execute('builder', [args.builder, 'build', '--manifest', manifest])
         report['build'] = 'passed'
-        kit = output/'kits'/args.platform/'Release'
-        gui_build = kit/'sdk/iiGUI/build'
+        builds = kit_builds(output, args.platform)
+        gui_build = builds['iiGUI']
         if args.compile_only:
             execute('host-checks', [ctest, '--test-dir', gui_build, '-R', r'^iiGUI\.(boundary|tooling)$',
                                    '--output-on-failure', '--output-junit', run/'host-checks.xml'])
@@ -121,12 +141,13 @@ def main(argv=None):
             execute('host-suite', [ctest, '--test-dir', gui_build, '--output-on-failure',
                                   '--output-junit', run/'host-tests.xml'])
             report['hostChecks'] = report['targetTests'] = 'passed'
-            execute('hello-gui', [ctest, '--test-dir', kit/'app/build', '--output-on-failure',
+            execute('hello-gui', [ctest, '--test-dir', builds['app'], '--output-on-failure',
                                  '--output-junit', run/'hello-gui-tests.xml'])
             report['helloGUI'] = 'passed'
-        package = [cmake, '-DSOURCE='+source.as_posix(), '-DBUILD='+run.as_posix(),
-                   '-DCORE_BUILD='+(kit/'sdk/iiSDKCore/build').as_posix(),
-                   '-DLVUI_BUILD='+(kit/'sdk/LVUI/build').as_posix(),
+        package = [cmake, '-DSOURCE='+source.as_posix(), '-DBUILD='+consumer_build.as_posix(),
+                   '-DRESOURCE_ROOT='+run.as_posix(),
+                   '-DCORE_BUILD='+builds['iiSDKCore'].as_posix(),
+                   '-DLVUI_BUILD='+builds['LVUI'].as_posix(),
                    '-DGUI_BUILD='+gui_build.as_posix()]
         if args.toolchain:
             package.append('-DTOOLCHAIN='+args.toolchain.resolve().as_posix())
@@ -144,9 +165,12 @@ def main(argv=None):
         print(str(error), file=sys.stderr)
         return 1
     finally:
-        destination = run/'verification.json'
-        destination.write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
-        print('Verification report: '+destination.as_posix(), flush=True)
+        verification_workspace.remove_owned_tree(consumer_build)
+        try:
+            consumer_build.parent.rmdir()
+        except OSError:
+            pass
+        print(json.dumps(report, indent=2), flush=True)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,10 @@
 # Native rendering and Vulkan fallback
 
+자체 위젯은 OS 컨트롤 대신 [GPU 장면](GpuSceneComposition.md)으로 표시한다.
+Linux의 기본 방향은 직접 Wayland이며 X11은 더 이상 권장하지 않는 레거시 호스트이다.
+플랫폼 글꼴 래스터화와 장치 선택의 한계는
+해당 문서에 구분한다.
+
 iiGUI uses the platform window system directly and provides native font
 measurement and GPU graphics. The application may compose it with LVUI, whose
 document adapter owns the corresponding box layout.

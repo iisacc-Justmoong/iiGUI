@@ -8,13 +8,18 @@
 #include <stdexcept>
 
 using ii::gui::detail::AndroidLabelFont;
+using ii::gui::detail::AndroidFontSource;
 void require(bool value,const char* why){if(!value)throw std::runtime_error(why);}
 int main(int argc,char** argv){
     try{
         require(argc==2,"Expected the pinned Pretendard font");std::ifstream file(argv[1],std::ios::binary);
         std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)),{});require(!bytes.empty(),"Font fixture missing");
         bool invalid_face=false;try{AndroidLabelFont invalid(bytes,1);}catch(const std::invalid_argument&){invalid_face=true;}require(invalid_face,"A standalone font accepted a collection index");
-        AndroidLabelFont font(std::move(bytes));
+        AndroidFontSource source{AndroidFontSource::Kind::asset, "fonts/한글.ttf"};
+        AndroidLabelFont font(std::move(bytes), 0, source);
+        source.path.clear();
+        require(font.source().kind == AndroidFontSource::Kind::asset && font.source().path == "fonts/한글.ttf" &&
+                font.collection_index() == 0, "Native text did not retain its selected font source");
         const auto width=font.width(32,"Hello World");require(width>50&&width<500,"Invalid native label advance");
         require(std::abs(font.width(64,"Hello World")-2*width)<.001,"Font scale must preserve logical geometry");
         require(font.height(32)>0&&font.ascent(32)>0,"Font line metrics missing");

@@ -1,4 +1,5 @@
 #pragma once
+#include <iiGUI/Host.h>
 #include <iiGUI/NativeWidgets.h>
 #include <iiSDKCore/Runtime/Application.h>
 

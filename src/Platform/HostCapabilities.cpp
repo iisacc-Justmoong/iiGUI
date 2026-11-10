@@ -1,25 +1,35 @@
 #include <iiGUI/Host.h>
+#include "HostCapabilitiesPolicy.h"
+#include "HostDriverPolicy.h"
+#include "HostForegroundPolicy.h"
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
 namespace ii::gui {
+void require_application_driver_abi_v1() noexcept {}
 HostCapabilities host_capabilities() noexcept {
 #if defined(__EMSCRIPTEN__)
-    return {HostBackend::web,true,true,false,false,true,true,false,false};
+    return detail::host_capabilities_for(HostBackend::web);
 #elif defined(__ANDROID__)
-    return {HostBackend::android,true,true,false,false,true,false,false,false};
+    return detail::host_capabilities_for(HostBackend::android);
 #elif defined(IIGUI_WAYLAND)
-    return {HostBackend::wayland,true,true,true,false,true,true,true,false};
+    return detail::host_capabilities_for(HostBackend::wayland);
 #elif defined(_WIN32)
-    return {HostBackend::win32,true,true,true,true,false,true,true,true};
+    return detail::host_capabilities_for(HostBackend::win32);
 #elif defined(__APPLE__) && TARGET_OS_IPHONE
-    return {HostBackend::uikit,true,true,true,false,true,true,true,true};
+    return detail::host_capabilities_for(HostBackend::uikit);
 #elif defined(__APPLE__)
-    return {HostBackend::cocoa,true,true,true,true,true,true,true,true};
+    return detail::host_capabilities_for(HostBackend::cocoa);
 #elif defined(__linux__)
-    return {HostBackend::x11,true,true,true,true,false,true,true,false};
+    return detail::host_capabilities_for(HostBackend::x11);
 #else
     return {};
 #endif
+}
+bool supports_application_driver() noexcept {
+    return detail::has_application_driver(host_capabilities().backend);
+}
+bool supports_application_foreground() noexcept {
+    return detail::has_application_foreground(host_capabilities().backend);
 }
 }

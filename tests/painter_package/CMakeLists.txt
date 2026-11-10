@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.31)
+project(iiGUIStandalonePainterConsumer LANGUAGES CXX)
+find_package(iiGUIPainter CONFIG REQUIRED PATHS "${IIGUI_STAGE}" NO_DEFAULT_PATH)
+add_executable(painter_consumer main.cpp)
+target_link_libraries(painter_consumer PRIVATE iiGUI::Painter)

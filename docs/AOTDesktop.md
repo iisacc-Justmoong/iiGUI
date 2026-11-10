@@ -9,10 +9,10 @@ Linux에서 함께 사용한다. `lvui-compile`은 빌드 호스트에서 LVUI�
 |---|---|---|---|
 | macOS | AppKit | Metal, 자동 선택 시 Vulkan 대체 가능 | Mach-O / `.app` |
 | Windows | Win32 | Direct3D 11, 자동 선택 시 Vulkan 대체 가능 | PE32+ GUI `.exe` |
-| Linux | X11 / XWayland | Vulkan | ELF64 |
+| Linux | 직접 Wayland | Vulkan | ELF64 |
 
 레이블·버튼·스택은 iiGUI의 C++ 위젯이다. OS 컨트롤이나 웹뷰로 교체하지 않는다.
-Linux의 직접 Wayland 호스트는 제공하지 않는다. GPU 드라이버, 창 서버와 시스템
+X11은 명시적으로 선택해야 하는 폐기 예정 경로이다. GPU 드라이버, Wayland compositor와 시스템
 텍스트 라이브러리는 대상 운영체제가 제공해야 한다.
 
 ## 앱 계약과 대상 검사

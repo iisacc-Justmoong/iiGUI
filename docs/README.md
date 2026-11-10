@@ -1,6 +1,11 @@
 # iiGUI Documentation
 
+- [Graphics framework and declarative language boundary](FrameworkBoundary.md)
+- [Custom UI GPU scene composition and current limits](GpuSceneComposition.md)
+- [External paint device and LVUI AOT boundary](ExternalPainter.md)
 - [Custom container accessibility semantics](AccessibilitySemantics.md)
+- [Reveal a local rectangle in scroll ancestors](RevealLocalRect.md)
+- [편집 캔버스와 타임라인 표시 영역](EditorViewports.md)
 
 <!-- workspace-docs:document-map:start -->
 ## Human and agent document map
@@ -15,11 +20,15 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/AccessibilitySemantics.md`](AccessibilitySemantics.md) | [JSON](AccessibilitySemantics.agent.json) |
 | [`docs/ActionSurfaces.md`](ActionSurfaces.md) | [JSON](ActionSurfaces.agent.json) |
 | [`docs/AndroidHello.md`](AndroidHello.md) | [JSON](AndroidHello.agent.json) |
+| [`docs/AndroidIME.md`](AndroidIME.md) | [JSON](AndroidIME.agent.json) |
+| [`docs/AndroidKeyboard.md`](AndroidKeyboard.md) | [JSON](AndroidKeyboard.agent.json) |
 | [`docs/Architecture.md`](Architecture.md) | [JSON](Architecture.agent.json) |
 | [`docs/BackdropMaterials.md`](BackdropMaterials.md) | [JSON](BackdropMaterials.agent.json) |
 | [`docs/Bindings.md`](Bindings.md) | [JSON](Bindings.agent.json) |
+| [`docs/BuildLayout.md`](BuildLayout.md) | [JSON](BuildLayout.agent.json) |
 | [`docs/CallableFields.md`](CallableFields.md) | [JSON](CallableFields.agent.json) |
 | [`docs/CellEditors.md`](CellEditors.md) | [JSON](CellEditors.agent.json) |
+| [`docs/ClipboardCapacity.md`](ClipboardCapacity.md) | [JSON](ClipboardCapacity.agent.json) |
 | [`docs/Colors.md`](Colors.md) | [JSON](Colors.agent.json) |
 | [`docs/Composition.md`](Composition.md) | [JSON](Composition.agent.json) |
 | [`docs/ContainerLayout.md`](ContainerLayout.md) | [JSON](ContainerLayout.agent.json) |
@@ -27,15 +36,21 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/CoreApplication.md`](CoreApplication.md) | [JSON](CoreApplication.agent.json) |
 | [`docs/DialogLayout.md`](DialogLayout.md) | [JSON](DialogLayout.agent.json) |
 | [`docs/DisplayFrames.md`](DisplayFrames.md) | [JSON](DisplayFrames.agent.json) |
+| [`docs/DynamicLinking.md`](DynamicLinking.md) | [JSON](DynamicLinking.agent.json) |
 | [`docs/EditorColorSwatch.md`](EditorColorSwatch.md) | [JSON](EditorColorSwatch.agent.json) |
+| [`docs/EditorViewports.md`](EditorViewports.md) | [JSON](EditorViewports.agent.json) |
+| [`docs/ExternalPainter.md`](ExternalPainter.md) | [JSON](ExternalPainter.agent.json) |
 | [`docs/FactoryCaptures.md`](FactoryCaptures.md) | [JSON](FactoryCaptures.agent.json) |
 | [`docs/Fonts.md`](Fonts.md) | [JSON](Fonts.agent.json) |
+| [`docs/FrameworkBoundary.md`](FrameworkBoundary.md) | [JSON](FrameworkBoundary.agent.json) |
+| [`docs/GpuSceneComposition.md`](GpuSceneComposition.md) | [JSON](GpuSceneComposition.agent.json) |
 | [`docs/Graphics.md`](Graphics.md) | [JSON](Graphics.agent.json) |
 | [`docs/HostPlatforms.md`](HostPlatforms.md) | [JSON](HostPlatforms.agent.json) |
 | [`docs/IPADOS.md`](IPADOS.md) | [JSON](IPADOS.agent.json) |
 | [`docs/ImageBudgets.md`](ImageBudgets.md) | [JSON](ImageBudgets.agent.json) |
 | [`docs/ImageComposition.md`](ImageComposition.md) | [JSON](ImageComposition.agent.json) |
 | [`docs/Images.md`](Images.md) | [JSON](Images.agent.json) |
+| [`docs/IncrementalWidgetUpdates.md`](IncrementalWidgetUpdates.md) | [JSON](IncrementalWidgetUpdates.agent.json) |
 | [`docs/InferredValues.md`](InferredValues.md) | [JSON](InferredValues.agent.json) |
 | [`docs/KeyedContent.md`](KeyedContent.md) | [JSON](KeyedContent.agent.json) |
 | [`docs/LVUI.md`](LVUI.md) | [JSON](LVUI.agent.json) |
@@ -48,16 +63,19 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/ObjectInputs.md`](ObjectInputs.md) | [JSON](ObjectInputs.agent.json) |
 | [`docs/Popovers.md`](Popovers.md) | [JSON](Popovers.agent.json) |
 | [`docs/PopupContent.md`](PopupContent.md) | [JSON](PopupContent.agent.json) |
+| [`docs/PopupMotionChannels.md`](PopupMotionChannels.md) | [JSON](PopupMotionChannels.agent.json) |
 | [`docs/Presentation.md`](Presentation.md) | [JSON](Presentation.agent.json) |
 | [`docs/QtGuiComparison.md`](QtGuiComparison.md) | [JSON](QtGuiComparison.agent.json) |
 | [`docs/Renderers.md`](Renderers.md) | [JSON](Renderers.agent.json) |
 | [`docs/RetainedPopupEffects.md`](RetainedPopupEffects.md) | [JSON](RetainedPopupEffects.agent.json) |
 | [`docs/Retirement.md`](Retirement.md) | [JSON](Retirement.agent.json) |
+| [`docs/RevealLocalRect.md`](RevealLocalRect.md) | [JSON](RevealLocalRect.agent.json) |
 | [`docs/ScrollViews.md`](ScrollViews.md) | [JSON](ScrollViews.agent.json) |
 | [`docs/SelfRenderedWidgets.md`](SelfRenderedWidgets.md) | [JSON](SelfRenderedWidgets.agent.json) |
 | [`docs/Shadows.md`](Shadows.md) | [JSON](Shadows.agent.json) |
 | [`docs/SourceLayout.md`](SourceLayout.md) | [JSON](SourceLayout.agent.json) |
 | [`docs/StackLayout.md`](StackLayout.md) | [JSON](StackLayout.agent.json) |
+| [`docs/SubtreeScenes.md`](SubtreeScenes.md) | [JSON](SubtreeScenes.agent.json) |
 | [`docs/TextBoundary.md`](TextBoundary.md) | [JSON](TextBoundary.agent.json) |
 | [`docs/TextInputProvider.md`](TextInputProvider.md) | [JSON](TextInputProvider.agent.json) |
 | [`docs/TextLine.md`](TextLine.md) | [JSON](TextLine.agent.json) |

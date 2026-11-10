@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a Qt-free, DEX-free LVUI NativeActivity APK and optionally open it."""
+"""Build a Qt-free LVUI NativeActivity APK and optionally open it."""
 import argparse
 import hashlib
 import json
@@ -13,7 +13,7 @@ import sys
 import time
 import zipfile
 
-from verify_desktop import build_environment, checked_build_root
+from verify_desktop import build_environment, checked_build_root, kit_builds, verification_workspace
 
 PACKAGE='com.iisacc.lvui.helloandroid'
 TRIPLES={'arm64-v8a':'aarch64-linux-android','x86_64':'x86_64-linux-android'}
@@ -59,7 +59,9 @@ def make_manifest(source,output,ndk,compiler,abi,api):
     data['app']={'name':'HelloAndroid','source':str(source/'examples/HelloAndroid'),'depends':['LVUI','iiGUI'],
                  'cache':{'BUILD_TESTING':'OFF'},'targets':['HelloAndroid']}
     data['sdkRoot']=str(source.parent);data['buildRoot']=str(output)
-    for p in data['sdks']:p['source']=str(source.parent/p['name'])
+    for p in data['sdks']:
+        p['source']=str(source.parent/p['name'])
+        p.pop('depends',None)
     triple=TRIPLES[abi]
     prebuilt=ndk/'toolchains/llvm/prebuilt'
     host='darwin-x86_64' if sys.platform=='darwin' else 'windows-x86_64' if sys.platform=='win32' else 'linux-x86_64'
@@ -72,7 +74,8 @@ def make_manifest(source,output,ndk,compiler,abi,api):
            'Vulkan_INCLUDE_DIR':str(sysroot/'usr/include'),
            'Vulkan_LIBRARY':str(sysroot/'usr/lib'/triple/str(api)/'libvulkan.so')}
     data['kits']=[{'id':'android','platform':'android','androidAbi':abi,'androidApi':api,
-                   'toolchain':str(ndk/'build/cmake/android.toolchain.cmake'),'cache':cache}]
+                   'toolchain':str(ndk/'build/cmake/android.toolchain.cmake'),'cache':cache,
+                   'prefixes':[str(output/'kits/android/Release/prefix'/name) for name in ('iiSDKCore','iiColorManager')]}]
     return data
 
 
@@ -103,10 +106,15 @@ def check_apk(path,abi):
         names=apk.namelist();native='lib/'+abi+'/libhello_lvui.so'
         if len(names)!=len(set(names)):raise ValueError('Duplicate APK entries')
         for name in names:
-            if re.search(r'\.dex$|\.lvui$|(?:^|/)libQt\d|(?:^|/)lvui-compile',name,re.I):
+            if (name.lower().endswith('.dex') and name!='classes.dex') or re.search(r'\.(?:lvui|qml)$|(?:^|/)lib(?:Qt\d|LVRS)|(?:^|/)lvui-compile',name,re.I):
                 raise ValueError('Unexpected interpreter/source/framework payload: '+name)
-        for required in (native,'AndroidManifest.xml','assets/Pretendard-Regular.ttf','assets/Pretendard-OFL.txt'):
+        for required in (native,'AndroidManifest.xml','classes.dex','assets/Pretendard-Regular.ttf','assets/Pretendard-OFL.txt'):
             if required not in names:raise ValueError('Missing native APK entry: '+required)
+        dex=apk.read('classes.dex')
+        if (len(dex)<112 or not re.fullmatch(rb'dex\n\d{3}\x00',dex[:8]) or
+            struct.unpack_from('<III',dex,32)!=(len(dex),112,0x12345678) or
+            b'Lcom/iisacc/iigui/AndroidImeBridge;' not in dex):
+            raise ValueError('Android IME bridge DEX is missing or invalid')
         native_hashes={}
         for name in names:
             if not name.startswith('lib/'):continue
@@ -116,7 +124,7 @@ def check_apk(path,abi):
                 raise ValueError('Wrong native shared-library ABI: '+name)
             native_hashes[name]=hashlib.sha256(image).hexdigest()
         return {'nativeLibrary':native,'nativeSha256':native_hashes[native],
-                'libraries':native_hashes,'dexPresent':False,'lvuiSourcePackaged':False,'entries':len(names)}
+                'libraries':native_hashes,'dexPresent':True,'lvuiSourcePackaged':False,'entries':len(names)}
 
 
 def main(argv=None):
@@ -138,7 +146,43 @@ def main(argv=None):
     if args.install and args.device_kind=='emulator' and not args.serial:
         parser.error('--device-kind emulator requires --serial')
     output=checked_build_root(source,args.build_root or source/'build/android-hello')
+    apk=output/'iiSDK-LVUI-HelloWorld.apk'
+    if apk.exists() or apk.is_symlink():
+        parser.error('APK already exists; select a fresh build root')
+    with verification_workspace.temporary(source,'android-') as workspace:
+        return run_verification(source,args,output,workspace)
+
+
+def android_paths(source,output,workspace):
+    return {'manifest':workspace/'manifest.json','staging':workspace/'apk',
+            'keystore':workspace/'hello-debug.keystore','unsigned':workspace/'hello-unsigned.apk',
+            'aligned':workspace/'hello-aligned.apk','signed':workspace/'hello-signed.apk',
+            'apk':output/'iiSDK-LVUI-HelloWorld.apk',
+            'native':kit_builds(output/'builder','android')['app']/'libhello_lvui.so',
+            'screenshot':source/'resources/outputs/android-hello'/workspace.name/'device-screen.png'}
+
+
+def save_screenshot(source,path,image):
+    output_root=source/'resources/outputs'
+    allowed=output_root/'android-hello'
+    if not path.resolve().is_relative_to(allowed.resolve()) or path.exists() or path.is_symlink():
+        raise FileExistsError('Screenshot destination is unavailable')
+    if any(p.is_symlink() for p in (source/'resources',output_root,allowed,path.parent)):
+        raise ValueError('Screenshot output cannot be a symlink')
+    files=verification_workspace.provider()
+    files.mkdir(path.parent,parents=True,exist_ok=True)
+    with files.open(path,'xb') as stream:stream.write(image)
+
+
+def publish_apk(signed, destination):
+    files=verification_workspace.provider()
+    with files.staged_path(destination,overwrite=False) as staged:
+        files.copy2(signed,staged)
+
+
+def run_verification(source,args,output,workspace):
     output.mkdir(parents=True,exist_ok=True)
+    paths=android_paths(source,output,workspace)
     environment=build_environment(args.ndk)
     for key in ('CMAKE_PREFIX_PATH','CMAKE_INCLUDE_PATH','CMAKE_LIBRARY_PATH','CPPFLAGS','CFLAGS','CXXFLAGS','LDFLAGS','PKG_CONFIG_LIBDIR'):
         environment.pop(key,None)
@@ -148,12 +192,12 @@ def main(argv=None):
             'deviceKind':args.device_kind,'physicalDeviceTested':False,'emulatorDeviceTested':False,'commands':[]}
 
     def run(label,command,binary=False):
-        log=output/(label+('.png' if binary else '.log'))
-        print(label+': '+str(log),flush=True)
+        log=workspace/(label+('.png' if binary else '.log'))
+        print(label,flush=True)
         with log.open('wb') as stream:result=subprocess.run([str(x) for x in command],stdout=stream,stderr=subprocess.PIPE,env=environment)
-        report['commands'].append({'step':label,'exitCode':result.returncode,'log':str(log)})
+        report['commands'].append({'step':label,'exitCode':result.returncode})
         if result.returncode:
-            if result.stderr:(output/(label+'.stderr.log')).write_bytes(result.stderr)
+            print(log.read_text(encoding='utf-8',errors='replace'),file=sys.stderr)
             raise RuntimeError(label+' failed: '+result.stderr.decode(errors='replace')[-2000:])
         return log.read_bytes() if binary else log.read_text(encoding='utf-8',errors='replace')
 
@@ -163,24 +207,27 @@ def main(argv=None):
             key,sep,value=override.partition('=')
             if not key or not sep:raise ValueError('--cache requires KEY=VALUE')
             manifest['kits'][0]['cache'][key]=value
-        (output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
-        run('builder',[args.builder,'build','--manifest',output/'manifest.json'])
+        verification_workspace.provider().write_text(paths['manifest'],json.dumps(manifest,indent=2)+'\n')
+        run('builder',[args.builder,'build','--manifest',paths['manifest']])
         kit=output/'builder/kits/android/Release'
-        native=kit/'app/build/libhello_lvui.so'
+        sdk_prefix=kit/'prefix';gui_prefix=sdk_prefix/'iiGUI'
+        native=paths['native']
         host='darwin-x86_64' if sys.platform=='darwin' else 'windows-x86_64' if sys.platform=='win32' else 'linux-x86_64'
         llvm=args.ndk/'toolchains/llvm/prebuilt'/host/'bin'
         libraries=run('native-dependencies',[llvm/'llvm-readobj','--needed-libs','--dyn-symbols',native])
         symbols=run('native-symbols',[llvm/'llvm-nm','--demangle','--defined-only',native])
         if 'ANativeActivity_onCreate' not in libraries or 'ii::runtime::Application::exec(' not in symbols or 'ii::gui::Host::mount_widgets(' not in symbols:
             raise ValueError('Missing native activity, Core application or C++ widget linkage')
-        if re.search(r'libQt|libpython|libjvm',libraries,re.I) or any(s in symbols for s in ['lvui::parse(','lvui::parse_view(','lvui::compile_native(']):
+        if (re.search(r'libQt|libLVRS|libpython|libjvm',libraries,re.I) or
+            re.search(r'\blvrs::|\bQt(?:Private)?::|\bQ(?:Object|CoreApplication|GuiApplication|Application|Widget|Window|Quick\w*|Qml\w*|Variant|MetaObject|String|ByteArray|Json\w*|EventLoop)\b',symbols) or
+            any(s in symbols for s in ['lvui::parse(','lvui::parse_view(','lvui::compile_native('])):
             raise ValueError('Framework/interpreter/compiler linked into APK')
-        staging=output/'apk';assets=staging/'assets';library=staging/'lib'/args.abi
+        staging=paths['staging'];assets=staging/'assets';library=staging/'lib'/args.abi
         assets.mkdir(parents=True,exist_ok=True);library.mkdir(parents=True,exist_ok=True)
         for name in ('Pretendard-Regular.ttf','Pretendard-OFL.txt'):
-            shutil.copy2(kit/'prefix/share/iiGUI/resources/native'/name,assets/name)
+            shutil.copy2(gui_prefix/'share/iiGUI/resources/native'/name,assets/name)
         for folder in ('share/iiGUI/licenses','share/licenses/iiGUI'):
-            dependency_licenses=kit/'prefix'/folder
+            dependency_licenses=gui_prefix/folder
             if dependency_licenses.exists():shutil.copytree(dependency_licenses,assets/'licenses/iiGUI',dirs_exist_ok=True)
         shutil.copy2(args.ndk/'sources/android/native_app_glue/NOTICE',assets/'licenses/NativeActivity-NOTICE')
         toolchain_notice=args.ndk/'toolchains/llvm/prebuilt'/host/'NOTICE'
@@ -188,13 +235,14 @@ def main(argv=None):
         native_sysroot=args.ndk/'toolchains/llvm/prebuilt'/host/'sysroot/usr/lib'/TRIPLES[args.abi]
         def find(name):
             if Path(name).name!=name:raise ValueError('Native dependency must be a soname, not a path')
-            for directory in (kit/'prefix/lib',native.parent,native_sysroot):
+            directories=[sdk_prefix/name/'lib' for name in ('iiSDKCore','iiColorManager','LVUI','iiGUI')]
+            for directory in (*directories,native.parent,native_sysroot):
                 candidate=directory/name
                 if candidate.is_file():return candidate
             return None
         def needed(path):
             text=run('dependencies-'+path.name,[llvm/'llvm-readobj','--needed-libs',path])
-            if re.search(r'libQt|libpython|libjvm',text,re.I):raise ValueError('Unexpected native framework/interpreter dependency')
+            if re.search(r'libQt|libLVRS|libpython|libjvm',text,re.I):raise ValueError('Unexpected native framework/interpreter dependency')
             return needed_libraries(text)
         closure=native_closure([native],needed,find)
         for path in list(library.glob('*.so')):
@@ -205,21 +253,34 @@ def main(argv=None):
         report['nativeDependencyClosure']=list(closure)
         versions=sorted((args.sdk/'build-tools').iterdir(),key=lambda p:tuple(int(x) for x in p.name.split('.')))
         tools=versions[-1]
-        unsigned=output/'hello-unsigned.apk'
+        java_source=gui_prefix/'share/iiGUI/android/AndroidImeBridge.java'
+        if not java_source.is_file():raise ValueError('The staged iiGUI package omitted its Android IME bridge')
+        classes=workspace/'ime-classes';dex=workspace/'ime-dex'
+        classes.mkdir();dex.mkdir()
+        android_jar=args.sdk/'platforms/android-35/android.jar'
+        run('ime-javac',[args.jdk/'bin/javac','--release','8','-Xlint:-options','-classpath',android_jar,
+                         '-d',classes,java_source])
+        class_files=sorted(classes.rglob('*.class'))
+        if not class_files:raise ValueError('Android IME bridge produced no class files')
+        run('ime-dex',[tools/'d8','--min-api',str(args.api),'--lib',android_jar,'--output',dex,*class_files])
+        unsigned=paths['unsigned']
         run('apk-link',[tools/'aapt2','link','-o',unsigned,'--manifest',source/'examples/HelloAndroid/AndroidManifest.xml',
                          '-I',args.sdk/'platforms/android-35/android.jar','-A',assets])
         with zipfile.ZipFile(unsigned,'a',compression=zipfile.ZIP_DEFLATED) as apk:
             for path in sorted(library.glob('*.so')):apk.write(path,'lib/'+args.abi+'/'+path.name)
-        aligned=output/'hello-aligned.apk'
+            apk.write(dex/'classes.dex','classes.dex')
+        aligned=paths['aligned']
         run('apk-align',[tools/'zipalign','-f','-P','16','4',unsigned,aligned])
-        keystore=output/'hello-debug.keystore'
+        keystore=paths['keystore']
         if not keystore.exists():
             run('debug-key',[args.jdk/'bin/keytool','-genkeypair','-keystore',keystore,'-storepass','android','-keypass','android',
                              '-alias','hello','-keyalg','RSA','-keysize','2048','-validity','3650','-dname','CN=iiSDK Native Hello'])
-        apk=output/'iiSDK-LVUI-HelloWorld.apk'
-        run('apk-sign',[tools/'apksigner','sign','--ks',keystore,'--ks-key-alias','hello','--ks-pass','pass:android','--key-pass','pass:android','--out',apk,aligned])
-        run('apk-verify',[tools/'apksigner','verify','--verbose',apk])
-        report.update(build='passed',apk=str(apk),apkSha256=hashlib.sha256(apk.read_bytes()).hexdigest(),native=check_apk(apk,args.abi),
+        signed=paths['signed'];apk=paths['apk']
+        run('apk-sign',[tools/'apksigner','sign','--ks',keystore,'--ks-key-alias','hello','--ks-pass','pass:android','--key-pass','pass:android','--out',signed,aligned])
+        run('apk-verify',[tools/'apksigner','verify','--verbose',signed])
+        native_metadata=check_apk(signed,args.abi)
+        publish_apk(signed,apk)
+        report.update(build='passed',apk=str(apk),apkSha256=hashlib.sha256(apk.read_bytes()).hexdigest(),native=native_metadata,
                       lvuiSha256=hashlib.sha256((source/'examples/HelloAndroid/HelloWorld.lvui').read_bytes()).hexdigest())
         if args.install:
             adb=args.sdk/'platform-tools/adb'
@@ -244,18 +305,19 @@ def main(argv=None):
             log=run('device-log',device+['logcat','-d','-t',start,
                                        '-s','iiSDK-LVUI:I','iiGUI:E','AndroidRuntime:E','DEBUG:F'])
             if 'HELLO_ANDROID_READY' not in log or 'HELLO_ANDROID_TIMER_OK' not in log:
-                raise ValueError('Native Hello World startup/timer evidence is missing; inspect device-log.log')
+                raise ValueError('Native Hello World startup/timer evidence is missing')
             pid=run('device-pid',device+['shell','pidof',PACKAGE]).strip()
             if not pid:raise ValueError('Hello World process is no longer running')
-            run('device-screen',device+['exec-out','screencap','-p'],binary=True)
-            record_execution(report,args.device_kind,pid,output/'device-screen.png')
+            screenshot=paths['screenshot']
+            image=run('device-screen',device+['exec-out','screencap','-p'],binary=True)
+            save_screenshot(source,screenshot,image)
+            record_execution(report,args.device_kind,pid,screenshot)
         else:report['status']='apk_built_execution_not_requested'
         return 0
     except Exception as error:
         report.update(status='failed',error=str(error));print(str(error),file=sys.stderr);return 1
     finally:
-        (output/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
-        print('Report: '+str(output/'verification.json'),flush=True)
+        print(json.dumps(report,indent=2),flush=True)
 
 
 if __name__=='__main__':sys.exit(main())

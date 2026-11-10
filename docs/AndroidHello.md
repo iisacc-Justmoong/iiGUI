@@ -1,8 +1,8 @@
 # Android 최소 네이티브 LVUI 앱
 
-호스트의 클립보드·외부 URL·AChoreographer 확장과 기존 최소 레이블 범위의 구분은
+호스트의 클립보드·외부 URL·AChoreographer와 일반 텍스트 범위는
 [HostPlatforms.md](HostPlatforms.md)를 따른다. 아래의 이전 장치 실행 기록과 새
-호스트 확장의 검증 기록은 구분한다.
+텍스트 경로의 검증 기록은 구분한다.
 
 `examples/HelloAndroid`는 Android 10/API 29 이상에서 실행하는 최소 Hello World이다.
 LVUI의 `ApplicationWindow`, `VStack`, `Label`을 빌드 호스트의 `lvui-compile`로
@@ -16,8 +16,14 @@ Android OS에 내장된 `android.app.NativeActivity`가 NDK `native_app_glue`의
 Android 문맥을 빌리고 Core 앱을 구성한다. Core와 GUI 첨부가 정리된 뒤 Activity
 종료를 마친다. Core 자체에는 Android GUI나 iiGUI 의존성을 추가하지 않는다.
 
-APK의 `hasCode=false`이며 Java·Kotlin 앱 클래스나 DEX를 생성하지 않는다.
-OS의 NativeActivity 연결을 제외한 앱·위젯·렌더링·폰트 처리는 네이티브 코드이다.
+`iiGUI::AndroidEntry`는 Android가 앱 라이브러리에서 찾는
+`ANativeActivity_onCreate`를 포함시키는 진입점 접착 코드다. 이 작은 NDK
+아카이브는 앱의 네이티브 진입 라이브러리에 링크하며, 화면과 런타임을
+제공하는 iiGUI 자체는 공유 라이브러리로 패키징한다.
+
+현재 APK는 `hasCode=true`이며 Android 입력기 연결용 Java 클래스를 DEX에 담는다.
+앱·위젯·GPU 렌더링은 네이티브 코드이며, 텍스트 조합과 폰트 대체에는 C++ JNI로
+Android의 시스템 서비스를 사용한다.
 Qt·WebView·LVUI 소스·컴파일러·인터프리터를 APK에 포함하지 않는다.
 
 Core의 Observation은 모듈 사이에서 같은 관찰 문맥을 사용하도록 공유 라이브러리로
@@ -37,18 +43,35 @@ Vulkan surface는 `VulkanWindowAndroid.cpp`가 제공한다. 네이티브 뒤로
 GPU와 모션 cadence는 별도로 중단한다. 따라서 백그라운드 타이머가 만료된 채 남아
 반복 폴링하는 상태와 화면 밖에서 모션 타이머가 계속 도는 상태를 방지한다.
 
-## 의도적으로 제한한 범위
+## Android 네이티브 텍스트 계약
 
-이번 경로는 정적 스택·출력 가능한 ASCII 레이블과 Core 타이머를 실제 기기에 표시하기 위한
-최소 구현이다. 폰트는 APK의 Pretendard Regular를 메모리에서 읽고, 기존 PlutoVG에
-고정된 stb_truetype 소스를 독립 C++ 글리프 어댑터로 사용한다. 폰트 바이트와 비트맵은
-소유 값이며 텍스트 호출은 C++ mutex로 직렬화한다. `iiGUI.android_label_font`는
-운영체제 창 없이 실제 폰트의 폭·2배 배율·잉크·잘못된 크기 거부를 검사한다.
-글자 크기·색상·기본 정렬·명시적 줄바꿈을 처리하지만
-복잡한 스크립트 조합, 자동 줄 감기, 말줄임·밑줄·weight별 폰트 선택과 텍스트 편집기는
-완전한 Android 텍스트 구현이 아니다. 복잡한 문자와 편집기 요청은 명시적으로 거부한다.
-IME, TalkBack 접근성 연결, 클립보드, 외부 URL, 파일 선택기, 다중 창은 미구현이다.
-모션의 선택적 Core cadence는 16 ms이며 디스플레이 vsync 지원으로 보고하지 않는다.
+일반 `TextRun`의 UTF-8 텍스트는 Android 시스템 글자 조합과 양방향 배치를
+사용한다. 선택한 폰트 자산 또는 시스템 파일의 실제 글꼴을 사용하고, 운영체제의
+대체 글꼴을 허용한다. 줄 바꿈·말줄임·밑줄·색상·물리적 좌우 정렬과 클립은
+기존 `TextRun` 입력을 따른다. 고정 줄 높이는 각 줄의 표시 영역을 기준으로
+적용한다. API 28 이상에서는 대체 글꼴의 줄 높이를 반영한다.
+
+선택된 글꼴의 자산 경로 또는 시스템 파일을 Android `Typeface`에 넘기고,
+`StaticLayout`과 `TextPaint`가 문자 조합과 줄 바꿈을 처리한다. 시스템 텍스트는
+비트맵에 합성한 뒤 iiGUI의 기존 Vulkan 그리기 표면에 전달한다. 웹뷰나 OS 텍스트
+컨트롤은 만들지 않는다. `AndroidLabelFont`의 기존 ASCII 전용 글리프 헬퍼는 별도로
+유지되며 일반 `TextRun`의 Unicode 표시 경로는 그 헬퍼를 사용하지 않는다.
+
+API 24–27에서는 대체 글꼴의 줄 높이를 반영하는 API가 없어 큰 대체 글리프가
+잘릴 수 있다. 글꼴 컬렉션의 첫 번째가 아닌 면 선택은 API 26 이상에서 지원하며,
+API 24–25에서는 해당 요청을 오류로 보고한다. 고정 줄 높이가 글리프보다 작을 때도
+해당 줄의 영역에서 잘린다. 편집기용 `TextLine`은 별도로 시스템 배치에 연결되었으며
+[한계와 검증 범위](TextLine.md#android-구현-계약)를 따른다. 하드웨어 키보드는
+[키보드 계약](AndroidKeyboard.md)을 따른다. Android 입력기 연결의 지원 범위와
+기기 미검증 상태는 [입력기 계약](AndroidIME.md)을 따른다. TalkBack 접근성, 파일 선택기,
+다중 창은 구현이 남았다. 클립보드와
+외부 URL의 범위는 호스트 문서에 따른다.
+
+2026-11-05 호스트의 모형 Android 경계 검사에서 한국어·아랍어·이모지의 UTF-16 전달,
+글꼴 소스, 줄 정렬·높이·클립, 말줄임, 비트맵 변환과 실패 시 자원 해제를 검사했다.
+Android SDK API 서명과 NDK r30의 arm64 API 24 정적·공유 빌드 및 LVUI 소비자
+링크를 확인했다. 모형은 시스템의 실제 조합이나 출력 모양을 검증하지 않으며,
+새 텍스트 경로를 실기기나 에뮬레이터에서 실행하지 않았다.
 
 ## 빌드와 기기 실행
 
@@ -78,6 +101,13 @@ python3 tools/android_hello.py \
 Qt·인터프리터·LVUI 파서의 부재를 검사하고 폰트와 라이선스를 패키징한다. 개발용 키로
 서명한 `iiSDK-LVUI-HelloWorld.apk`는 배포용 릴리스 서명을 대신하지 않는다.
 
+설치된 `examples/HelloAndroid`는 선택적 OS·렌더 검사에 필요한 소스를 함께 제공한다.
+OS 검사는 Activity를 직접 빌려 공개 SDK만 사용하며 원래 클립보드를 복원한다.
+API 24–27에서 원래 클립이 없으면 빈 상태를 복원할 공개 API가 없으므로,
+클립보드를 변경하기 전에 검사를 중단한다. 2026-11-05 정적·공유 iiGUI 설치본의
+소비자에서 두 선택적 검사를 켜고 Android NDK arm64/API 24로 각각 컴파일·링크했다.
+이때 앱은 실행하지 않았다.
+
 설치 후 한 번 실행하여 `HELLO_ANDROID_READY`, 2회 Core 타이머의
 `HELLO_ANDROID_TIMER_OK`, 살아 있는 앱 PID와 화면을 수집한다.
 `verification.json`의 빌드·설치·실기기·에뮬레이터 실행 상태는 별도 필드이다.
@@ -91,7 +121,7 @@ Qt·인터프리터·LVUI 파서의 부재를 검사하고 폰트와 라이선�
 
 Apple Silicon 호스트에서는 ARM64 시스템 이미지와 `--abi arm64-v8a`를 사용한다.
 가상 기기의 OS가 에뮬레이터에서 동작하는 것이며, 앱은 동일한 LVUI 소스에서 AOT
-생성한 네이티브 C++23 ELF이다. 에뮬레이터를 위한 Qt·DEX·LVUI 인터프리터를 앱에
+생성한 네이티브 C++23 ELF이다. 에뮬레이터를 위한 Qt·LVUI 인터프리터를 앱에
 추가하지 않는다. 에뮬레이터 자체의 호스트 UI 구현은 APK 의존성과 별개이다.
 
 SDK 이미지·AVD·사용자 설정·서명 키·실행 증거는 `build/` 아래에서 관리한다.

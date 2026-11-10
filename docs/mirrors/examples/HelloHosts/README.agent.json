@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "examples/HelloHosts/README.md",
-    "sha256": "cbdf4fb694b81a72f9b6cdd244fdee2f77a8475e77bf1e6606d998c8c3013426",
-    "bytes": 574,
-    "line_count": 9,
+    "sha256": "597c90bba205f6edc9372a29ad09d2ff95ab071247d69bc478b73a85b5d31ac6",
+    "bytes": 717,
+    "line_count": 11,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -42,8 +42,8 @@
       "id": "b000003",
       "kind": "paragraph",
       "start_line": 3,
-      "end_line": 9,
-      "raw": "The same LVUI view and C++23 application exercise iiGUI's host, Core timer,\npersistent background pool, display frames, resize, capture and orderly shutdown.\nBuild with iiSDKBuilder. `--self-test` (browser query `?self-test`) runs the bounded\nfive-second lifecycle check. The Web target is AOT WebAssembly with a pthread\napplication and an OffscreenCanvas/WebGL2 renderer; it requires cross-origin\nisolation and a secure browser context. No LVUI source interpreter or DOM widget\ntree is deployed. See `docs/HostPlatforms.md` for platform contracts and limits.\n"
+      "end_line": 11,
+      "raw": "The same LVUI view and C++23 application exercise iiGUI's host, Core timer,\npersistent background pool, display frames, resize, capture and orderly shutdown.\nThe application explicitly allocates its two background workers during\nconfiguration; an unconfigured Core application starts without workers.\nBuild with iiSDKBuilder. `--self-test` (browser query `?self-test`) runs the bounded\nfive-second lifecycle check. The Web target is AOT WebAssembly with a pthread\napplication and an OffscreenCanvas/WebGL2 renderer; it requires cross-origin\nisolation and a secure browser context. No LVUI source interpreter or DOM widget\ntree is deployed. See `docs/HostPlatforms.md` for platform contracts and limits.\n"
     }
   ],
   "outline": [

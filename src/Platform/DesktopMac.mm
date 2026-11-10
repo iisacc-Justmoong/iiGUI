@@ -8,6 +8,7 @@ core::Result<void> main_thread(){if(!NSThread.isMainThread)return core::fail(cor
 namespace detail {
 core::Result<ClipboardContent> read_pasteboard(void* native_board){
     if(auto ready=main_thread();!ready)return std::unexpected(ready.error());
+    if(!native_board)return core::fail(core::ErrorCode::invalid_argument,"Pasteboard is unavailable");
     ClipboardContent value;auto board=(__bridge NSPasteboard*)native_board;
     if(auto text=[board stringForType:NSPasteboardTypeString])value.text=text.UTF8String;
     if(auto text=[board stringForType:NSPasteboardTypeURL])value.url=text.UTF8String;
@@ -21,14 +22,13 @@ core::Result<ClipboardContent> read_pasteboard(void* native_board){
     }
     if(!detail::valid_clipboard(value))return core::fail(core::ErrorCode::invalid_argument,"Invalid clipboard payload");return value;
 }
-}
-core::Result<ClipboardContent> read_clipboard(){return detail::read_pasteboard((__bridge void*)NSPasteboard.generalPasteboard);}
-core::Result<void> write_clipboard(const ClipboardContent& value){
+core::Result<void> write_pasteboard(void* native_board, const ClipboardContent& value){
     if(auto ready=main_thread();!ready)return ready;
     if(!detail::valid_clipboard(value))return core::fail(core::ErrorCode::invalid_argument,"Invalid clipboard payload");
-    auto board=NSPasteboard.generalPasteboard;[board clearContents];
-    if(!value.text.empty())[board setString:native(value.text) forType:NSPasteboardTypeString];
-    if(!value.url.empty())[board setString:native(value.url) forType:NSPasteboardTypeURL];
+    if(!native_board)return core::fail(core::ErrorCode::invalid_argument,"Pasteboard is unavailable");
+    auto board=(__bridge NSPasteboard*)native_board;[board clearContents];
+    if(!value.text.empty()&&![board setString:native(value.text) forType:NSPasteboardTypeString])return core::fail(core::ErrorCode::failed,"Cannot write clipboard text");
+    if(!value.url.empty()&&![board setString:native(value.url) forType:NSPasteboardTypeURL])return core::fail(core::ErrorCode::failed,"Cannot write clipboard URL");
     if(!value.files.empty()){NSMutableArray* files=[NSMutableArray new];for(const auto& path:value.files)[files addObject:[NSURL fileURLWithPath:native(path)]];if(![board writeObjects:files])return core::fail(core::ErrorCode::failed,"Cannot write clipboard files");}
     if(!value.image.empty()){
         auto type=value.image_mime=="image/png"?NSPasteboardTypePNG:value.image_mime=="image/tiff"?NSPasteboardTypeTIFF:value.image_mime=="image/bmp"?@"com.microsoft.bmp":@"public.jpeg";
@@ -36,6 +36,9 @@ core::Result<void> write_clipboard(const ClipboardContent& value){
     }
     return {};
 }
+}
+core::Result<ClipboardContent> read_clipboard(){return detail::read_pasteboard((__bridge void*)NSPasteboard.generalPasteboard);}
+core::Result<void> write_clipboard(const ClipboardContent& value){return detail::write_pasteboard((__bridge void*)NSPasteboard.generalPasteboard,value);}
 core::Result<void> open_external_url(std::string_view value){
     if(auto ready=main_thread();!ready)return ready;
     if(!detail::valid_external_url(value))return core::fail(core::ErrorCode::invalid_argument,"Expected a web, mail, or Society account URL");

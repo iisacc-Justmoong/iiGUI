@@ -1,5 +1,18 @@
 # iiGUI
 
+iiGUI is the C++ graphics interface framework for components, layout, input,
+accessibility and rendering. LVUI is a separate declarative language that can
+generate calls to iiGUI; C++ applications can also use iiGUI without LVUI.
+This division corresponds to the QML/QtQuick roles without a Qt dependency or
+compatibility requirement. The [framework boundary](docs/FrameworkBoundary.md)
+distinguishes the intended ownership from the current migration state.
+
+iiGUI draws application components from its own C++ scene through GPU APIs.
+The operating system supplies the window, presentation surface, input, font
+and accessibility services; desktop components do not embed a browser or wrap
+individual OS controls. See [GPU scene composition](docs/GpuSceneComposition.md)
+for the current rasterization, hardware-selection and legacy-host limits.
+
 Custom-drawn containers can expose [accessibility semantics](docs/AccessibilitySemantics.md)
 including an adjustable slider range without giving iiGUI ownership of the
 application's component model.
@@ -21,6 +34,13 @@ NativeActivity, iiSDKCore and self-rendered Vulkan labels. The
 [Android guide](docs/AndroidHello.md) states its supported label subset and the
 separate build, installation, physical-device and emulator evidence. Emulator
 installation requires an explicit `--device-kind emulator --serial emulator-NNNN`.
+The Android host selects a compatible frame callback for API 24 or API 29 and
+restores truncated 32-bit frame timestamps using the monotonic clock. Full
+Android builds and device execution have separate verification requirements.
+An Android iiGUI package also exports `iiGUI::AndroidEntry`, which connects a
+NativeActivity to an application-supplied iiSDKCore configuration. LVUI's
+application helper uses this target for its Android shared library; manifest,
+APK packaging and signing remain with the application.
 
 The AOT [Hello World](examples/HelloWorld) uses one LVUI source and one C++23
 application on macOS, Windows and Linux. Its [desktop verification guide](docs/AOTDesktop.md)
@@ -35,6 +55,14 @@ surface, shared Metal/CoreText rendering, touch and Pencil input, and an optiona
 Vulkan surface through MoltenVK. The Congregation device build exercises Metal
 and forced Vulkan independently. Full marked-text input and external drag and
 drop remain outside this adapter's current support.
+The single-window host binds its own UIKit session, rejects events from unrelated
+scenes, and retains its view during same-session reconnection. Its independent
+application driver routes separately requested UIKit scenes; this path has been
+cross-compiled, tested headlessly, and linked into a generated iPhoneOS app, but
+not exercised on a device. Restoring window declarations after process restart
+remains unsupported.
+When the primary host closes, the UIKit adapter schedules Core-owned application
+and view cleanup after native callbacks have returned, even if its event loop stays alive.
 
 Native [container layout](docs/ContainerLayout.md) now supports minimum implicit
 metrics, independent implicit/content insets and construction-time default slots.
@@ -56,6 +84,10 @@ updates, with on-demand idle behavior and live reduced-motion preferences. Metal
 [shadows](docs/Shadows.md) and cached foreground scale/opacity composition support
 the authored LVRS Alert transitions without OS control wrappers.
 
+
+Window and widget rendering follow the active display's backing scale without
+an idle polling loop. Wayland supports fractional scale and viewport protocols
+when the compositor provides both; see [display scaling](docs/HostPlatforms.md).
 
 Native widgets now use iiGUI's own C++ layout, hit testing, focus, input state and
 GPU drawing. Cocoa supplies one input/presentation surface and virtual
@@ -90,9 +122,24 @@ unverified or unfinished as documented.
 
 [Core-owned widget applications](docs/CoreApplication.md) connect native C++ widgets
 to iiSDKCore's app runtime, entrypoint and attachment lifecycle. LVUI emits concrete
-C++ widget classes; LVRS provides appearance data/fonts; iiGUI supplies the OS driver
+C++ widget classes and supplies its own style tokens; iiGUI supplies the OS driver
 and its own C++ widgets using the same Core-owned event loop. Hello World now uses this
 path and Core's final-executable/resource helper.
+For independently managed desktop windows, `Host::set_application_driver(true)`
+keeps the event pump in an invisible host while application windows close independently.
+The capability is exposed for Cocoa, Win32, X11 and Wayland; platform execution remains a
+separate verification step.
+The primary host can separately report application foreground transitions on
+Cocoa, Win32, X11, UIKit, Android NativeActivity and Web. Cocoa and Win32 aggregate
+visible non-minimized application windows; X11 aggregates mapped application
+windows according to the window manager's structure notifications. Focus and
+occlusion are separate. `supports_application_foreground()` reports the compiled
+capability. Wayland currently returns `unsupported` for a foreground handler. See
+the [host lifecycle contract](docs/HostPlatforms.md).
+On Cocoa and UIKit, file-open requests use bounded UTF-8 queues. Cocoa reports
+rejected batches to the operating system; UIKit records rejected URLs as host
+errors. See [host file requests](docs/HostPlatforms.md#cocoa-파일-열기-요청-접수)
+and [iPadOS hosting](docs/IPADOS.md).
 
 The working tree now also implements [compiled self-rendered widgets and LVUI AOT](docs/SelfRenderedWidgets.md):
 `examples/HelloWorld/HelloWorld.lvui` generates C++23 during the build and mounts
@@ -115,7 +162,7 @@ the Web target uses WebGL2 without a Vulkan SDK. [Native rendering](docs/Rendere
 uses Metal/Direct3D first and Vulkan as the default fallback; Linux uses Vulkan.
 Released 0.4.1 binaries do not include these additions until rebuilt. The version above is the last package release.
 
-iiGUI 0.4.1 is a C++23 native desktop GUI host and retained GPU canvas above iiSDKCore 0.16. The same
+iiGUI 0.5.0 is a C++23 native desktop GUI host and retained GPU canvas above iiSDKCore 0.16. The same
 public API and HelloGUI source build on Windows, macOS and Linux. Each backend
 uses its platform window system directly. Qt, SDL, a WebView and a JavaScript engine
 are not used. Standard C/C++ runtime libraries
@@ -125,12 +172,15 @@ and native system libraries remain normal deployment dependencies.
 |---|---|---|
 | Windows | Win32, DirectWrite/Direct2D text, Direct3D 11 flip presentation, wake event/deadline timer | Windows 10 1703+; C++23 compiler/Windows SDK; D3D feature level 11.0 device; Vulkan loader/driver for fallback |
 | macOS | AppKit/CoreText text, Metal/CAMetalLayer, CFRunLoop wake/deadline sources | Xcode/Command Line Tools; logged-in WindowServer; Metal GPU; Vulkan/MoltenVK for fallback |
-| Linux | X11, Pango/Cairo text, Vulkan, eventfd/poll | X11/XWayland desktop, fonts, Vulkan graphics/presentation driver for canvas |
+| Linux | Direct Wayland, Pango/Cairo text, Vulkan, eventfd/poll | Wayland compositor, fonts, Vulkan graphics/presentation driver for canvas |
 
-Linux currently uses X11. A Wayland desktop needs XWayland; there is no direct
-Wayland backend. Linux derives a logical scale from the desktop's Xft.dpi
-resource (96 DPI when absent), including live resource changes. This is one
-X11 desktop scale, not Wayland per-output fractional scaling.
+The direct Wayland source supports an independent application driver and
+multiple window connections. Its current multi-window changes have been checked
+with a mock host and target object compilation, not a live Linux compositor.
+Wayland is the default Linux backend, and `AUTO` also requires Wayland instead
+of falling back. The legacy X11 backend is deprecated and must be explicitly
+selected for existing consumers. Wayland uses integer output scaling;
+fractional scaling remains unsupported.
 Windows uses 96-DPI logical units with per-monitor scaling; macOS uses AppKit
 points. A cross build or binary inspection does not prove desktop execution.
 
@@ -163,17 +213,24 @@ points. A cross build or binary inspection does not prove desktop execution.
   bytes and render/presentation counters. A strict hardware policy rejects an
   unverified/software device. Explicit in-memory capture supports pixel tests.
 - Native Unicode shaping and font fallback: AppKit/CoreText, DirectWrite, and
-  Pango/Cairo. Linux no longer wraps text by repeatedly measuring UTF-8 prefixes.
+  Pango/Cairo. Android labels and editable text layout use system StaticLayout;
+  the editor path has host-mock and NDK link coverage; device validation remains open.
+  Linux no longer wraps text by repeatedly measuring UTF-8 prefixes.
+- Android hardware keys use the device's system character map and the retained
+  widget input path. A small Android Java bridge connects basic text-service
+  selection and composition to native editors; unsupported operations and the
+  absence of device validation are detailed in [AndroidIME.md](docs/AndroidIME.md).
 - An optional application-side LVUI adapter owns document parsing and bounded
   row/column layout. `Host::set_view` accepts an app-supplied view extension;
   `lvui::native::layout_document` exposes logical ID bounds. HelloLVUI embeds
   a real `.lvui` source at build time.
 
-Mobile/web hosts, direct Wayland, editable text/IME, general input, a widget
-framework, custom-control accessibility, arbitrary vector/image drawing,
-3D/compute rendering, HDR and ICC-managed content are outside this
-release. Unsupported targets fail configuration. No GUI implementation or
-reverse iiGUI dependency is added to iiSDKCore.
+The 0.5.0 release baseline excluded mobile/web hosts, direct Wayland, editable
+text/IME, general input, a widget framework, custom-control accessibility,
+arbitrary vector/image drawing, 3D/compute rendering, HDR and ICC-managed
+content. Later source additions and their platform limits are recorded in the
+host contracts and verification documents. No GUI implementation or reverse
+iiGUI dependency is added to iiSDKCore.
 
 ## Build and test
 
@@ -200,6 +257,21 @@ desktop, including DISPLAY on Linux. Default installation is
 `~/.local/SDK/iiGUI`; verification uses isolated prefixes under build/ and does
 not replace global SDK packages.
 
+## Build layout
+
+The default build produces the iiGUI module and enabled tests in `build/`. Native
+examples are opt-in with `-DIIGUI_BUILD_EXAMPLES=ON`. LunaSVG source is stored
+in `resources/dependencies/lunasvg`; a new download uses a pinned revision. An
+existing source tree is reused without replacement or automatic revision checks;
+an incomplete tree fails configuration. Build
+products remain in `build/`. Font metadata tests read small, invalid test fonts
+from `resources/font-metadata/` without generating files. The dependency-source
+test uses an automatically removed workspace in `resources/.state/` through
+the iiFileProvider Python adapter. Set `IIFILEPROVIDER_PYTHON_DIRECTORY` when
+the adapter is installed outside `~/.local/SDK/iiFileProvider/share/iiFileProvider/python`.
+Private state, recovered data, test fixtures and dependency sources are excluded
+from installed resources. See [build layout](docs/BuildLayout.md).
+
 ## HelloGUI through iiSDKBuilder
 
 ```sh
@@ -208,9 +280,11 @@ iisdk-builder build --manifest examples/HelloGUI/iiSDKBuilder.json --platform ho
 
 The manifest contains Windows, macOS and Linux kits. `--platform host` selects
 the native host. Without it all three are requested; foreign desktop kits need
-explicit toolchains. Core and iiGUI are built before the common HelloGUI source.
-Builder uses FileProvider for its own manifests and logs; HelloGUI links Core,
-iiGUI, Vulkan and native system libraries. LVUI-based examples add LVUI explicitly.
+explicit toolchains. The current application manifest also selects LVUI; the
+HelloGUI C++ target uses iiGUI, Core, Vulkan and native system libraries.
+Builder uses FileProvider for its own manifests and logs. The independent
+consumer test verifies that iiGUI can be installed and linked without LVUI,
+LVRS or Qt, independently of an application's SDK selection.
 See [renderer selection and deployment](docs/Renderers.md) for Vulkan SDK paths.
 
 HelloGUI displays a 250 ms Core timer, a worker's computed result of 42, content
@@ -223,10 +297,13 @@ and checks timer, worker, resize, native GPU readback and normal close before re
 
 ## Reproducible installed-consumer verification
 
-From iiGUI, run the verifier with an installed Builder CLI:
+The verifier accepts explicit target package prefixes for the existing iiGUI
+and LVUI CMake dependencies. Its temporary result layout has not yet been moved
+out of `build/`; see [the build layout](docs/BuildLayout.md) before using it.
+With a compatible target prefix and an installed Builder CLI, the invocation is:
 
 ```sh
-python3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder
+python3 -B tools/verify_desktop.py --builder /path/to/iisdk-builder --prefix /path/to/target-sdk
 ```
 
 On Windows use an initialized compiler environment with CMake/Ninja/Python:

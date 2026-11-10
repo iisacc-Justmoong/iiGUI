@@ -1,14 +1,22 @@
-# All destinations are disposable test-owned paths below the caller's build/.
-foreach(_required SOURCE BUILD CORE_BUILD LVUI_BUILD GUI_BUILD)
+# Build output and temporary installation data have separate owned locations.
+foreach(_required SOURCE BUILD RESOURCE_ROOT CORE_BUILD LVUI_BUILD GUI_BUILD)
     if(NOT DEFINED ${_required})
         message(FATAL_ERROR "Missing ${_required}")
     endif()
 endforeach()
-cmake_path(CONVERT "${BUILD}" TO_CMAKE_PATH_LIST BUILD NORMALIZE)
-if(NOT BUILD MATCHES "/build(/|$)")
-    message(FATAL_ERROR "Package verification must stay under build/")
+file(REAL_PATH "${SOURCE}" _source_root)
+file(REAL_PATH "${BUILD}" _build_root)
+file(REAL_PATH "${RESOURCE_ROOT}" _resource_root)
+set(_allowed_build "${_source_root}/build")
+set(_allowed_resources "${_source_root}/resources/.state/verification")
+cmake_path(IS_PREFIX _allowed_build "${_build_root}" NORMALIZE _inside_build)
+cmake_path(IS_PREFIX _allowed_resources "${_resource_root}" NORMALIZE _inside_resources)
+if(NOT _inside_build OR _build_root STREQUAL _allowed_build OR
+   NOT _inside_resources OR _resource_root STREQUAL _allowed_resources)
+    message(FATAL_ERROR "Package verification requires owned build/ and resource-state subdirectories")
 endif()
-set(_root "${BUILD}/installed-consumer")
+set(_root "${_resource_root}/installed-consumer")
+set(_build "${_build_root}")
 set(_stage "${_root}/stage")
 set(_relocated "${_root}/relocated")
 file(MAKE_DIRECTORY "${_root}")
@@ -44,7 +52,7 @@ foreach(_variable Vulkan_INCLUDE_DIR Vulkan_LIBRARY)
         list(APPEND _vulkan_args "-D${_variable}=${_value}")
     endif()
 endforeach()
-execute_process(COMMAND ${_clean_env} "${CMAKE_COMMAND}" -S "${_root}/source" -B "${_root}/build" -G Ninja
+execute_process(COMMAND ${_clean_env} "${CMAKE_COMMAND}" -S "${_root}/source" -B "${_build}" -G Ninja
     ${_toolchain_args} ${_vulkan_args}
     "-DCMAKE_PREFIX_PATH=${_relocated}" -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
@@ -56,20 +64,20 @@ execute_process(COMMAND ${_clean_env} "${CMAKE_COMMAND}" -S "${_root}/source" -B
 if(NOT _result EQUAL 0)
     message(FATAL_ERROR "Consumer configure failed: ${_output}\n${_error}")
 endif()
-file(STRINGS "${_root}/build/CMakeCache.txt" _gui_dir REGEX "^iiGUI_DIR:PATH=")
-file(STRINGS "${_root}/build/CMakeCache.txt" _core_dir REGEX "^iiSDKCore_DIR:PATH=")
-file(STRINGS "${_root}/build/CMakeCache.txt" _lvui_dir REGEX "^LVUI_DIR:PATH=")
+file(STRINGS "${_build}/CMakeCache.txt" _gui_dir REGEX "^iiGUI_DIR:PATH=")
+file(STRINGS "${_build}/CMakeCache.txt" _core_dir REGEX "^iiSDKCore_DIR:PATH=")
+file(STRINGS "${_build}/CMakeCache.txt" _lvui_dir REGEX "^LVUI_DIR:PATH=")
 if(NOT _gui_dir STREQUAL "iiGUI_DIR:PATH=${_relocated}/lib/cmake/iiGUI" OR
    NOT _lvui_dir STREQUAL "LVUI_DIR:PATH=${_relocated}/lib/cmake/LVUI" OR
    NOT _core_dir STREQUAL "iiSDKCore_DIR:PATH=${_relocated}/lib/cmake/iiSDKCore")
     message(FATAL_ERROR "Consumer resolved a package outside its relocated prefix: ${_gui_dir}; ${_core_dir}")
 endif()
-execute_process(COMMAND ${_clean_env} "${CMAKE_COMMAND}" --build "${_root}/build" --parallel 4
+execute_process(COMMAND ${_clean_env} "${CMAKE_COMMAND}" --build "${_build}" --parallel 4
     RESULT_VARIABLE _result OUTPUT_VARIABLE _output ERROR_VARIABLE _error)
 if(NOT _result EQUAL 0)
     message(FATAL_ERROR "Consumer build failed: ${_output}\n${_error}")
 endif()
-file(STRINGS "${_root}/build/compile_commands.json" _commands)
+file(STRINGS "${_build}/compile_commands.json" _commands)
 cmake_path(GET SOURCE PARENT_PATH _sdk_source)
 if(_commands MATCHES "${SOURCE}/include" OR _commands MATCHES "${SOURCE}/src" OR _commands MATCHES "${_sdk_source}/LVUI/include")
     message(FATAL_ERROR "Installed consumer accessed iiGUI source-tree headers")
@@ -77,7 +85,7 @@ endif()
 if(SKIP_EXECUTION)
     message(STATUS "Installed C++23 consumer COMPILED using relocated packages: ${_relocated}; execution explicitly NOT RUN")
 else()
-    execute_process(COMMAND ${_clean_env} "${CMAKE_CTEST_COMMAND}" --test-dir "${_root}/build" --output-on-failure
+    execute_process(COMMAND ${_clean_env} "${CMAKE_CTEST_COMMAND}" --test-dir "${_build}" --output-on-failure
         --output-junit "${_root}/tests.xml"
         RESULT_VARIABLE _result OUTPUT_VARIABLE _output ERROR_VARIABLE _error)
     if(NOT _result EQUAL 0)

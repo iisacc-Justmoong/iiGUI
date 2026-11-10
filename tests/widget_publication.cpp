@@ -76,5 +76,31 @@ void popup(){
     fail=false;good(popup.open_at(0,0));check(count==1,"Popup publication was not delivered after open");
     good(popup.close_popup());good(popup.open_at(0,0));check(count==2,"Popup reopening did not publish its fresh generation");owner->close();
 }
+void publish_can_open_popup(){
+    auto owner=state();auto host=take(owner->content_host({},"host",{300,200}));gui::Widget popup;
+    bool published=false,opened=false;
+    good(host.set_content([&](gui::WidgetBuilder& b)->core::Result<void>{
+        auto root=take(b.vstack({},"root"));popup=take(b.popover(root,"initial",{.width=120,.height=100}));
+        return b.on_publish([&]{published=true;opened=bool(popup.open_at(0,0));});
+    }));
+    check(published&&opened&&take(popup.snapshot()).opened,"Published content could not open its initial popup");
+    owner->close();
 }
-int main(){root_and_nested();rollback();keyed();retirement();popup();}
+void publish_can_replace_content(){
+    auto owner=state();auto host=take(owner->content_host({},"host",{}));gui::Widget original;
+    bool replaced=false,new_published=false;
+    good(host.set_content([&](gui::WidgetBuilder& b)->core::Result<void>{
+        original=take(b.label({},"first",{.text="First"}));
+        return b.on_publish([&]{
+            replaced=bool(host.set_content([&](gui::WidgetBuilder& next)->core::Result<void>{
+                take(next.label({},"second",{.text="Second"}));
+                return next.on_publish([&]{new_published=true;});
+            }));
+        });
+    }));
+    check(replaced&&new_published&&!original.snapshot()&&take(take(host.content_item()).snapshot()).text=="Second",
+          "Replacement from a published callback left stale content or skipped publication");
+    owner->close();
+}
+}
+int main(){gui::require_committed_publication_abi_v1();root_and_nested();rollback();keyed();retirement();popup();publish_can_open_popup();publish_can_replace_content();}

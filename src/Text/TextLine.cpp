@@ -21,6 +21,7 @@ struct TextLine::Impl final {
     std::thread::id owner = std::this_thread::get_id();
     TextIndex source;
     std::unique_ptr<detail::NativeTextLine> native;
+    bool fragment = false;
 };
 TextLine::TextLine(std::shared_ptr<const Impl> p): impl_(std::move(p)) {}
 core::Result<TextLine> TextLine::create(TextIndex source, TextLineStyle style) {
@@ -106,6 +107,40 @@ core::Result<TextBitmap> TextLine::render(double x, double width, Color color, d
             if(!bitmap.rgba[i+3])bitmap.rgba[i]=bitmap.rgba[i+1]=bitmap.rgba[i+2]=0;
         }
         return bitmap;
+    });
+}
+core::Result<std::vector<TextLineSlice>> TextLine::wrap(double width, std::size_t maximum_lines) const {
+    if (auto r = ready(); !r) return std::unexpected(r.error());
+    if (impl_->fragment) return core::fail(core::ErrorCode::unsupported, "Rewrap the original paragraph, not a wrapped fragment");
+    if (!std::isfinite(width) || width <= 0 || width > 8192 || maximum_lines == 0 || maximum_lines > 65536)
+        return core::fail(core::ErrorCode::invalid_argument, "Invalid native wrapping width or line budget");
+    return protect<std::vector<TextLineSlice>>([&]() -> core::Result<std::vector<TextLineSlice>> {
+        auto slices = impl_->native->wrap(width, maximum_lines);
+        if (slices.empty() || slices.size() > maximum_lines)
+            return core::fail(core::ErrorCode::failed, "Native wrapping returned an invalid line count");
+        const auto& source=impl_->source;
+        const auto edge=[&](std::size_t position) {
+            return position==0 || position==source.utf16_size() ||
+                source.next_grapheme(source.previous_grapheme(position))==position;
+        };
+        std::size_t cursor=0;std::vector<TextLineSlice> output;output.reserve(slices.size());
+        for (auto& slice:slices) {
+            if (!slice.line || slice.first!=cursor || slice.last<slice.first || slice.last>source.utf16_size() ||
+                (slice.last==slice.first && (source.utf16_size()!=0 || slices.size()!=1)) || !edge(slice.first) || !edge(slice.last))
+                return core::fail(core::ErrorCode::failed, "Native wrapping returned an invalid Unicode range");
+            auto first=source.byte_for_utf16(slice.first),last=source.byte_for_utf16(slice.last);
+            if (!first || !last) return core::fail(core::ErrorCode::failed, "Native wrapping split a Unicode scalar");
+            auto part=TextIndex::create(std::string(source.text().substr(*first,*last-*first)));
+            if (!part) return std::unexpected(part.error());
+            const auto metrics=slice.line->metrics();
+            if (!std::isfinite(metrics.width)||metrics.width<0||metrics.width>1e12||!std::isfinite(metrics.height)||
+                metrics.height<=0||metrics.height>8192||!std::isfinite(metrics.baseline))
+                return core::fail(core::ErrorCode::full, "Wrapped line geometry exceeds the supported coordinate range");
+            auto child=std::make_shared<Impl>();child->source=std::move(*part);child->native=std::move(slice.line);child->fragment=true;
+            output.push_back({slice.first,slice.last,TextLine(std::move(child))});cursor=slice.last;
+        }
+        if (cursor!=source.utf16_size()) return core::fail(core::ErrorCode::failed, "Native wrapping omitted text");
+        return output;
     });
 }
 } // namespace ii::gui

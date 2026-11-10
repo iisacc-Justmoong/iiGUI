@@ -2,11 +2,11 @@
 
 iiGUI의 위젯 트리는 Cocoa, Win32, X11, 직접 Wayland, Android, UIKit, Web canvas에 부착된다. OS 호스트에는 브라우저나 WebView를 넣지 않는다. Web은 별도의 AOT WASM 대상이며 DOM 위젯을 사용하지 않는다. 공통 WidgetState가 배치, 포커스, 편집, 캡처와 렌더 장면을 소유하고 플랫폼 어댑터가 운영체제 이벤트를 표준 값으로 변환한다. 지원 범위와 제한은 [HostPlatforms.md](HostPlatforms.md)를 따른다.
 
-macOS는 AppKit/Metal, Windows는 Win32/D3D11과 IMM32, Linux는 X11/XInput2/XIM과 Vulkan을 사용한다. 기본 네이티브 가속기가 실패하면 Vulkan으로 전환한다. Windows의 IME·클립보드·파일 드롭과 Linux의 XInput2 압력·기울기, XIM, XDND 및 INCR 클립보드 전송을 소스에 구현했다. Linux 파일 선택은 XDG Desktop Portal, 외부 URL은 GIO, 앱 메뉴는 GMenuModel/GActionGroup의 D-Bus 내보내기를 사용한다. Linux의 직접 Wayland 경로는 포함하지 않는다.
+macOS는 AppKit/Metal, Windows는 Win32/D3D11과 IMM32, Linux는 직접 Wayland와 Vulkan을 기본 경로로 사용한다. X11은 폐기 예정인 명시적 선택 경로이다. Windows의 IME·클립보드·파일 드롭과 Wayland 입력·클립보드·파일 선택 경계는 각각의 플랫폼 호스트에 구현한다. Linux 파일 선택은 XDG Desktop Portal, 외부 URL은 GIO를 사용한다. 세부 플랫폼 지원과 검증 상태는 [HostPlatforms.md](HostPlatforms.md)를 따른다.
 
 보조창은 부모의 iiSDKCore 이벤트 루프를 공유하며 각 창의 작업 범위만 취소한다. 파일 선택 완료와 메뉴 콜백은 UiExecutor를 통하여 해당 창의 유효한 수명 안에서 전달한다.
 
-현재 검증 호스트는 macOS이다. Windows·Linux 구현은 소스 이식 범위이며 해당 운영체제에서의 빌드·실행·IME·접근성 완료를 주장하지 않는다. Linux 어댑터의 운영체제 접근성 객체 노출은 아직 제공하지 않는다. 공통 위젯 의미와 키보드 조작은 유지한다.
+현재 검증 호스트는 macOS이다. Windows·Linux 구현은 소스 이식 및 개별 교차 컴파일 범위이며 해당 운영체제에서의 실행·IME·접근성 완료를 주장하지 않는다. Linux AT-SPI 경계가 있으나 실제 compositor와 접근성 서비스 검증은 별개이다. 공통 위젯 의미와 키보드 조작은 유지한다.
 
 Vulkan 재료 효과의 실제 GPU 검사는 `iiGUI.vulkan_effects`, Cocoa 입력과 보조창 검사는 `iiGUI.desktop_*` 및 `iiGUI.editor_*`에서 수행한다. 펜 장치의 필드 전달 검사와 물리 태블릿 실기기 검증은 별개의 증거이다.
 

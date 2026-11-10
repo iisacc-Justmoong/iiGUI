@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(iiSDKCore 0.16 CONFIG COMPONENTS Runtime)
+include("${CMAKE_CURRENT_LIST_DIR}/iiGUIPainterTargets.cmake")
+check_required_components(iiGUIPainter)

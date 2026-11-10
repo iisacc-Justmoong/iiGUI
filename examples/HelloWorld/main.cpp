@@ -37,6 +37,8 @@ ii::core::Result<void> ii::runtime::configure_application(Application& app) {
     auto state=std::make_shared<HelloState>();
     if (app.arguments().size()==2 && app.arguments()[1]=="--self-test") state->self_test=true;
     else if (app.arguments().size()!=1) return core::fail(core::ErrorCode::invalid_argument,"Usage: HelloWorld [--self-test]");
+    if (auto workers=app.workers().resize_workers(1); !workers)
+        return core::fail(core::ErrorCode::failed,"HelloWorld cannot allocate its background worker",workers.error().cause);
     const auto ui=app.event_loop().sender();
     state->host=take(gui::attach_application(app,View::options(),{
         .opened=[state,ui,&app] {

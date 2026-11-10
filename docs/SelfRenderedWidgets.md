@@ -38,10 +38,17 @@ C++ dispatch. Enter/Space and pointer activation dispatch pressed, released,
 clicked, then stepped. Outside release omits the click; disabling, Escape,
 focus loss and moving focus cancel capture once. A release callback may unmount
 its generation without a stale click following it.
-SegmentedControl is a styled horizontal container with independent child actions,
-as in the original LVRS label/icon segmented controls. It supports separate
-horizontal/vertical padding, spacing, an opaque fill/border, rounded/cylindrical
-shape and optional borderless tone propagation. It does not infer selection.
+`SegmentedControl`은 독립적인 자식 동작을 유지하는 가로 또는 세로 컨테이너다.
+기본 프레임은 바깥 패딩과 테두리가 없고 자식 간 간격은 2이다. 둥근 사각형의
+기본 반경은 버튼과 같은 8이며, 원통형은 이용 가능한 짧은 변의 절반을 쓴다.
+표면 색상은 호출자가 제공한다. LVUI는 `Panel/subSurface` 토큰을 전달한다. 따라서 표면은
+세그먼트 버튼의 전체 크기에 맞는다. 목록 항목에 포함된 기본 세그먼트도 같다.
+가로·세로 패딩, 간격, 불투명 배경과 테두리, 둥근 사각형·원통형 및 무테 톤
+전파를 지원한다. 생성 시 `SegmentedOptions::vertical`을 설정하면 자식을 세로로
+배치한다. 선택 상태를 자동으로 만들지 않으며 자식 수에 고정 상한은 없다.
+LVRS 디자인은 2~15개 변형을 제공한다. 자식 버튼의 `checkable`·`checked` 상태는 원래 톤을 유지하며 앱 악센트 기반 Selected 배경을 그린다.
+macOS arm64 헤드리스 검사에서 가로·세로 2~15개 배치와 명시적 패딩·테두리,
+LVUI 생성 뷰와의 결합을 확인했다. 운영체제 창을 띄우지는 않았다.
 Self-rendered [menus](Menus.md) add popup ownership, regular/context rows and
 dividers, context binding, scrolling, placement, input capture and focus return.
 [Popovers](Popovers.md) mount ordinary native C++ widget content in the same GPU

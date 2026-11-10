@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/AOTDesktop.md",
-    "sha256": "bb0f9554317e5498daff7a2c3c7fe7fcb55bcf51910a03c8ee4d0c9e5b78fa7f",
-    "bytes": 6405,
+    "sha256": "64ac9fdd8c3cd7abf79c7b0a6a030b135f4579d8e14ac6e1305c25bfbd0986d5",
+    "bytes": 6423,
     "line_count": 102,
     "encoding": "utf-8",
     "language": "ko"
@@ -57,7 +57,7 @@
       "kind": "table",
       "start_line": 8,
       "end_line": 12,
-      "raw": "| 대상 | 창·입력 호스트 | 자체 위젯 표시 | 실행 파일 |\n|---|---|---|---|\n| macOS | AppKit | Metal, 자동 선택 시 Vulkan 대체 가능 | Mach-O / `.app` |\n| Windows | Win32 | Direct3D 11, 자동 선택 시 Vulkan 대체 가능 | PE32+ GUI `.exe` |\n| Linux | X11 / XWayland | Vulkan | ELF64 |\n",
+      "raw": "| 대상 | 창·입력 호스트 | 자체 위젯 표시 | 실행 파일 |\n|---|---|---|---|\n| macOS | AppKit | Metal, 자동 선택 시 Vulkan 대체 가능 | Mach-O / `.app` |\n| Windows | Win32 | Direct3D 11, 자동 선택 시 Vulkan 대체 가능 | PE32+ GUI `.exe` |\n| Linux | 직접 Wayland | Vulkan | ELF64 |\n",
       "columns": [
         "대상",
         "창·입력 호스트",
@@ -79,7 +79,7 @@
         ],
         [
           "Linux",
-          "X11 / XWayland",
+          "직접 Wayland",
           "Vulkan",
           "ELF64"
         ]
@@ -97,7 +97,7 @@
       "kind": "paragraph",
       "start_line": 14,
       "end_line": 16,
-      "raw": "레이블·버튼·스택은 iiGUI의 C++ 위젯이다. OS 컨트롤이나 웹뷰로 교체하지 않는다.\nLinux의 직접 Wayland 호스트는 제공하지 않는다. GPU 드라이버, 창 서버와 시스템\n텍스트 라이브러리는 대상 운영체제가 제공해야 한다.\n"
+      "raw": "레이블·버튼·스택은 iiGUI의 C++ 위젯이다. OS 컨트롤이나 웹뷰로 교체하지 않는다.\nX11은 명시적으로 선택해야 하는 폐기 예정 경로이다. GPU 드라이버, Wayland compositor와 시스템\n텍스트 라이브러리는 대상 운영체제가 제공해야 한다.\n"
     },
     {
       "id": "b000008",
@@ -468,13 +468,6 @@
       },
       {
         "block_id": "b000007",
-        "line": 15,
-        "text": "Linux의 직접 Wayland 호스트는 제공하지 않는다. GPU 드라이버, 창 서버와 시스템",
-        "basis": "lexical_match",
-        "context": "paragraph"
-      },
-      {
-        "block_id": "b000007",
         "line": 16,
         "text": "텍스트 라이브러리는 대상 운영체제가 제공해야 한다.",
         "basis": "lexical_match",
@@ -561,7 +554,7 @@
           ],
           [
             "Linux",
-            "X11 / XWayland",
+            "직접 Wayland",
             "Vulkan",
             "ELF64"
           ]

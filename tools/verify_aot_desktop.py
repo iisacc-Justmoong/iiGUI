@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Compile and audit native AOT consumers; deliberately never launch a GUI."""
 import argparse
-import datetime
 import hashlib
 import json
 import os
@@ -12,7 +11,7 @@ import struct
 import subprocess
 import sys
 
-from verify_desktop import build_environment, checked_build_root, host_platform
+from verify_desktop import build_environment, checked_build_root, host_platform, kit_builds, verification_workspace
 
 RESOURCES = tuple(entry['file'] for entry in json.loads((Path(__file__).resolve().parents[1]/'resources/lvrs-native-appearance.json').read_text())['fonts'])+("Pretendard-OFL.txt","Inter-OFL.txt")
 
@@ -115,9 +114,20 @@ def main(argv=None):
         output = checked_build_root(source, args.build_root or source / "build/verify-aot-desktop" / args.platform)
     except ValueError as error:
         parser.error(str(error))
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
-    run = output / "runs" / stamp
-    run.mkdir(parents=True, exist_ok=False)
+    with verification_workspace.temporary(source, "aot-") as run:
+        return run_verification(source, args, output, run, cache)
+
+
+def consumer_paths(output, run):
+    return {"prefix": run / "relocated", "source": run / "consumer/source",
+            "install": run / "consumer/install", "build": output / "installed-consumer-aot" / run.name}
+
+
+def run_verification(source, args, output, run, cache):
+    paths = consumer_paths(output, run)
+    app_build = paths["build"]
+    if app_build.exists() or app_build.is_symlink():
+        raise FileExistsError("Consumer build already exists: " + str(app_build))
     manifest = run / "manifest.json"
     data = make_manifest(source, output, args.platform, args.host_compiler, args.toolchain, cache)
     manifest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -129,12 +139,13 @@ def main(argv=None):
 
     def execute(label, command):
         log = run / (label + ".log")
-        print(label + ": " + str(log), flush=True)
+        print(label, flush=True)
         with log.open("w", encoding="utf-8") as stream:
             result = subprocess.run([str(x) for x in command], stdout=stream, stderr=subprocess.STDOUT, env=environment)
-        report["commands"].append({"step": label, "exitCode": result.returncode, "log": str(log)})
+        report["commands"].append({"step": label, "exitCode": result.returncode})
         if result.returncode:
-            raise RuntimeError(label + " failed; inspect " + str(log))
+            print(log.read_text(encoding="utf-8", errors="replace"), file=sys.stderr)
+            raise RuntimeError(label + " failed")
         return log.read_text(encoding="utf-8", errors="replace")
 
     try:
@@ -142,18 +153,17 @@ def main(argv=None):
         kit = output / "kits" / args.platform / "Release"
         # Verify the installed contract after moving the complete kit. No authoring
         # headers or CMake build-tree target exports may be used by this consumer.
-        prefix = run / "relocated"
+        prefix = paths["prefix"]
         shutil.copytree(kit / "prefix", prefix, symlinks=True)
-        consumer = run / "consumer"
-        shutil.copytree(prefix / "share/iiGUI/examples/HelloWorld", consumer / "source")
-        app_build = consumer / "build"
+        consumer_source = paths["source"]
+        shutil.copytree(prefix / "share/iiGUI/examples/HelloWorld", consumer_source)
         flags = ["-D" + key + "=" + value for key, value in data["kits"][0]["cache"].items()]
         flags += ["-D" + package + "_DIR:PATH=" + str(prefix / "lib/cmake" / package)
                   for package in ("iiSDKCore", "iiColorManager", "LVUI", "iiGUI", "lunasvg", "plutovg")]
         if args.toolchain:
             flags += ["-DCMAKE_TOOLCHAIN_FILE=" + str(args.toolchain.resolve())]
         cmake = shutil.which("cmake") or "cmake"
-        execute("consumer-configure", [cmake, "-S", consumer / "source", "-B", app_build, "-G", "Ninja",
+        execute("consumer-configure", [cmake, "-S", consumer_source, "-B", app_build, "-G", "Ninja",
                 "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_PREFIX_PATH=" + str(prefix),
                 "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF", "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF", *flags])
         execute("consumer-build", [cmake, "--build", app_build, "--parallel", "4"])
@@ -172,13 +182,13 @@ def main(argv=None):
         generated = app_build / "HelloWorld.generated.h"
         font_hashes = check_resources(prefix, app_build, args.platform)
         target = "HostWindows.cpp" if args.platform == "windows" else "HostLinux.cpp" if args.platform == "linux" else "Host.mm"
-        gui_commands = (kit / "sdk/iiGUI/build/compile_commands.json").read_text(encoding="utf-8")
+        gui_commands = (kit_builds(output, args.platform)["iiGUI"] / "compile_commands.json").read_text(encoding="utf-8")
         if target not in gui_commands:
             raise ValueError("Native platform host was not compiled: " + target)
-        execute("consumer-install", [cmake, "--install", app_build, "--prefix", consumer / "install"])
+        execute("consumer-install", [cmake, "--install", app_build, "--prefix", paths["install"]])
         report.update(status="native_build_and_package_verified", image=image, binary=str(binary),
                       binarySha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
-                      sourceSha256=hashlib.sha256((consumer / "source/HelloWorld.lvui").read_bytes()).hexdigest(),
+                      sourceSha256=hashlib.sha256((consumer_source / "HelloWorld.lvui").read_bytes()).hexdigest(),
                       generatedSha256=hashlib.sha256(generated.read_bytes()).hexdigest(), nativeHostSource=target,
                       qtLinked=False, interpreterLinked=False, lvuiParserLinked=False, coreEntryCompiled=True,
                       installedConsumerBuilt=True, installedConsumerExecuted=False, resources=font_hashes)
@@ -188,9 +198,12 @@ def main(argv=None):
         print(str(error), file=sys.stderr)
         return 1
     finally:
-        destination = run / "verification.json"
-        destination.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        print("Verification report: " + str(destination), flush=True)
+        verification_workspace.remove_owned_tree(app_build)
+        try:
+            app_build.parent.rmdir()
+        except OSError:
+            pass
+        print(json.dumps(report, indent=2), flush=True)
 
 
 if __name__ == "__main__":

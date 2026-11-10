@@ -1,13 +1,24 @@
 #import <AppKit/AppKit.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <QuartzCore/QuartzCore.h>
 #include <iiGUI/Host.h>
+#include "DisplayPixelsPolicy.h"
 #include <iiSDKCore/Core/Text/Utf8.h>
 #include <iiGUI/DispatchState.h>
 #include <iiGUI/HostCommon.h>
+#include <iiGUI/HostActivity.h>
+#include "HostFailure.h"
+#include "HostCallback.h"
+#include "HostFileRequests.h"
+#include "HostDriverPolicy.h"
+#include "WindowForeground.h"
+#include "CocoaHostDelegate.h"
+#include "CocoaBackingObserver.h"
 #include <iiGUI/DesktopCommon.h>
 #include <iiGUI/CanvasState.h>
 #include <iiGUI/WidgetState.h>
+#include <iiGUI/WidgetSurfaceNative.h>
 #include <cmath>
 #include <mutex>
 #include <optional>
@@ -21,63 +32,6 @@
 @end
 @implementation IIGUIAppCommand
 - (void)trigger:(id)sender { (void)sender;if(invoke)invoke(); }
-@end
-
-namespace ii::gui::detail {
-struct NativeCallbacks final {
-    std::function<void()> resize;
-    std::function<bool()> may_close;
-    std::function<void()> did_close;
-    std::function<void()> request_close;
-    std::function<void(double,double)> frame;
-    std::function<void(std::vector<std::string>)> files;
-};
-}
-
-@interface IIGUIHostDelegate : NSObject <NSWindowDelegate, NSApplicationDelegate> {
-@public
-    ii::gui::detail::NativeCallbacks* callbacks;
-}
-- (void)requestQuit:(id)sender;
-- (void)displayFrame:(CADisplayLink*)sender;
-@end
-
-@implementation IIGUIHostDelegate
-- (void)application:(NSApplication*)application openFiles:(NSArray<NSString*>*)filenames {
-    if(!callbacks||!callbacks->files||filenames.count>256){[application replyToOpenOrPrint:NSApplicationDelegateReplyFailure];return;}
-    std::vector<std::string> paths;
-    for(NSString* path in filenames){if(path.length>32768||!path.UTF8String){[application replyToOpenOrPrint:NSApplicationDelegateReplyFailure];return;}paths.emplace_back(path.UTF8String);}
-    callbacks->files(std::move(paths));[application replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
-}
-- (void)displayFrame:(CADisplayLink*)sender {
-    if(callbacks && callbacks->frame) callbacks->frame(sender.targetTimestamp,sender.targetTimestamp-sender.timestamp);
-}
-- (void)windowDidResize:(NSNotification*)notification {
-    (void)notification;
-    if (callbacks && callbacks->resize) callbacks->resize();
-}
-- (void)windowDidChangeBackingProperties:(NSNotification*)notification {
-    (void)notification;
-    if (callbacks && callbacks->resize) callbacks->resize();
-}
-- (BOOL)windowShouldClose:(NSWindow*)sender {
-    (void)sender;
-    return !callbacks || !callbacks->may_close || callbacks->may_close();
-}
-- (void)windowWillClose:(NSNotification*)notification {
-    (void)notification;
-    if (callbacks && callbacks->did_close) callbacks->did_close();
-}
-- (void)requestQuit:(id)sender {
-    (void)sender;
-    if (callbacks && callbacks->request_close) callbacks->request_close();
-}
-- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)sender {
-    (void)sender;
-    [self requestQuit:nil];
-    // Return through Host::run so C++ owners and Runtime workers can shut down.
-    return NSTerminateCancel;
-}
 @end
 
 namespace ii::gui {
@@ -150,27 +104,32 @@ struct Host::Impl {
     const std::thread::id owner = std::this_thread::get_id();
     Phase phase = Phase::created;
     HostCallbacks callbacks;
+    detail::HostActivity activity;
+    detail::WindowForeground foreground;
     detail::NativeCallbacks native;
     WindowSnapshot state;
     HostStats statistics;
     detail::CanvasState canvas;
     std::shared_ptr<detail::WidgetState> widgets;
     bool mounting = false;
-    std::optional<core::Error> failure;
+    detail::HostFailure failure;
     bool draining = false;
     bool opened_delivered = false;
-    std::vector<std::string> pending_files;
+    detail::HostFileRequests pending_files;
     CFRunLoopSourceRef source = nullptr;
     CFRunLoopTimerRef timer = nullptr;
     NSApplication* application = nil;
     NSWindow* window = nil;
+    __weak NSView* embedded_parent = nil;
+    id external_close_observer = nil, external_resize_observer = nil;
+    std::unique_ptr<detail::CocoaBackingObserver> external_backing_observer;
     std::shared_ptr<detail::WidgetState> legacy;
     Widget legacy_text;
     IIGUIHostDelegate* delegate = nil;
     NSMenu* previous_menu = nil;
     NSMutableArray<IIGUIAppCommand*>* menu_commands=nil;
     NSSavePanel* file_panel=nil;
-    bool secondary=false;
+    bool secondary=false, application_driver=false, external_application=false, embedded=false;
     Impl* parent=nullptr;
     std::vector<Impl*> children;
     CADisplayLink* display_link = nil;
@@ -194,7 +153,8 @@ struct Host::Impl {
             },
             .preferences=motion_preferences,
             .renderer=options.renderer,
-            .events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations
+            .events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations,
+            .transparent_background=embedded
         };
     }
     void refresh_frames() {
@@ -271,7 +231,7 @@ struct Host::Impl {
             if(!root) return std::unexpected(root.error());
             auto text=replacement->add(WidgetKind::label,*root,"iiGUI.legacy.text",{},{.text=state.text,.font_size=17},{},{});
             if(!text) return std::unexpected(text.error());
-            if(auto r=replacement->attach((__bridge void*)window.contentView);!r) return r;
+            if(auto r=replacement->attach((__bridge void*)native_parent(), detail::make_native_widget_surface);!r) return r;
             replacement->set_frame_paced(display_link!=nil || options.frame_loop!=nullptr);
             legacy_text=*text; legacy=std::move(replacement);
         }
@@ -285,15 +245,17 @@ struct Host::Impl {
     void remember_failure(std::string message, std::exception_ptr cause = {}) {
         if (!failure) failure = core::Error{core::ErrorCode::failed, std::move(message), cause};
     }
+    NSView* native_parent() const { return embedded ? embedded_parent : window.contentView; }
     void update_snapshot() {
         if (!window) return;
-        auto size = window.contentView.bounds.size;
+        NSView* parent=native_parent();if(!parent)return;
+        auto size = parent.bounds.size;
         state.size = {size.width, size.height};
         state.backing_scale = window.backingScaleFactor;
         state.visible = window.visible;
     }
     void stop_application() {
-        if(secondary)return;
+        if(secondary || external_application)return;
         [application stop:nil];
         // stop: is observed by NSApplication after nextEvent returns.
         NSEvent* wake = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
@@ -304,7 +266,13 @@ struct Host::Impl {
     }
     void force_close() noexcept {
         @try {
-            if (phase == Phase::running) [window close];
+            if (phase == Phase::running) {
+                if(embedded){did_close();return;}
+                [window close];
+                // An unmapped driver has no visible window-close transition to
+                // rely on. Complete its teardown if AppKit did not notify it.
+                if (application_driver && phase == Phase::running) did_close();
+            }
             else if (phase == Phase::closed) stop_application();
         } @catch (NSException* error) {
             remember_failure(native_error(error));
@@ -326,9 +294,24 @@ struct Host::Impl {
             force_close();
         }
     }
+    Impl* primary_host() noexcept {
+        auto* host = this;
+        while (host->parent) host = host->parent;
+        return host;
+    }
+    void forget_foreground_window() noexcept {
+        if (!secondary || !parent) return;
+        auto* primary = primary_host();
+        if (primary->phase != Phase::running) return;
+        primary->guard([&] { primary->foreground.remove_window(this); primary->gate->signal(); });
+    }
     void did_close() noexcept {
         if (phase == Phase::closed || phase == Phase::closing) return;
         phase = Phase::closing;
+        activity.close();
+        if (secondary) forget_foreground_window();
+        else foreground.close();
+        pending_files.clear();
         auto descendants=children;for(auto* child:descendants)child->force_close();children.clear();
         if(file_panel){[file_panel cancel:nil];file_panel=nil;}
         stop_frames(true);
@@ -337,14 +320,46 @@ struct Host::Impl {
         canvas.clear();
         clear_legacy();
         if (widgets) { widgets->close(); widgets.reset(); }
-        [window orderOut:nil];
+        if(!embedded)[window orderOut:nil];
         update_snapshot();
         state.visible = false;
         state.closed = true;presentations->close();
         phase = Phase::closed;
+        if(external_application){
+            auto callback=std::move(callbacks.closed);
+            auto failure_handler=failure.handler_snapshot();
+            // A close can arrive from a task currently executing in our own
+            // Core pump. HostLoop must not be destroyed until that task exits.
+            // Keep the host in closing state until the deferred teardown.
+            phase=Phase::closing;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                cleanup();
+                try { if(callback)callback(); }
+                catch (...) {
+                    try { if(failure_handler)failure_handler({core::ErrorCode::failed,"External host close callback failed",std::current_exception()}); }
+                    catch (...) {}
+                }
+            });
+            return;
+        }
         if(secondary){
-            auto callback=std::move(callbacks.closed);auto endpoint=parent?parent->dispatch:std::shared_ptr<detail::DispatchState>{};cleanup();
-            if(callback&&endpoint&&endpoint->accepting.load()){auto sender=endpoint->loop.sender();(void)endpoint->track(endpoint->tasks.post(sender,std::move(callback)));}
+            auto callback=std::move(callbacks.closed);auto* owner=parent;
+            auto endpoint=owner?owner->dispatch:std::shared_ptr<detail::DispatchState>{};cleanup();
+            try {
+                detail::defer_host_closed(std::move(callback), [owner, endpoint](auto call) {
+                    if (!owner || !endpoint || !endpoint->accepting.load()) return;
+                    auto sender=endpoint->loop.sender();
+                    if (!endpoint->track(endpoint->tasks.post(sender,std::move(call)))) {
+                        owner->remember_failure("Cannot deliver secondary window close");
+                        endpoint->loop.request_stop();
+                    }
+                });
+            } catch (...) {
+                if (owner && endpoint) {
+                    owner->remember_failure("Cannot defer secondary window close",std::current_exception());
+                    endpoint->loop.request_stop();
+                }
+            }
             return;
         }
         guard([&] { if (callbacks.closed) callbacks.closed(); });
@@ -358,6 +373,14 @@ struct Host::Impl {
             catch (...) { remember_failure("iiGUI close callback failed", std::current_exception()); }
         } @catch (NSException* error) { remember_failure(native_error(error)); }
         return accepted;
+    }
+    void close_by_request() noexcept {
+        if (phase != Phase::running) return;
+        if (embedded) {
+            if(may_close())did_close();
+        } else if (application_driver) {
+            if (may_close()) force_close();
+        } else guard([&] { [window performClose:nil]; });
     }
     void discard_timer() {
         if (timer) { CFRunLoopTimerInvalidate(timer); CFRelease(timer); timer = nullptr; }
@@ -393,11 +416,15 @@ struct Host::Impl {
             ++statistics.dispatches;
             if (!opened_delivered) {
                 opened_delivered = true;
-                if (callbacks.opened) callbacks.opened();
+                detail::deliver_host_opened(callbacks.opened);
+                if (phase == Phase::running) { activity.open(); if (!secondary) foreground.open(); }
             }
+            if (phase == Phase::running) activity.deliver();
+            if (phase == Phase::running && !secondary) foreground.deliver();
             if(phase==Phase::running&&!pending_files.empty()){
-                auto paths=std::exchange(pending_files,{});
-                if(callbacks.files_opened)callbacks.files_opened(std::move(paths));
+                auto call=callbacks.files_opened;
+                if(call)pending_files.deliver(std::move(call),[this]{if(phase==Phase::running)gate->signal();});
+                else pending_files.clear();
             }
             if (phase == Phase::running&&!secondary) dispatch->loop.poll(options.budget);
             if (phase == Phase::running && dispatch->loop.state()==runtime::LoopState::stopped) force_close();
@@ -412,20 +439,41 @@ struct Host::Impl {
         native.resize = [this] {
             if (phase != Phase::running) return;
             guard([&] {
+                const auto previous_size=state.size;
+                const auto previous_scale=state.backing_scale;
                 update_snapshot();
+                if(state.size==previous_size&&state.backing_scale==previous_scale)return;
                 canvas.dirty = true;
                 gate->signal();
                 if (opened_delivered && callbacks.resized) callbacks.resized(state.size);
             });
         };
+        native.backing_changed = [this] {
+            if (phase != Phase::running) return;
+            guard([&] {
+                const auto previous_size=state.size;
+                const auto previous_scale=state.backing_scale;
+                update_snapshot();
+                canvas.dirty=true;gate->signal();
+                if (opened_delivered && callbacks.resized &&
+                    (state.size!=previous_size || state.backing_scale!=previous_scale)) callbacks.resized(state.size);
+            });
+        };
         native.may_close = [this] { return may_close(); };
         native.did_close = [this] { guard([&] { did_close(); }); };
-        native.request_close = [this] { guard([&] { if (phase == Phase::running) [window performClose:nil]; }); };
+        native.request_close = [this] { close_by_request(); };
         native.frame = [this](double target,double interval) { display_frame(target,interval); };
-        native.files = [this](std::vector<std::string> paths){guard([&]{if(phase==Phase::running&&pending_files.size()+paths.size()<=256){for(auto& path:paths)pending_files.push_back(std::move(path));gate->signal();}});};
+        native.files = [this](std::vector<std::string> paths){bool accepted=false;guard([&]{if(phase==Phase::running&&callbacks.files_opened&&pending_files.admit(std::move(paths))){accepted=true;gate->signal();}});return accepted;};
+        native.activity = [this](bool value){guard([&]{if(!secondary && phase==Phase::running){activity.observe(value);gate->signal();}});};
+        native.application_hidden = [this](bool value){guard([&]{if(!secondary && phase==Phase::running){foreground.set_hidden(value);gate->signal();}});};
+        native.window_visible = [this](bool value){
+            if(phase!=Phase::running)return;
+            auto* primary=primary_host();
+            primary->guard([&]{if(primary->phase==Phase::running){primary->foreground.set_window_visible(this,value);primary->gate->signal();}});
+        };
         delegate = [IIGUIHostDelegate new];
         delegate->callbacks = &native;
-        if(!secondary){
+        if(!secondary && !external_application){
         application.delegate = delegate;
         [application setActivationPolicy:NSApplicationActivationPolicyRegular];
 
@@ -444,6 +492,22 @@ struct Host::Impl {
         application.mainMenu = menu;
         }
 
+        if(embedded){
+            NSView* parent=embedded_parent;
+            if(!parent || !parent.window)throw std::runtime_error("External parent view is detached");
+            window=parent.window;
+            auto* owner=this;auto center=NSNotificationCenter.defaultCenter;
+            external_close_observer=[center addObserverForName:NSWindowWillCloseNotification object:window queue:nil usingBlock:^(NSNotification*) {
+                owner->guard([&]{owner->did_close();});
+            }];
+            external_resize_observer=[center addObserverForName:NSWindowDidResizeNotification object:window queue:nil usingBlock:^(NSNotification*) {
+                if(owner->native.resize)owner->native.resize();
+            }];
+            if(!external_close_observer || !external_resize_observer)throw std::runtime_error("Cannot observe the external window");
+            external_backing_observer=std::make_unique<detail::CocoaBackingObserver>(center,window,[owner] {
+                if(owner->native.backing_changed)owner->native.backing_changed();
+            });
+        } else {
         window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, options.size.width, options.size.height)
             styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                       NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
@@ -453,6 +517,7 @@ struct Host::Impl {
         window.contentMinSize = NSMakeSize(options.minimum_size.width, options.minimum_size.height);
         window.delegate = delegate;
         [window center];
+        }
 
         CFRunLoopSourceContext context{};
         context.info = this;
@@ -463,14 +528,26 @@ struct Host::Impl {
         gate->attach(source);
         if(!secondary)dispatch->connect([wake=gate]() noexcept { wake->signal(); });
         phase = Phase::running;
-        [window makeKeyAndOrderFront:nil];
-        [application activateIgnoringOtherApps:YES];
+        const bool show_window = !embedded && detail::show_native_window(application_driver);
+        if (show_window) {
+            [window makeKeyAndOrderFront:nil];
+            [application activateIgnoringOtherApps:YES];
+        }
+        if(!secondary){activity.observe(application.active);foreground.set_hidden(application.hidden);}
+        if(show_window){auto* primary=primary_host();primary->foreground.open_window(this,!window.miniaturized);primary->gate->signal();}
         update_snapshot();
         gate->signal();
     }
     void cleanup() {
+        activity.close();
+        if (secondary) forget_foreground_window();
+        else foreground.close();
+        pending_files.clear();
         auto descendants=children;for(auto* child:descendants)child->force_close();children.clear();
         if(file_panel){[file_panel cancel:nil];file_panel=nil;}
+        external_backing_observer.reset();
+        if(external_close_observer){[NSNotificationCenter.defaultCenter removeObserver:external_close_observer];external_close_observer=nil;}
+        if(external_resize_observer){[NSNotificationCenter.defaultCenter removeObserver:external_resize_observer];external_resize_observer=nil;}
         stop_frames(true);
         dispatch->retire();
         if(!secondary)dispatch->loop.request_stop();
@@ -485,13 +562,13 @@ struct Host::Impl {
             CFRelease(source);
             source = nullptr;
         }
-        if (window) {
+        if (window && !embedded) {
             window.delegate = nil;
             [window orderOut:nil];
             [window close];
         }
         if (application.delegate == delegate) application.delegate = nil;
-        if(!secondary)application.mainMenu = previous_menu;
+        if(!secondary && !external_application)application.mainMenu = previous_menu;
         menu_commands=nil;
         if(parent){std::erase(parent->children,this);parent=nullptr;}
         if (delegate) delegate->callbacks = nullptr;
@@ -522,6 +599,29 @@ Host::~Host() {
 }
 UiExecutor Host::executor() const noexcept { return UiExecutor(impl_->dispatch); }
 bool Host::is_ui_thread() const noexcept { return impl_->on_owner(); }
+core::Result<void> Host::set_application_driver(bool enabled) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Application driver requires the owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Application driver must be configured before run");
+    if (enabled && impl_->options.frame_loop) return core::fail(core::ErrorCode::invalid_argument, "A hidden application driver cannot own a window frame loop");
+    impl_->application_driver = enabled;
+    return {};
+}
+core::Result<void> Host::set_application_activity_handler(std::function<void(bool)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor,"Application activity requires the host owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy,"Application activity must be configured before run");
+    impl_->activity.set_handler(std::move(handler)); return {};
+}
+core::Result<void> Host::set_application_foreground_handler(std::function<void(bool)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Application foreground requires the host owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Application foreground must be configured before run");
+    impl_->foreground.set_handler(std::move(handler)); return {};
+}
+core::Result<void> Host::set_failure_handler(std::function<void(const core::Error&)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Host failure handling requires the owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Host failure handling must be configured before run or show");
+    impl_->failure.set_handler(std::move(handler));
+    return {};
+}
 core::Result<void> Host::run(HostCallbacks callbacks) {
     if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Host::run requires the main thread");
     if (impl_->phase != Impl::Phase::created)
@@ -554,9 +654,63 @@ core::Result<void> Host::run(HostCallbacks callbacks) {
     if (impl_->failure) return std::unexpected(*impl_->failure);
     return {};
 }
+core::Result<void> Host::show_external(HostCallbacks callbacks) {
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires the main thread");
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"External host is single use");
+    if(impl_->options.event_loop || impl_->options.frame_loop)
+        return core::fail(core::ErrorCode::invalid_argument,"External host requires its own event pump");
+    if(impl_->activity.has_handler() || impl_->foreground.has_handler())
+        return core::fail(core::ErrorCode::invalid_argument,"The external application owns lifecycle notifications");
+    @autoreleasepool {
+        NSApplication* application=NSApplication.sharedApplication;
+        if(!application.running)return core::fail(core::ErrorCode::closed,"The external application event loop is not running");
+        impl_->external_application=true;
+        impl_->application=application;
+        impl_->callbacks=std::move(callbacks);
+        @try {
+            try { impl_->open_native(); }
+            catch (...) { impl_->cleanup(); return core::fail(core::ErrorCode::failed,"Cannot open external host window",std::current_exception()); }
+        } @catch(NSException* error) {
+            const auto message=native_error(error);impl_->cleanup();return core::fail(core::ErrorCode::failed,message);
+        }
+    }
+    return {};
+}
+core::Result<void> Host::attach_external(void* native_parent,HostCallbacks callbacks) {
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External surface requires the main thread");
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"External host is single use");
+    if(!native_parent)return core::fail(core::ErrorCode::invalid_argument,"External parent view is required");
+    if(impl_->application_driver || impl_->options.event_loop || impl_->options.frame_loop)
+        return core::fail(core::ErrorCode::invalid_argument,"External surface requires its own event pump");
+    if(impl_->options.renderer==Renderer::vulkan)
+        return core::fail(core::ErrorCode::unsupported,"Embedded surfaces require the transparent native renderer");
+    if(impl_->activity.has_handler() || impl_->foreground.has_handler())
+        return core::fail(core::ErrorCode::invalid_argument,"The external application owns lifecycle notifications");
+    @autoreleasepool {
+        NSApplication* application=NSApplication.sharedApplication;
+        if(!application.running)return core::fail(core::ErrorCode::closed,"The external application event loop is not running");
+        NSView* parent=(__bridge NSView*)native_parent;
+        if(![parent isKindOfClass:NSView.class] || !parent.window)
+            return core::fail(core::ErrorCode::invalid_argument,"External parent must be a view attached to a window");
+        impl_->external_application=true;impl_->embedded=true;impl_->embedded_parent=parent;
+        // Vulkan swapchains can select opaque composition. Use Metal for the
+        // borrowed window and let the owner fall back if it is unavailable.
+        impl_->options.renderer=Renderer::native;
+        impl_->application=application;impl_->callbacks=std::move(callbacks);
+        @try {
+            try { impl_->open_native(); }
+            catch (...) { impl_->cleanup(); return core::fail(core::ErrorCode::failed,"Cannot attach external host surface",std::current_exception()); }
+        } @catch(NSException* error) {
+            const auto message=native_error(error);impl_->cleanup();return core::fail(core::ErrorCode::failed,message);
+        }
+    }
+    return {};
+}
 core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
     if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Secondary windows require the owning main thread");
+    if(impl_->application_driver)return core::fail(core::ErrorCode::invalid_argument,"An application driver cannot be a secondary window");
     if(this==&parent||impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Secondary windows are single use");
+    if(impl_->activity.has_handler()||impl_->foreground.has_handler())return core::fail(core::ErrorCode::invalid_argument,"Application lifecycle belongs to the primary host");
     if(auto ready=parent.impl_->ready();!ready)return ready;
     if(impl_->options.event_loop&&impl_->options.event_loop!=&parent.impl_->dispatch->loop)return core::fail(core::ErrorCode::invalid_argument,"Secondary windows must share their parent's EventLoop");
     if(impl_->options.frame_loop)return core::fail(core::ErrorCode::invalid_argument,"A secondary window manages its own display cadence");
@@ -586,6 +740,7 @@ core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogComplet
 }
 core::Result<void> Host::window_action(WindowAction action){
     if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");
     switch(action){
     case WindowAction::restore:[impl_->window deminiaturize:nil];if(impl_->window.zoomed)[impl_->window zoom:nil];[impl_->window makeKeyAndOrderFront:nil];break;
     case WindowAction::minimize:[impl_->window miniaturize:nil];break;
@@ -597,7 +752,7 @@ core::Result<void> Host::window_action(WindowAction action){
 }
 core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){
     if(auto ready=impl_->ready();!ready)return ready;
-    if(impl_->secondary)return core::fail(core::ErrorCode::invalid_argument,"The primary Host owns the application menu");
+    if(impl_->secondary || impl_->external_application)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls the application menu");
     if(!detail::valid_menu(items))return core::fail(core::ErrorCode::invalid_argument,"Invalid application menu");
     auto ui=executor();NSMutableArray<IIGUIAppCommand*>* commands=[NSMutableArray new];
     const auto build=[&](auto&& self,const std::vector<AppMenuItem>& rows)->NSMenu*{
@@ -617,6 +772,7 @@ core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){
 }
 core::Result<void> Host::set_title(std::string_view title) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");
     if (!detail::valid_title(title)) return core::fail(core::ErrorCode::invalid_argument, "Title must be UTF-8 without embedded NUL");
     std::string value(title);
     impl_->window.title = native_text(value);
@@ -635,6 +791,7 @@ core::Result<void> Host::set_text(std::string_view text) {
 }
 core::Result<void> Host::set_content_size(Size size) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");
     if (!valid_size(size) || size.width < impl_->options.minimum_size.width ||
         size.height < impl_->options.minimum_size.height)
         return core::fail(core::ErrorCode::invalid_argument, "Content size must be finite and at least the window minimum");
@@ -644,6 +801,7 @@ core::Result<void> Host::set_content_size(Size size) {
 }
 core::Result<void> Host::set_window_geometry(const WindowGeometry& update) {
     if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");
     impl_->update_snapshot();
     const WindowGeometryValue previous{impl_->state.title,impl_->state.size,impl_->options.minimum_size};
     auto next=resolve_window_geometry(previous,update);if(!next)return std::unexpected(next.error());
@@ -663,14 +821,14 @@ core::Result<void> Host::set_window_geometry(const WindowGeometry& update) {
 }
 core::Result<void> Host::request_close() {
     if (auto ready = impl_->ready(); !ready) return ready;
-    [impl_->window performClose:nil];
+    impl_->close_by_request();
     return {};
 }
 core::Result<void> Host::set_canvas(CanvasFrame frame) {
     if(frame.renderer==Renderer::automatic)frame.renderer=impl_->options.renderer;
     if (auto ready = impl_->ready(); !ready) return ready;
     if (impl_->mounting) return core::fail(core::ErrorCode::busy, "A widget factory is active");
-    auto result = impl_->canvas.set(std::move(frame), (__bridge void*)impl_->window.contentView,
+    auto result = impl_->canvas.set(std::move(frame), (__bridge void*)impl_->native_parent(),
                                    nullptr, impl_->state.backing_scale,impl_->presentations);
     if (result) {
         if (impl_->widgets) { impl_->widgets->close(); impl_->widgets.reset(); }
@@ -696,7 +854,7 @@ core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory, const Widge
             }, appearance,std::move(hooks));
             if (auto built = replacement->construct(std::move(factory)); !built) return std::unexpected(built.error());
             if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
-            if (auto attached = replacement->attach((__bridge void*)impl_->window.contentView); !attached)
+            if (auto attached = replacement->attach((__bridge void*)impl_->native_parent(), detail::make_native_widget_surface); !attached)
                 return std::unexpected(attached.error());
             if(auto committed=replacement->commit_window_properties();!committed)return std::unexpected(committed.error());
             impl_->canvas.clear();
@@ -753,6 +911,21 @@ core::Result<WindowSnapshot> Host::snapshot() const {
     if (impl_->phase == Impl::Phase::created) return core::fail(core::ErrorCode::closed, "Window has not opened");
     impl_->update_snapshot();
     return impl_->state;
+}
+core::Result<DisplayPixels> Host::display_pixels() const {
+    if (auto ready=impl_->ready(); !ready) return std::unexpected(ready.error());
+    NSScreen* screen=impl_->window.screen;
+    if (!screen) return core::fail(core::ErrorCode::busy,"The window display is not yet available");
+    NSNumber* number=screen.deviceDescription[@"NSScreenNumber"];
+    if (!number) return core::fail(core::ErrorCode::busy,"The window display identifier is unavailable");
+    CGDisplayModeRef mode=CGDisplayCopyDisplayMode(CGDirectDisplayID(number.unsignedIntValue));
+    if (!mode) return core::fail(core::ErrorCode::busy,"The window display mode is unavailable");
+    const auto width=CGDisplayModeGetPixelWidth(mode),height=CGDisplayModeGetPixelHeight(mode);
+    CGDisplayModeRelease(mode);
+    const auto frame=screen.frame.size;
+    const auto pixels=detail::oriented_display_pixels(width,height,frame.width,frame.height);
+    if (!pixels) return core::fail(core::ErrorCode::failed,"The window display mode has invalid dimensions");
+    return *pixels;
 }
 core::Result<HostStats> Host::stats() const {
     if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Stats require the main thread");

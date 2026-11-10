@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/Renderers.md",
-    "sha256": "37c75541a415c183d4bf10dc125a7b73ae13e030faf26622b6c527fe1897c5eb",
-    "bytes": 7346,
-    "line_count": 132,
+    "sha256": "d950f5bead6dfedba217a9ae66bc14751d74d2ca833581ed8519262a5a581c6c",
+    "bytes": 7644,
+    "line_count": 137,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -42,22 +42,22 @@
       "id": "b000003",
       "kind": "paragraph",
       "start_line": 3,
-      "end_line": 7,
-      "raw": "iiGUI uses the platform window system directly and provides native font\nmeasurement and GPU graphics. The application may compose it with LVUI, whose\ndocument adapter owns the corresponding box layout.\nQt, a browser engine, WebView, SDL and a JavaScript application runtime are\nnot part of this rendering path.\n"
+      "end_line": 6,
+      "raw": "자체 위젯은 OS 컨트롤 대신 [GPU 장면](GpuSceneComposition.md)으로 표시한다.\nLinux의 기본 방향은 직접 Wayland이며 X11은 더 이상 권장하지 않는 레거시 호스트이다.\n플랫폼 글꼴 래스터화와 장치 선택의 한계는\n해당 문서에 구분한다.\n"
     },
     {
       "id": "b000004",
       "kind": "blank",
-      "start_line": 8,
-      "end_line": 8,
+      "start_line": 7,
+      "end_line": 7,
       "raw": "\n"
     },
     {
       "id": "b000005",
       "kind": "paragraph",
-      "start_line": 9,
+      "start_line": 8,
       "end_line": 12,
-      "raw": "이 문서는 기존 데스크톱 GPU 경로를 설명한다. 직접 Wayland는 xdg-shell/Vulkan,\nAndroid는 NativeActivity/Vulkan, Web은 C++23 AOT Wasm/OffscreenCanvas/WebGL2로\n확장되었다. Web에는 브라우저 API bridge가 존재한다. 새 대상의 지원 범위·선택·제약은\n[HostPlatforms.md](HostPlatforms.md)를 기준으로 삼는다.\n"
+      "raw": "iiGUI uses the platform window system directly and provides native font\nmeasurement and GPU graphics. The application may compose it with LVUI, whose\ndocument adapter owns the corresponding box layout.\nQt, a browser engine, WebView, SDL and a JavaScript application runtime are\nnot part of this rendering path.\n"
     },
     {
       "id": "b000006",
@@ -68,9 +68,23 @@
     },
     {
       "id": "b000007",
-      "kind": "table",
+      "kind": "paragraph",
       "start_line": 14,
+      "end_line": 17,
+      "raw": "이 문서는 기존 데스크톱 GPU 경로를 설명한다. 직접 Wayland는 xdg-shell/Vulkan,\nAndroid는 NativeActivity/Vulkan, Web은 C++23 AOT Wasm/OffscreenCanvas/WebGL2로\n확장되었다. Web에는 브라우저 API bridge가 존재한다. 새 대상의 지원 범위·선택·제약은\n[HostPlatforms.md](HostPlatforms.md)를 기준으로 삼는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 18,
       "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "table",
+      "start_line": 19,
+      "end_line": 23,
       "raw": "| Platform | Window/text host | Automatic graphics selection |\n|---|---|---|\n| macOS | Cocoa/AppKit, native text shaping, NSView/CAMetalLayer | Metal, then Vulkan/MoltenVK on native accelerator failure |\n| Windows | Win32, DirectWrite/Direct2D, native child HWND | Direct3D 11 hardware, then Vulkan on native accelerator failure |\n| Linux | Wayland/xdg-shell 또는 X11, Pango/Cairo | Vulkan directly |\n",
       "columns": [
         "Platform",
@@ -96,20 +110,6 @@
       ]
     },
     {
-      "id": "b000008",
-      "kind": "blank",
-      "start_line": 19,
-      "end_line": 19,
-      "raw": "\n"
-    },
-    {
-      "id": "b000009",
-      "kind": "paragraph",
-      "start_line": 20,
-      "end_line": 23,
-      "raw": "The previous Linux EGL/GLES renderer is retired from this source. WARP is no\nlonger the automatic Windows fallback. `GraphicsApi::opengl_es3` retains its\nold enum value for source compatibility; it does not enable a GLES backend.\nDirect Wayland and mobile host contracts are documented in HostPlatforms.md.\n"
-    },
-    {
       "id": "b000010",
       "kind": "blank",
       "start_line": 24,
@@ -118,39 +118,53 @@
     },
     {
       "id": "b000011",
-      "kind": "heading",
+      "kind": "paragraph",
       "start_line": 25,
-      "end_line": 25,
+      "end_line": 28,
+      "raw": "The previous Linux EGL/GLES renderer is retired from this source. WARP is no\nlonger the automatic Windows fallback. `GraphicsApi::opengl_es3` retains its\nold enum value for source compatibility; it does not enable a GLES backend.\nDirect Wayland and mobile host contracts are documented in HostPlatforms.md.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "heading",
+      "start_line": 30,
+      "end_line": 30,
       "raw": "## Selection and failures\n",
       "level": 2,
       "title": "Selection and failures"
     },
     {
-      "id": "b000012",
-      "kind": "blank",
-      "start_line": 26,
-      "end_line": 26,
-      "raw": "\n"
-    },
-    {
-      "id": "b000013",
-      "kind": "paragraph",
-      "start_line": 27,
-      "end_line": 27,
-      "raw": "`CanvasFrame::renderer` and `Host::set_view(document, renderer)` accept:\n"
-    },
-    {
       "id": "b000014",
       "kind": "blank",
-      "start_line": 28,
-      "end_line": 28,
+      "start_line": 31,
+      "end_line": 31,
       "raw": "\n"
     },
     {
       "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "`CanvasFrame::renderer` and `Host::set_view(document, renderer)` accept:\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
       "kind": "list",
-      "start_line": 29,
-      "end_line": 34,
+      "start_line": 34,
+      "end_line": 39,
       "raw": "- `Renderer::automatic` (default): try the platform-specific accelerator;\n  if initialization or a drawing operation fails, switch to Vulkan. Linux\n  starts with Vulkan and reports this as its default, not as a failure.\n- `Renderer::native`: require the platform-specific accelerator; return its\n  failure instead of silently choosing another API. Linux rejects this mode.\n- `Renderer::vulkan`: use Vulkan directly, including for verification.\n",
       "items": [
         {
@@ -171,226 +185,226 @@
       ]
     },
     {
-      "id": "b000016",
+      "id": "b000018",
       "kind": "blank",
-      "start_line": 35,
-      "end_line": 35,
+      "start_line": 40,
+      "end_line": 40,
       "raw": "\n"
     },
     {
-      "id": "b000017",
+      "id": "b000019",
       "kind": "fenced_code",
-      "start_line": 36,
-      "end_line": 43,
+      "start_line": 41,
+      "end_line": 48,
       "raw": "```cpp\n#include <LVUI/NativeDocument.h> // Application composes LVUI and iiGUI.\nauto document = lvui::parse(source);\n// Production default: Metal/Direct3D hardware first, Vulkan fallback.\nauto shown = host.set_view(*document);\n// Explicit Vulkan uses exactly the same document/layout/text contract.\nauto checked_vulkan = host.set_view(*document, ii::gui::Renderer::vulkan);\n```\n",
       "language": "cpp",
       "code": "#include <LVUI/NativeDocument.h> // Application composes LVUI and iiGUI.\nauto document = lvui::parse(source);\n// Production default: Metal/Direct3D hardware first, Vulkan fallback.\nauto shown = host.set_view(*document);\n// Explicit Vulkan uses exactly the same document/layout/text contract.\nauto checked_vulkan = host.set_view(*document, ii::gui::Renderer::vulkan);\n",
       "closed": true
     },
     {
-      "id": "b000018",
-      "kind": "blank",
-      "start_line": 44,
-      "end_line": 44,
-      "raw": "\n"
-    },
-    {
-      "id": "b000019",
-      "kind": "paragraph",
-      "start_line": 45,
-      "end_line": 50,
-      "raw": "After a successful automatic switch, the canvas keeps Vulkan until cleared or\nits selection/acceleration policy changes. It does not repeatedly retry a\nbroken native device every frame. `GraphicsInfo::api`, `adapter`, `hardware`,\n`fallback` and `fallback_reason` report the actual result. A failed native\nattempt and failed Vulkan attempt are both retained in the returned error.\nResources are created/destroyed on the owning UI thread.\n"
-    },
-    {
       "id": "b000020",
       "kind": "blank",
-      "start_line": 51,
-      "end_line": 51,
+      "start_line": 49,
+      "end_line": 49,
       "raw": "\n"
     },
     {
       "id": "b000021",
       "kind": "paragraph",
-      "start_line": 52,
-      "end_line": 59,
-      "raw": "Acceleration policy is separate from API selection. `prefer_hardware` permits\na software/unknown Vulkan implementation when no classified GPU is available;\nhardware adapters are preferred. `require_hardware` accepts only a reported\nintegrated or discrete Vulkan GPU. CPU, virtual and unknown device types cannot\nsatisfy the strict policy. Vulkan is an API fallback, not a guarantee that any\nmachine has a usable GPU/driver. Failure of Vulkan itself enters the host's\nnormal error/cleanup path; automatic recovery from Vulkan device loss and hot\ndevice migration are not implemented.\n"
+      "start_line": 50,
+      "end_line": 55,
+      "raw": "After a successful automatic switch, the canvas keeps Vulkan until cleared or\nits selection/acceleration policy changes. It does not repeatedly retry a\nbroken native device every frame. `GraphicsInfo::api`, `adapter`, `hardware`,\n`fallback` and `fallback_reason` report the actual result. A failed native\nattempt and failed Vulkan attempt are both retained in the returned error.\nResources are created/destroyed on the owning UI thread.\n"
     },
     {
       "id": "b000022",
       "kind": "blank",
-      "start_line": 60,
-      "end_line": 60,
+      "start_line": 56,
+      "end_line": 56,
       "raw": "\n"
     },
     {
       "id": "b000023",
       "kind": "paragraph",
-      "start_line": 61,
-      "end_line": 67,
-      "raw": "On macOS, MoltenVK translates Vulkan into Metal. It provides a different API\nand pipeline implementation, not a second physical graphics system. Missing\nMetal hardware or a broken underlying Metal driver can prevent both paths.\nThis follows the [Vulkan portability model](https://docs.vulkan.org/guide/latest/portability_initiative.html).\nWhen advertised, the renderer enables portability enumeration and the device's\nportability-subset extension, following the\n[Khronos contract](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_portability_enumeration.html).\n"
+      "start_line": 57,
+      "end_line": 64,
+      "raw": "Acceleration policy is separate from API selection. `prefer_hardware` permits\na software/unknown Vulkan implementation when no classified GPU is available;\nhardware adapters are preferred. `require_hardware` accepts only a reported\nintegrated or discrete Vulkan GPU. CPU, virtual and unknown device types cannot\nsatisfy the strict policy. Vulkan is an API fallback, not a guarantee that any\nmachine has a usable GPU/driver. Failure of Vulkan itself enters the host's\nnormal error/cleanup path; automatic recovery from Vulkan device loss and hot\ndevice migration are not implemented.\n"
     },
     {
       "id": "b000024",
       "kind": "blank",
-      "start_line": 68,
-      "end_line": 68,
+      "start_line": 65,
+      "end_line": 65,
       "raw": "\n"
     },
     {
       "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 66,
+      "end_line": 72,
+      "raw": "On macOS, MoltenVK translates Vulkan into Metal. It provides a different API\nand pipeline implementation, not a second physical graphics system. Missing\nMetal hardware or a broken underlying Metal driver can prevent both paths.\nThis follows the [Vulkan portability model](https://docs.vulkan.org/guide/latest/portability_initiative.html).\nWhen advertised, the renderer enables portability enumeration and the device's\nportability-subset extension, following the\n[Khronos contract](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_portability_enumeration.html).\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 73,
+      "end_line": 73,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
       "kind": "heading",
-      "start_line": 69,
-      "end_line": 69,
+      "start_line": 74,
+      "end_line": 74,
       "raw": "## Vulkan implementation\n",
       "level": 2,
       "title": "Vulkan implementation"
     },
     {
-      "id": "b000026",
-      "kind": "blank",
-      "start_line": 70,
-      "end_line": 70,
-      "raw": "\n"
-    },
-    {
-      "id": "b000027",
-      "kind": "paragraph",
-      "start_line": 71,
-      "end_line": 77,
-      "raw": "The shared C++23 renderer uses `VK_KHR_swapchain` and a private native surface:\n`VK_EXT_metal_surface`, `VK_KHR_win32_surface` or `VK_KHR_xlib_surface`.\nPublic headers expose no Vulkan or platform handle. The selected queue must\nsupport both graphics and presentation. SDR sRGB surface/image formats and\nGPU blits are checked before use.\nStorage-buffer ranges and the actual sRGB image-usage/dimension capabilities\nare checked against the selected device before allocation.\n"
-    },
-    {
       "id": "b000028",
       "kind": "blank",
-      "start_line": 78,
-      "end_line": 78,
+      "start_line": 75,
+      "end_line": 75,
       "raw": "\n"
     },
     {
       "id": "b000029",
       "kind": "paragraph",
-      "start_line": 79,
-      "end_line": 85,
-      "raw": "Instanced rounded panels use the same gradient, analytic coverage and\nlinear-light premultiplied blending equations as the Metal/Direct3D paths.\nNative glyph rasterization uploads encoded-sRGB text to an sRGB image and\ncomposites in linear light. Rendering targets a retained RGBA8 sRGB image;\nGPU blits present it through a FIFO native swapchain. Equal scenes retain the\nimage. Explicit capture copies it to host-visible memory, with a fence and\ntransfer-to-host visibility barrier; normal presentation performs no readback.\n"
+      "start_line": 76,
+      "end_line": 82,
+      "raw": "The shared C++23 renderer uses `VK_KHR_swapchain` and a private native surface:\n`VK_EXT_metal_surface`, `VK_KHR_win32_surface` or `VK_KHR_xlib_surface`.\nPublic headers expose no Vulkan or platform handle. The selected queue must\nsupport both graphics and presentation. SDR sRGB surface/image formats and\nGPU blits are checked before use.\nStorage-buffer ranges and the actual sRGB image-usage/dimension capabilities\nare checked against the selected device before allocation.\n"
     },
     {
       "id": "b000030",
       "kind": "blank",
-      "start_line": 86,
-      "end_line": 86,
+      "start_line": 83,
+      "end_line": 83,
       "raw": "\n"
     },
     {
       "id": "b000031",
       "kind": "paragraph",
-      "start_line": 87,
-      "end_line": 92,
-      "raw": "One graphics command stream is owned by the UI thread. Fence completion bounds\nresource reuse; presentation semaphores are allocated per swapchain image so\nthey are reused only after acquiring that image again. Resize drains the device\nand recreates the swapchain/attachment. Zero-sized/temporarily unavailable\nsurfaces defer presentation; a later host invalidation/update can retry.\nThis is not an automatic animation timer or partial-damage renderer.\n"
+      "start_line": 84,
+      "end_line": 90,
+      "raw": "Instanced rounded panels use the same gradient, analytic coverage and\nlinear-light premultiplied blending equations as the Metal/Direct3D paths.\nNative glyph rasterization uploads encoded-sRGB text to an sRGB image and\ncomposites in linear light. Rendering targets a retained RGBA8 sRGB image;\nGPU blits present it through a FIFO native swapchain. Equal scenes retain the\nimage. Explicit capture copies it to host-visible memory, with a fence and\ntransfer-to-host visibility barrier; normal presentation performs no readback.\n"
     },
     {
       "id": "b000032",
       "kind": "blank",
-      "start_line": 93,
-      "end_line": 93,
+      "start_line": 91,
+      "end_line": 91,
       "raw": "\n"
     },
     {
       "id": "b000033",
-      "kind": "heading",
-      "start_line": 94,
-      "end_line": 94,
-      "raw": "## Build and shader source\n",
-      "level": 2,
-      "title": "Build and shader source"
+      "kind": "paragraph",
+      "start_line": 92,
+      "end_line": 97,
+      "raw": "One graphics command stream is owned by the UI thread. Fence completion bounds\nresource reuse; presentation semaphores are allocated per swapchain image so\nthey are reused only after acquiring that image again. Resize drains the device\nand recreates the swapchain/attachment. Zero-sized/temporarily unavailable\nsurfaces defer presentation; a later host invalidation/update can retry.\nThis is not an automatic animation timer or partial-damage renderer.\n"
     },
     {
       "id": "b000034",
-      "kind": "blank",
-      "start_line": 95,
-      "end_line": 95,
-      "raw": "\n"
-    },
-    {
-      "id": "b000035",
-      "kind": "paragraph",
-      "start_line": 96,
-      "end_line": 97,
-      "raw": "All desktop builds now require Vulkan 1.1+ development headers and a loader/\ndriver library. Install a target Vulkan SDK, or pass explicit target paths:\n"
-    },
-    {
-      "id": "b000036",
       "kind": "blank",
       "start_line": 98,
       "end_line": 98,
       "raw": "\n"
     },
     {
-      "id": "b000037",
-      "kind": "fenced_code",
+      "id": "b000035",
+      "kind": "heading",
       "start_line": 99,
-      "end_line": 109,
+      "end_line": 99,
+      "raw": "## Build and shader source\n",
+      "level": 2,
+      "title": "Build and shader source"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 100,
+      "end_line": 100,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 101,
+      "end_line": 102,
+      "raw": "All desktop builds now require Vulkan 1.1+ development headers and a loader/\ndriver library. Install a target Vulkan SDK, or pass explicit target paths:\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 103,
+      "end_line": 103,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "fenced_code",
+      "start_line": 104,
+      "end_line": 114,
       "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan\n```\n",
       "language": "sh",
       "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan\n",
       "closed": true
     },
     {
-      "id": "b000038",
-      "kind": "blank",
-      "start_line": 110,
-      "end_line": 110,
-      "raw": "\n"
-    },
-    {
-      "id": "b000039",
-      "kind": "paragraph",
-      "start_line": 111,
-      "end_line": 117,
-      "raw": "Use the target's Vulkan loader on Windows/Linux and MoltenVK on macOS; the\nexample library path above is illustrative, not a macOS path. Installed static\nconsumers receive `Vulkan::Vulkan` through CMake dependency discovery. If the\nVulkan SDK is outside normal search paths, provide the same two cache variables\nto the consumer. Runtime loader paths remain a deployment responsibility;\nverification removes inherited DYLD overrides and checks a relocated consumer.\nNo Vulkan dependency is added to LVUI or iiSDKCore.\n"
-    },
-    {
       "id": "b000040",
       "kind": "blank",
-      "start_line": 118,
-      "end_line": 118,
+      "start_line": 115,
+      "end_line": 115,
       "raw": "\n"
     },
     {
       "id": "b000041",
       "kind": "paragraph",
-      "start_line": 119,
-      "end_line": 121,
-      "raw": "GLSL sources are in `src/shaders`. Checked-in `VulkanShaders.h` contains their\nSPIR-V, so consumers do not need a runtime or build-time shader compiler.\nAfter editing GLSL, regenerate using the official Khronos tool:\n"
+      "start_line": 116,
+      "end_line": 122,
+      "raw": "Use the target's Vulkan loader on Windows/Linux and MoltenVK on macOS; the\nexample library path above is illustrative, not a macOS path. Installed static\nconsumers receive `Vulkan::Vulkan` through CMake dependency discovery. If the\nVulkan SDK is outside normal search paths, provide the same two cache variables\nto the consumer. Runtime loader paths remain a deployment responsibility;\nverification removes inherited DYLD overrides and checks a relocated consumer.\nNo Vulkan dependency is added to LVUI or iiSDKCore.\n"
     },
     {
       "id": "b000042",
       "kind": "blank",
-      "start_line": 122,
-      "end_line": 122,
+      "start_line": 123,
+      "end_line": 123,
       "raw": "\n"
     },
     {
       "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 124,
+      "end_line": 126,
+      "raw": "GLSL sources are in `src/shaders`. Checked-in `VulkanShaders.h` contains their\nSPIR-V, so consumers do not need a runtime or build-time shader compiler.\nAfter editing GLSL, regenerate using the official Khronos tool:\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 127,
+      "end_line": 127,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
       "kind": "fenced_code",
-      "start_line": 123,
-      "end_line": 125,
+      "start_line": 128,
+      "end_line": 130,
       "raw": "```sh\npython3 -B tools/compile_vulkan_shaders.py /path/to/glslang\n```\n",
       "language": "sh",
       "code": "python3 -B tools/compile_vulkan_shaders.py /path/to/glslang\n",
       "closed": true
     },
     {
-      "id": "b000044",
+      "id": "b000046",
       "kind": "blank",
-      "start_line": 126,
-      "end_line": 126,
+      "start_line": 131,
+      "end_line": 131,
       "raw": "\n"
     },
     {
-      "id": "b000045",
+      "id": "b000047",
       "kind": "paragraph",
-      "start_line": 127,
-      "end_line": 132,
+      "start_line": 132,
+      "end_line": 137,
       "raw": "The shader guard checks source hashes and SPIR-V magic. Renderer policy tests\ninject deterministic private backend failures; real forced-Vulkan tests verify\npanel colors/alpha/antialiasing, native glyph pixels/clipping, swapchain\npresentation, resize, equal-scene reuse and the installed consumer. A policy\ntest is not evidence that a physical Metal/DirectX device was made unavailable.\nRuntime evidence must name its actual platform/device and API.\n"
     }
   ],
@@ -404,49 +418,49 @@
       "start_line": 1
     },
     {
-      "block_id": "b000011",
+      "block_id": "b000013",
       "parent_id": "b000001",
       "level": 2,
       "title": "Selection and failures",
       "anchor": "selection-and-failures",
-      "start_line": 25
+      "start_line": 30
     },
     {
-      "block_id": "b000025",
+      "block_id": "b000027",
       "parent_id": "b000001",
       "level": 2,
       "title": "Vulkan implementation",
       "anchor": "vulkan-implementation",
-      "start_line": 69
+      "start_line": 74
     },
     {
-      "block_id": "b000033",
+      "block_id": "b000035",
       "parent_id": "b000001",
       "level": 2,
       "title": "Build and shader source",
       "anchor": "build-and-shader-source",
-      "start_line": 94
+      "start_line": 99
     }
   ],
   "indexes": {
     "directive_candidates": [
       {
-        "block_id": "b000027",
-        "line": 73,
+        "block_id": "b000029",
+        "line": 78,
         "text": "Public headers expose no Vulkan or platform handle. The selected queue must",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000041",
-        "line": 120,
+        "block_id": "b000043",
+        "line": 125,
         "text": "SPIR-V, so consumers do not need a runtime or build-time shader compiler.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000045",
-        "line": 132,
+        "block_id": "b000047",
+        "line": 137,
         "text": "Runtime evidence must name its actual platform/device and API.",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -454,42 +468,49 @@
     ],
     "commands": [
       {
-        "block_id": "b000037",
+        "block_id": "b000039",
         "language": "sh",
         "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan\n"
       },
       {
-        "block_id": "b000043",
+        "block_id": "b000045",
         "language": "sh",
         "code": "python3 -B tools/compile_vulkan_shaders.py /path/to/glslang\n"
       }
     ],
     "links": [
       {
-        "block_id": "b000005",
+        "block_id": "b000003",
+        "label": "GPU 장면",
+        "target": "GpuSceneComposition.md",
+        "kind": "relative",
+        "line": 3
+      },
+      {
+        "block_id": "b000007",
         "label": "HostPlatforms.md",
         "target": "HostPlatforms.md",
         "kind": "relative",
-        "line": 12
+        "line": 17
       },
       {
-        "block_id": "b000023",
+        "block_id": "b000025",
         "label": "Vulkan portability model",
         "target": "https://docs.vulkan.org/guide/latest/portability_initiative.html",
         "kind": "external",
-        "line": 64
+        "line": 69
       },
       {
-        "block_id": "b000023",
+        "block_id": "b000025",
         "label": "Khronos contract",
         "target": "https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_portability_enumeration.html",
         "kind": "external",
-        "line": 67
+        "line": 72
       }
     ],
     "tables": [
       {
-        "block_id": "b000007",
+        "block_id": "b000009",
         "columns": [
           "Platform",
           "Window/text host",

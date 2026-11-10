@@ -67,7 +67,9 @@ ctest --test-dir build --output-on-failure
 open build/examples/HelloWorld/HelloWorld.app
 ```
 
-`examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`
+The HelloWorld configuration explicitly requests one Core worker before the
+native host starts, so its background result does not depend on an implicit
+worker pool. `examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`
 at build time into `HelloWorld.generated.h`. C++23 then compiles the generated
 native construction calls and scoped backend callbacks. The app binary does
 not call or contain the LVUI parser/compiler, and needs neither the source file

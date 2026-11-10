@@ -15,10 +15,10 @@ int main() {
     using namespace ii::gui::detail;
     try {
         auto finger = touch_input(WidgetInputKind::pointer_down,
-                                 {.x=21, .y=34, .timestamp=12, .identity=42});
+                                 {.x=21, .y=34, .timestamp=12, .identity=42, .tap_count=2});
         check(finger.device == PointerDevice::touch && finger.pressure == 1 &&
               finger.buttons == 1 && finger.x == 21 && finger.y == 34 &&
-              finger.device_id == 42 && finger.timestamp == 12,
+              finger.device_id == 42 && finger.timestamp == 12 && finger.native_click_count == 2,
               "Finger coordinates, identity or contact were lost");
         auto pencil = touch_input(WidgetInputKind::pointer_move,
                                   {.force=2, .maximum_force=4,
@@ -35,6 +35,8 @@ int main() {
               "Pressure clamping or azimuth conversion is incorrect");
         auto up = touch_input(WidgetInputKind::pointer_up, {.pencil=true});
         check(up.buttons == 0, "Pencil release retained contact");
+        auto moved = touch_input(WidgetInputKind::pointer_move, {.tap_count=2});
+        check(moved.native_click_count == 0, "Tap count leaked into a pointer move");
         WidgetInput space{.kind=WidgetInputKind::key_down,.key=WidgetKey::space};
         check(mobile_text_service_key(space,true)&&!mobile_text_service_key(space,false),
               "UIKit space did not distinguish an editor from a button");

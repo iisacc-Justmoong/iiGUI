@@ -1,4 +1,5 @@
 #include <iiGUI/NativeWidgets.h>
+#include <iiGUI/Host.h>
 #include <iostream>
 #include <limits>
 #include <stdexcept>

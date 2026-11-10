@@ -7,29 +7,29 @@ namespace {
 void check(bool value,const char* message) { if (!value) throw std::runtime_error(message); }
 struct Native {
     static inline int created=0,drawn=0,destroyed=0;
-    static inline bool fail_init=false,fail_draw=false;
+    static inline bool fail_init=false,fail_draw=false,scene_support=false;
     Native(void*,void*,Acceleration) { ++created; if (fail_init) throw std::runtime_error("native unavailable"); }
     ~Native() { ++destroyed; }
     void draw(const CanvasFrame&,double,double) { ++drawn; if (fail_draw) throw std::runtime_error("device lost"); }
     PixelBuffer capture() { return {}; }
-    GraphicsInfo info() const { return {.api=GraphicsApi::metal,.hardware=true}; }
+    GraphicsInfo info() const { return {.api=GraphicsApi::metal,.hardware=true,.backdrop_supported=true,.scene_sources_supported=scene_support}; }
     bool native_event(const void*) { return true; }
 };
 struct Vulkan {
     static inline int created=0,drawn=0;
-    static inline bool fail_init=false,software=false;
+    static inline bool fail_init=false,software=false,scene_support=false;
     Vulkan(void*,void*,Acceleration acceleration) {
         ++created;
         if (fail_init || (software && acceleration==Acceleration::require_hardware)) throw std::runtime_error("Vulkan unavailable");
     }
     void draw(const CanvasFrame&,double,double) { ++drawn; }
     PixelBuffer capture() { return {}; }
-    GraphicsInfo info() const { return {.api=GraphicsApi::vulkan,.hardware=!software}; }
+    GraphicsInfo info() const { return {.api=GraphicsApi::vulkan,.hardware=!software,.backdrop_supported=true,.scene_sources_supported=scene_support}; }
     bool native_event(const void*) { return false; }
 };
 using Chain=ii::gui::detail::RendererChain<Native,Vulkan>;
 void reset() { Native::created=Native::drawn=Native::destroyed=Vulkan::created=Vulkan::drawn=0;
-    Native::fail_init=Native::fail_draw=Vulkan::fail_init=Vulkan::software=false; }
+    Native::fail_init=Native::fail_draw=Native::scene_support=Vulkan::fail_init=Vulkan::software=Vulkan::scene_support=false; }
 template<class F> std::string failure(F&& f) {
     try { f(); } catch (const std::exception& e) { return e.what(); }
     throw std::runtime_error("Expected failure");
@@ -48,6 +48,40 @@ int main() {
         { Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::automatic);
             chain.draw(frame,1,100); chain.draw(frame,1,100);
             check(Native::drawn==1 && Native::destroyed==1 && Vulkan::drawn==2 && chain.info().fallback,"Draw failure switches once and preserves rendering"); }
+        reset();Native::fail_draw=true;Native::scene_support=true;
+        { auto graph=frame;graph.scenes.push_back({.viewport=frame.viewport});graph.overlays.push_back({.backdrop=BackdropMaterial{.bounds={0,0,20,20},.content_scene=0}});
+            Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::automatic);
+            const auto unsupported=failure([&]{chain.draw(graph,1,100);});
+            check(unsupported.find("source scenes")!=unsupported.npos&&Vulkan::drawn==0&&!chain.info().fallback,
+                "Fallback silently ignored an unsupported source scene");
+            Vulkan::scene_support=true;chain.draw(graph,1,100);
+            check(Vulkan::drawn==1&&chain.info().fallback,"Compatible fallback did not render the scene graph"); }
+        for(const auto policy:{Renderer::automatic,Renderer::native}) {
+            reset();Native::scene_support=true;
+            auto graph=frame;graph.scenes.push_back({.viewport=frame.viewport});
+            graph.overlays.push_back({.backdrop=BackdropMaterial{.bounds={0,0,20,20},.content_scene=0}});
+            Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,policy);
+            chain.prepare(graph);chain.draw(graph,1,100);
+            check(Native::drawn==1&&Vulkan::created==0&&!chain.info().fallback,
+                "Scene-capable native renderer was replaced or rejected");
+        }
+        reset();Vulkan::scene_support=true;
+        { auto graph=frame;graph.scenes.push_back({.viewport=frame.viewport});graph.overlays.push_back({.backdrop=BackdropMaterial{.bounds={0,0,20,20},.content_scene=0}});
+            Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::automatic);
+            chain.prepare(graph);
+            check(chain.info().api==GraphicsApi::vulkan&&chain.info().fallback&&Vulkan::drawn==0,
+                "Automatic selection did not admit source scenes through Vulkan before drawing");
+            chain.draw(graph,1,100);check(Vulkan::drawn==1,"Capability-selected Vulkan did not render"); }
+        reset();
+        { auto graph=frame;graph.scenes.push_back({.viewport=frame.viewport});graph.overlays.push_back({.backdrop=BackdropMaterial{.bounds={0,0,20,20},.content_scene=0}});
+            Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::automatic);
+            (void)failure([&]{chain.prepare(graph);});
+            check(chain.info().api==GraphicsApi::metal&&!chain.info().fallback,"Failed capability fallback discarded the native renderer"); }
+        reset();Vulkan::scene_support=true;
+        { auto graph=frame;graph.scenes.push_back({.viewport=frame.viewport});graph.overlays.push_back({.backdrop=BackdropMaterial{.bounds={0,0,20,20},.content_scene=0}});
+            Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::native);
+            (void)failure([&]{chain.prepare(graph);});
+            check(Vulkan::created==0&&chain.info().api==GraphicsApi::metal,"Explicit native selection silently changed renderer"); }
         reset(); { Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::vulkan);
             check(Native::created==0 && Vulkan::created==1 && !chain.info().fallback,"Explicit Vulkan"); }
         reset(); Native::fail_init=true;

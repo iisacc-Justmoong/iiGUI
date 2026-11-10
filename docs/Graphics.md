@@ -1,8 +1,13 @@
 # Native GPU canvas contracts (0.3)
 
+현재 자체 위젯의 GPU 장면과 빈 레이어의 배치·캐시 규칙은
+[GPU 장면 합성](GpuSceneComposition.md)을 따른다. 이 문서의 텍스트 전용 호스트는
+기존 별도 경로를 뜻하며, 자체 위젯이 CPU에서 완전히 자유롭거나 모든 대상이
+물리 GPU 사용을 보장한다는 뜻은 아니다.
+
 The public Graphics.h is standard C++23 and uses no native/Qt types. Host
-owns one optional canvas. Existing text-only applications do not initialize
-Metal, D3D or Vulkan devices. [Renderer selection](Renderers.md)
+owns one optional canvas. A text-only `Host::set_text` uses the same native widget scene and may
+initialize a GPU renderer. [Renderer selection](Renderers.md)
 uses Metal/Direct3D first, then Vulkan; Linux uses Vulkan directly. Core remains the runtime/scheduling dependency; Builder
 orchestrates compilation and is not linked into the GUI application.
 
@@ -51,7 +56,8 @@ scheduling, not an always-running SDK frame loop.
 - Viewport/panel origins: finite, absolute logical value <=32767. Their width
   and height: finite, 0 < value <=8192. Viewport device-pixel origins must also
   fit +/-32767. Physical canvas width/height are ceil(logical*backing_scale),
-  each <=8192; allocation can still fail on a lower-limit device or low memory.
+  except Wayland toplevel buffers use nearest-pixel rounding, with half values
+  rounded away from zero. Each axis is <=8192; allocation can still fail on a lower-limit device or low memory.
 - At most 4096 ordered panels. Radius is finite, 0..min(width,height)/2.
   Color components must be finite 0..1, and background alpha must equal 1.
   Panels clip to the viewport. Colors are SDR sRGB, not ICC/HDR/wide gamut.
@@ -69,7 +75,7 @@ scheduling, not an always-running SDK frame loop.
   native initialization/drawing failure in automatic mode retries through
   Vulkan and records the actual API and fallback reason. Failure of Vulkan
   itself uses normal guarded host cleanup. See [Renderers](Renderers.md).
-- Text-only hosting does not require a GPU device. Failed canvas initialization
+- Failed canvas initialization
   returns `unsupported`; invalid input returns `invalid_argument` and physical
   coordinate overflow `out_of_range`. Rejected admission preserves the prior
   canvas. Vulkan device-loss recovery/hot-device migration are outside scope.

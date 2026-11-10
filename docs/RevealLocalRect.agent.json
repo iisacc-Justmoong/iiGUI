@@ -1,0 +1,107 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:50a8cb1da5d4e1505eb9a9d06f6a39ddd3628f0e0d6e97726f0bb874025d88fe",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/RevealLocalRect.md",
+    "sha256": "f7368d0e7cc6e98e4244f43b4b2819e619e3a3979337d94e671667c29a30e9eb",
+    "bytes": 780,
+    "line_count": 10,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "위젯 내부 영역의 스크롤 노출",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 위젯 내부 영역의 스크롤 노출\n",
+      "level": 1,
+      "title": "위젯 내부 영역의 스크롤 노출"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "여러 줄 편집기의 커서처럼 위젯보다 작은 특정 영역은 `Widget::reveal_local_rect`로\n스크롤 조상에게 알린다. 좌표는 호출 위젯의 로컬 논리 좌표이다. 가장 안쪽부터\n일반 스크롤 뷰를 이동하고 각 이동 후 현재 위치를 다시 계산하며 범위를 클램프한다.\n이미 보이는 영역은 이동하지 않는다. 가상 콘텐츠의 오프셋은 공급자가 소유하므로\n이 API가 직접 변경하지 않는다. 잘못된 값과 퇴역한 핸들은 거절한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 10,
+      "raw": "이 호출은 명시적인 이벤트에 반응하며 주기적으로 실행되지 않는다. 서로 다른 위젯\n트리나 팝업 사이의 좌표 전달은 현재 계약에 포함하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "위젯 내부 영역의 스크롤 노출",
+      "anchor": "위젯-내부-영역의-스크롤-노출",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 6,
+        "text": "이미 보이는 영역은 이동하지 않는다. 가상 콘텐츠의 오프셋은 공급자가 소유하므로",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000003",
+        "line": 7,
+        "text": "이 API가 직접 변경하지 않는다. 잘못된 값과 퇴역한 핸들은 거절한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "트리나 팝업 사이의 좌표 전달은 현재 계약에 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

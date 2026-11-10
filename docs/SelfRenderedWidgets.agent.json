@@ -10,11 +10,11 @@
   },
   "source": {
     "path": "docs/SelfRenderedWidgets.md",
-    "sha256": "f14d3b6844c390258d6caa67757fd55e0ec5cd2c2e25b105a723cd287280d3f2",
-    "bytes": 5842,
-    "line_count": 84,
+    "sha256": "ce4e90d9bebe40e309d489c74e044395d4456a09c4463646ce39ac7a38d91ed4",
+    "bytes": 6741,
+    "line_count": 91,
     "encoding": "utf-8",
-    "language": "en"
+    "language": "ko"
   },
   "document": {
     "title": "Self-rendered C++ widgets",
@@ -98,35 +98,35 @@
       "id": "b000011",
       "kind": "paragraph",
       "start_line": 27,
-      "end_line": 66,
-      "raw": "Current primitives include vertical/horizontal/overlay stacks, spacers, labels,\nfive button tones, checkboxes, radio groups, switches, basic text inputs, sliders\nand interval progress, icon/help/dropdown button visuals and icon-bearing tabs.\nTabBar uses equal-width children, single selection, disabled-tab reconciliation,\nand focus-only Left/Right/Home/End navigation; activation changes selection.\nComboBox is a 97×20 clickable field with an 18×18 stepper indicator, not an\nimplicitly constructed menu. Stepper emits +1/-1 from its clicked half or an\nexplicit direction; it does not own a numeric value or run a repeat timer.\nSingle-arrow controls ignore the opposite direction. Up/Down keys emit once per\nkey event, and virtual increment/decrement accessibility actions use the same\nC++ dispatch. Enter/Space and pointer activation dispatch pressed, released,\nclicked, then stepped. Outside release omits the click; disabling, Escape,\nfocus loss and moving focus cancel capture once. A release callback may unmount\nits generation without a stale click following it.\nSegmentedControl is a styled horizontal container with independent child actions,\nas in the original LVRS label/icon segmented controls. It supports separate\nhorizontal/vertical padding, spacing, an opaque fill/border, rounded/cylindrical\nshape and optional borderless tone propagation. It does not infer selection.\nSelf-rendered [menus](Menus.md) add popup ownership, regular/context rows and\ndividers, context binding, scrolling, placement, input capture and focus return.\n[Popovers](Popovers.md) mount ordinary native C++ widget content in the same GPU\noverlay path, with modal/nonmodal input, close policies and retained content.\nAn explicit [activation factory](PopupContent.md) can instead build/retire a\ngeneration of C++ content per open while reusing the same native GPU surface.\nThe disabled tone remains effectively disabled when `set_enabled(true)` is called;\nthe Boolean setter cannot bypass the authored tone contract. The borderless\nStepper pressed surface uses LVRS's opaque accent-muted mix.\nMutations and input require the UI owner; stale handles\ncannot affect a successor tree. Unchanged text skips mutation/layout invalidation;\nlayout caches intrinsic metrics, redraw requests coalesce on the OS surface, and\nidentical GPU scenes reuse retained attachments.\nForeground textures are keyed by immutable image identity, text, geometry and scale;\npanel-only hover/background changes do not reshape text, rasterize icons or upload\ntheir pixels. `foreground_rasterizations` and `foreground_texture_bytes` expose\nactual work and active texture storage. See [Images and layers](Images.md).\nAn empty Host allocates no widget surface or GPU renderer. Explicit text content,\nwidget mounting or canvas submission creates presentation resources on demand.\nFont snapshots report the resolved native family after bundle-font registration.\nApplications and games can opt into the same Core frame loop with a native\n[display-synchronized source](DisplayFrames.md); duration timers remain independent.\n"
+      "end_line": 73,
+      "raw": "Current primitives include vertical/horizontal/overlay stacks, spacers, labels,\nfive button tones, checkboxes, radio groups, switches, basic text inputs, sliders\nand interval progress, icon/help/dropdown button visuals and icon-bearing tabs.\nTabBar uses equal-width children, single selection, disabled-tab reconciliation,\nand focus-only Left/Right/Home/End navigation; activation changes selection.\nComboBox is a 97×20 clickable field with an 18×18 stepper indicator, not an\nimplicitly constructed menu. Stepper emits +1/-1 from its clicked half or an\nexplicit direction; it does not own a numeric value or run a repeat timer.\nSingle-arrow controls ignore the opposite direction. Up/Down keys emit once per\nkey event, and virtual increment/decrement accessibility actions use the same\nC++ dispatch. Enter/Space and pointer activation dispatch pressed, released,\nclicked, then stepped. Outside release omits the click; disabling, Escape,\nfocus loss and moving focus cancel capture once. A release callback may unmount\nits generation without a stale click following it.\n`SegmentedControl`은 독립적인 자식 동작을 유지하는 가로 또는 세로 컨테이너다.\n기본 프레임은 바깥 패딩과 테두리가 없고 자식 간 간격은 2이다. 둥근 사각형의\n기본 반경은 버튼과 같은 8이며, 원통형은 이용 가능한 짧은 변의 절반을 쓴다.\n표면 색상은 호출자가 제공한다. LVUI는 `Panel/subSurface` 토큰을 전달한다. 따라서 표면은\n세그먼트 버튼의 전체 크기에 맞는다. 목록 항목에 포함된 기본 세그먼트도 같다.\n가로·세로 패딩, 간격, 불투명 배경과 테두리, 둥근 사각형·원통형 및 무테 톤\n전파를 지원한다. 생성 시 `SegmentedOptions::vertical`을 설정하면 자식을 세로로\n배치한다. 선택 상태를 자동으로 만들지 않으며 자식 수에 고정 상한은 없다.\nLVRS 디자인은 2~15개 변형을 제공한다. 자식 버튼의 `checkable`·`checked` 상태는 원래 톤을 유지하며 앱 악센트 기반 Selected 배경을 그린다.\nmacOS arm64 헤드리스 검사에서 가로·세로 2~15개 배치와 명시적 패딩·테두리,\nLVUI 생성 뷰와의 결합을 확인했다. 운영체제 창을 띄우지는 않았다.\nSelf-rendered [menus](Menus.md) add popup ownership, regular/context rows and\ndividers, context binding, scrolling, placement, input capture and focus return.\n[Popovers](Popovers.md) mount ordinary native C++ widget content in the same GPU\noverlay path, with modal/nonmodal input, close policies and retained content.\nAn explicit [activation factory](PopupContent.md) can instead build/retire a\ngeneration of C++ content per open while reusing the same native GPU surface.\nThe disabled tone remains effectively disabled when `set_enabled(true)` is called;\nthe Boolean setter cannot bypass the authored tone contract. The borderless\nStepper pressed surface uses LVRS's opaque accent-muted mix.\nMutations and input require the UI owner; stale handles\ncannot affect a successor tree. Unchanged text skips mutation/layout invalidation;\nlayout caches intrinsic metrics, redraw requests coalesce on the OS surface, and\nidentical GPU scenes reuse retained attachments.\nForeground textures are keyed by immutable image identity, text, geometry and scale;\npanel-only hover/background changes do not reshape text, rasterize icons or upload\ntheir pixels. `foreground_rasterizations` and `foreground_texture_bytes` expose\nactual work and active texture storage. See [Images and layers](Images.md).\nAn empty Host allocates no widget surface or GPU renderer. Explicit text content,\nwidget mounting or canvas submission creates presentation resources on demand.\nFont snapshots report the resolved native family after bundle-font registration.\nApplications and games can opt into the same Core frame loop with a native\n[display-synchronized source](DisplayFrames.md); duration timers remain independent.\n"
     },
     {
       "id": "b000012",
       "kind": "blank",
-      "start_line": 67,
-      "end_line": 67,
+      "start_line": 74,
+      "end_line": 74,
       "raw": "\n"
     },
     {
       "id": "b000013",
       "kind": "paragraph",
-      "start_line": 68,
-      "end_line": 77,
+      "start_line": 75,
+      "end_line": 84,
       "raw": "Tests reject OS controls/layout in the actual content tree, deliver actual Cocoa\nmouse/key events through the surface, activate virtual accessibility peers, and\nread GPU pixels for primary/disabled LVRS states. They also cover capture cancel,\nkeyboard focus, scalar-safe UTF-8 deletion, IME preedit vs commit, radio exclusion,\nrange clamping and unchanged-scene reuse.\nValue mutation rejects labels/buttons; inputs report virtual focus and editable\nvalues. Some OS accessibility clients still report read-only virtual peers as\nwritable because of the shared value-setter bridge; that metadata discrepancy\nremains to be corrected. The single input surface handles Command-V and Cocoa\npaste commands without creating a native field editor or OS text control.\n"
     },
     {
       "id": "b000014",
       "kind": "blank",
-      "start_line": 78,
-      "end_line": 78,
+      "start_line": 85,
+      "end_line": 85,
       "raw": "\n"
     },
     {
       "id": "b000015",
       "kind": "paragraph",
-      "start_line": 79,
-      "end_line": 84,
+      "start_line": 86,
+      "end_line": 91,
       "raw": "This supersedes the previous claim that native OS controls are the widget backend.\nFull LVRS parity remains in progress in `LVRS/catalog/native/parity.json`. The OS\ninput/presentation adapter currently supports macOS; Windows/Linux mounting still\nreturns unsupported. Full IME replacement ranges, pointer text selection, clipboard\nand advanced input contracts remain incomplete. Self-rendering does not imply\nthose remaining behaviors have already been implemented.\n"
     }
   ],
@@ -144,7 +144,7 @@
     "directive_candidates": [
       {
         "block_id": "b000011",
-        "line": 59,
+        "line": 66,
         "text": "panel-only hover/background changes do not reshape text, rasterize icons or upload",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -171,35 +171,35 @@
         "label": "menus",
         "target": "Menus.md",
         "kind": "relative",
-        "line": 45
+        "line": 52
       },
       {
         "block_id": "b000011",
         "label": "Popovers",
         "target": "Popovers.md",
         "kind": "relative",
-        "line": 47
+        "line": 54
       },
       {
         "block_id": "b000011",
         "label": "activation factory",
         "target": "PopupContent.md",
         "kind": "relative",
-        "line": 49
+        "line": 56
       },
       {
         "block_id": "b000011",
         "label": "Images and layers",
         "target": "Images.md",
         "kind": "relative",
-        "line": 61
+        "line": 68
       },
       {
         "block_id": "b000011",
         "label": "display-synchronized source",
         "target": "DisplayFrames.md",
         "kind": "relative",
-        "line": 66
+        "line": 73
       }
     ],
     "tables": []

@@ -8,6 +8,7 @@
 #include <iiGUI/NativeText.h>
 #include <iiGUI/Image.h>
 #include <iiGUI/GpuEffects.h>
+#include <iiGUI/Direct3DScenePlan.h>
 #include <optional>
 #include <cstring>
 
@@ -50,6 +51,8 @@ float4 text_fragment(float4 position : SV_POSITION) : SV_TARGET {
 
 Texture2D<float4> shape_image : register(t2);
 Texture2D<float4> underlay_image : register(t3);
+Texture2D<float4> background_scene : register(t4);
+Texture2D<float4> content_scene : register(t5);
 SamplerState linear_clamp : register(s0);
 float shape_distance(float2 sample_point,float4 bounds,float radius) {
     float2 q=abs(sample_point-bounds.xy-bounds.zw*.5)-(bounds.zw*.5-radius);
@@ -58,7 +61,14 @@ float shape_distance(float2 sample_point,float4 bounds,float radius) {
 bool effect_flag(uint n){return (uint(effect_style.w)&n)!=0;}
 float shape_mask(float2 sample_point){if(effect_flag(2)){float2 uv=(sample_point-effect_bounds.xy)/effect_bounds.zw;if(any(uv<0)||any(uv>1))return 0;return shape_image.SampleLevel(linear_clamp,uv,0).a;}return saturate(.5-shape_distance(sample_point,effect_bounds,effect_style.x)*padding.x);}
 float4 effect_over(float4 a,float4 b){return a+b*(1-a.a);}
-float4 input_at(float2 sample_point){float4 value=float4(effect_base.rgb*effect_base.a,effect_base.a);if(effect_flag(8)){float4 scene=glyphs.SampleLevel(linear_clamp,sample_point/size,0);scene.rgb*=scene.a;value=effect_over(scene,value);}if(effect_flag(4)){float2 uv=(sample_point-effect_underlay.xy)/effect_underlay.zw;if(all(uv>=0)&&all(uv<=1)){float4 image=underlay_image.SampleLevel(linear_clamp,uv,0);if(effect_flag(16)){uint a=asuint(effect_highlight.z),b=asuint(effect_highlight.w);float4 tint=float4(f16tof32(a&65535),f16tof32(a>>16),f16tof32(b&65535),f16tof32(b>>16));image=float4(tint.rgb,image.a*tint.a);}image.rgb*=image.a;value=effect_over(image,value);}}return value;}
+float4 input_at(float2 sample_point){
+    float4 value=float4(effect_base.rgb*effect_base.a,effect_base.a);
+    // Render targets are already premultiplied in linear color. Only uploaded
+    // straight-alpha images need multiplication before source-over blending.
+    if(effect_flag(8))value=effect_over(glyphs.SampleLevel(linear_clamp,sample_point/size,0),value);
+    if(effect_flag(32))value=effect_over(background_scene.SampleLevel(linear_clamp,sample_point/size,0),value);
+    if(effect_flag(64))value=effect_over(content_scene.SampleLevel(linear_clamp,sample_point/size,0),value);
+    if(effect_flag(4)){float2 uv=(sample_point-effect_underlay.xy)/effect_underlay.zw;if(all(uv>=0)&&all(uv<=1)){float4 image=underlay_image.SampleLevel(linear_clamp,uv,0);if(effect_flag(16)){uint a=asuint(effect_highlight.z),b=asuint(effect_highlight.w);float4 tint=float4(f16tof32(a&65535),f16tof32(a>>16),f16tof32(b&65535),f16tof32(b>>16));image=float4(tint.rgb,image.a*tint.a);}image.rgb*=image.a;value=effect_over(image,value);}}return value;}
 float4 effect_fragment(float4 position : SV_POSITION) : SV_TARGET {
     float scale=padding.x,opacity=padding.y,blur=effect_style.y;float2 sample_point=position.xy/scale;bool shadow=effect_flag(1);
     if(opacity<=0||shape_distance(sample_point,effect_bounds,effect_flag(2)?0:effect_style.x)>(shadow?blur+1:1))return 0;
@@ -92,6 +102,7 @@ struct PlatformCanvas::Impl final {
     HINSTANCE instance=GetModuleHandleW(nullptr);
     std::wstring class_name;
     bool registered=false;
+    bool external_swapchain=false;
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     ComPtr<IDXGISwapChain> swapchain;
@@ -107,8 +118,15 @@ struct PlatformCanvas::Impl final {
     ComPtr<ID3D11RasterizerState> rasterizer;
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11RenderTargetView> target;
-    struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key;PixelClip region{}; };
+    struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key;PixelClip region{};ComPtr<ID3D11Buffer> panels;ComPtr<ID3D11ShaderResourceView> panel_view;PanelKey geometry; };
     std::vector<Layer> layers;
+    struct SceneTarget final {
+        ComPtr<ID3D11Texture2D> texture;
+        ComPtr<ID3D11RenderTargetView> render;
+        ComPtr<ID3D11ShaderResourceView> sampled;
+        std::vector<Layer> layers;
+    };
+    std::vector<SceneTarget> scene_targets;
     struct EffectAsset{std::shared_ptr<const RasterImage> image;ComPtr<ID3D11ShaderResourceView> view;};
     std::vector<EffectAsset> effect_assets;
     ID3D11ShaderResourceView* effect_image(std::shared_ptr<const RasterImage> image){
@@ -134,10 +152,18 @@ struct PlatformCanvas::Impl final {
         if (message==WM_PAINT) { PAINTSTRUCT p{}; BeginPaint(window,&p); EndPaint(window,&p); return 0; }
         return DefWindowProcW(window,message,w,l);
     }
-    void initialize(HWND parent,Acceleration) {
+    void initialize(HWND parent,Acceleration,IDXGISwapChain* external=nullptr) {
         const D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0};
         D3D_FEATURE_LEVEL level{};
-        auto result=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+        HRESULT result=S_OK;
+        if(external){
+            swapchain=external;external_swapchain=true;
+            result=external->GetDevice(IID_PPV_ARGS(&device));
+            checked(result,"External swapchain does not expose a D3D11 device");
+            device->GetImmediateContext(&context);
+            if(!context || device->GetFeatureLevel()<D3D_FEATURE_LEVEL_11_0)
+                throw std::runtime_error("External swapchain requires a D3D11 feature-level 11 device");
+        }else result=D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             levels,1,D3D11_SDK_VERSION,&device,&level,&context);
         statistics.hardware=SUCCEEDED(result);
         checked(result,"No suitable Direct3D 11 hardware device");
@@ -160,7 +186,8 @@ struct PlatformCanvas::Impl final {
         statistics.api=GraphicsApi::direct3d11;
         statistics.adapter=utf8(description.Description);
         statistics.srgb_attachment=true;
-        statistics.backdrop_supported=statistics.shadow_supported=statistics.content_transform_supported=true;
+        statistics.backdrop_supported=statistics.shadow_supported=statistics.content_transform_supported=statistics.scene_sources_supported=true;
+        if(!external){
         class_name=L"iiGUI.Canvas."+std::to_wstring(reinterpret_cast<std::uintptr_t>(this));
         WNDCLASSEXW type{}; type.cbSize=sizeof(type); type.lpfnWndProc=procedure;
         type.hInstance=instance; type.lpszClassName=class_name.c_str();
@@ -176,6 +203,7 @@ struct PlatformCanvas::Impl final {
         swap.SwapEffect=DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         checked(factory->CreateSwapChain(device.Get(),&swap,&swapchain),"Cannot create D3D11 flip swapchain");
         checked(factory->MakeWindowAssociation(window,DXGI_MWA_NO_ALT_ENTER),"Cannot set DXGI window association");
+        }
         auto vs=compile("vertex_main","vs_5_0"), ps=compile("fragment_main","ps_5_0");
         checked(device->CreateVertexShader(vs->GetBufferPointer(),vs->GetBufferSize(),nullptr,&vertex),"Cannot create D3D11 vertex pipeline");
         checked(device->CreatePixelShader(ps->GetBufferPointer(),ps->GetBufferSize(),nullptr,&fragment),"Cannot create D3D11 pixel pipeline");
@@ -200,95 +228,86 @@ struct PlatformCanvas::Impl final {
         raster.DepthClipEnable=TRUE;raster.ScissorEnable=TRUE;
         checked(device->CreateRasterizerState(&raster,&rasterizer),"Cannot create D3D11 rasterizer state");
     }
-    void draw(const CanvasFrame& frame,double scale) {
-        const auto [width,height]=canvas_pixels(frame,scale);
-        if (!SetWindowPos(window,nullptr,static_cast<int>(std::lround(frame.viewport.x*scale)),
-            static_cast<int>(std::lround(frame.viewport.y*scale)),width,height,SWP_NOZORDER|SWP_NOACTIVATE|SWP_SHOWWINDOW))
-            throw std::runtime_error("Cannot position D3D11 canvas child surface");
-        bool changed=!previous || *previous!=frame || previous_scale!=scale;
-        if (!texture || statistics.pixel_width!=width || statistics.pixel_height!=height) {
-            context->OMSetRenderTargets(0,nullptr,nullptr);
-            target.Reset(); texture.Reset();content_snapshot.Reset();current_snapshot.Reset();content_view.Reset();current_view.Reset();
-            checked(swapchain->ResizeBuffers(0,width,height,DXGI_FORMAT_UNKNOWN,0),"Cannot resize D3D11 swapchain");
-            D3D11_TEXTURE2D_DESC desc{}; desc.Width=width; desc.Height=height;
-            desc.MipLevels=desc.ArraySize=1; desc.SampleDesc.Count=1;
-            desc.Format=DXGI_FORMAT_R8G8B8A8_TYPELESS; desc.Usage=D3D11_USAGE_DEFAULT;
-            desc.BindFlags=D3D11_BIND_RENDER_TARGET;
-            checked(device->CreateTexture2D(&desc,nullptr,&texture),"Cannot allocate D3D11 canvas attachment");
-            D3D11_RENDER_TARGET_VIEW_DESC rtv{}; rtv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-            rtv.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
-            checked(device->CreateRenderTargetView(texture.Get(),&rtv,&target),"Cannot create D3D11 sRGB view");
-            statistics.pixel_width=width; statistics.pixel_height=height;
-            statistics.cached_texture_bytes=std::uint64_t(width)*height*4; changed=true;
-        }
-        if (changed) {
-            auto* render=target.Get(); context->OMSetRenderTargets(1,&render,nullptr);
-            const float clear[]{frame.background.red,frame.background.green,frame.background.blue,1};
-            context->ClearRenderTargetView(render,clear);
-            D3D11_VIEWPORT viewport{0,0,float(width),float(height),0,1};
-            context->RSSetViewports(1,&viewport); context->RSSetState(rasterizer.Get());
-            context->OMSetBlendState(blend.Get(),nullptr,0xffffffff);
-            context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            const GpuEffect size{{frame.viewport.width,frame.viewport.height,float(scale),1},{},{},{},{}};
-            context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
-            auto* uniform=view.Get(); context->VSSetConstantBuffers(0,1,&uniform);context->PSSetConstantBuffers(0,1,&uniform);
-            const auto views=canvas_layers(frame);layers.resize(views.size());statistics.foreground_texture_bytes=0;
-            const bool effects=std::ranges::any_of(views,[](const auto& layer){return layer.backdrop||layer.shadow;});
-            const bool captures=std::ranges::any_of(views,[](const auto& layer){return layer.backdrop&&layer.backdrop->capture;});
-            statistics.backdrop_texture_bytes=captures?std::uint64_t(width)*height*8:0;
-            if(effects&&!content_snapshot){
-                D3D11_TEXTURE2D_DESC snapshot{};texture->GetDesc(&snapshot);snapshot.BindFlags=D3D11_BIND_SHADER_RESOURCE;
-                ComPtr<ID3D11Texture2D> content,current;
-                ComPtr<ID3D11ShaderResourceView> content_sampler,current_sampler;
-                checked(device->CreateTexture2D(&snapshot,nullptr,&content),"Cannot allocate D3D11 content snapshot");
-                checked(device->CreateTexture2D(&snapshot,nullptr,&current),"Cannot allocate D3D11 layer snapshot");
-                D3D11_SHADER_RESOURCE_VIEW_DESC srv{};srv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;srv.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
-                checked(device->CreateShaderResourceView(content.Get(),&srv,&content_sampler),"Cannot create D3D11 content sampler");
-                checked(device->CreateShaderResourceView(current.Get(),&srv,&current_sampler),"Cannot create D3D11 layer sampler");
-                content_snapshot=std::move(content);current_snapshot=std::move(current);
-                content_view=std::move(content_sampler);current_view=std::move(current_sampler);
-                statistics.cached_texture_bytes+=std::uint64_t(width)*height*8;
-            }
-            std::vector<std::shared_ptr<const RasterImage>> needed;
-            for(const auto& layer:views){if(layer.backdrop){if(layer.backdrop->mask)needed.push_back(layer.backdrop->mask);if(layer.backdrop->underlay)needed.push_back(layer.backdrop->underlay);}if(layer.shadow&&layer.shadow->mask)needed.push_back(layer.shadow->mask);}
-            std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(needed,asset.image)==needed.end();});
-            std::vector<std::shared_ptr<const RasterImage>> unique;std::uint64_t bytes=0;for(const auto& image:needed)if(std::ranges::find(unique,image)==unique.end()){unique.push_back(image);bytes+=image->rgba().size();}statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);if(bytes>statistics.effect_texture_budget_bytes)throw std::runtime_error("Effect image storage exceeds the effect budget");for(const auto& image:unique)effect_image(image);statistics.effect_image_texture_bytes=bytes;
-
-            for(std::size_t i=0;i<views.size();++i) {
+    void allocate_scene(SceneTarget& state,std::uint32_t width,std::uint32_t height) {
+        if(state.texture)return;
+        D3D11_TEXTURE2D_DESC desc{};desc.Width=width;desc.Height=height;
+        desc.MipLevels=desc.ArraySize=1;desc.SampleDesc.Count=1;
+        desc.Format=DXGI_FORMAT_R8G8B8A8_TYPELESS;desc.Usage=D3D11_USAGE_DEFAULT;
+        desc.BindFlags=D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE;
+        D3D11_RENDER_TARGET_VIEW_DESC rtv{};rtv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        rtv.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
+        D3D11_SHADER_RESOURCE_VIEW_DESC srv{};srv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+        srv.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
+        ComPtr<ID3D11Texture2D> texture;
+        ComPtr<ID3D11RenderTargetView> render;
+        ComPtr<ID3D11ShaderResourceView> sampled;
+        checked(device->CreateTexture2D(&desc,nullptr,&texture),"Cannot allocate D3D11 source scene");
+        checked(device->CreateRenderTargetView(texture.Get(),&rtv,&render),"Cannot create D3D11 scene target");
+        checked(device->CreateShaderResourceView(texture.Get(),&srv,&sampled),"Cannot create D3D11 scene sampler");
+        state.texture=std::move(texture);state.render=std::move(render);state.sampled=std::move(sampled);
+    }
+    void draw_pass(const CanvasFrame& frame,ID3D11Texture2D* attachment,ID3D11RenderTargetView* render,
+            std::vector<Layer>& layers,std::optional<Rect> crop,double scale,std::uint32_t width,std::uint32_t height) {
+        context->OMSetRenderTargets(1,&render,nullptr);
+        const float alpha=frame.background.alpha;
+        const float clear[]{frame.background.red*alpha,frame.background.green*alpha,frame.background.blue*alpha,alpha};
+        context->ClearRenderTargetView(render,clear);
+        D3D11_VIEWPORT viewport{0,0,float(width),float(height),0,1};
+        context->RSSetViewports(1,&viewport);context->RSSetState(rasterizer.Get());
+        context->OMSetBlendState(blend.Get(),nullptr,0xffffffff);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        const GpuEffect size{{frame.viewport.width,frame.viewport.height,float(scale),1},{},{},{},{},{},{},{}};
+        context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
+        auto* uniform=view.Get();context->VSSetConstantBuffers(0,1,&uniform);context->PSSetConstantBuffers(0,1,&uniform);
+        const auto batches=canvas_batch_layers(frame);const auto& views=batches.views;layers.resize(views.size());
+        for(std::size_t i=0;i<views.size();++i) {
             const auto layer=views[i];auto& cached=layers[i];
-            const auto snapshot=[&](ID3D11Texture2D* destination){context->OMSetRenderTargets(0,nullptr,nullptr);context->CopyResource(destination,texture.Get());context->OMSetRenderTargets(1,&render,nullptr);++statistics.backdrop_copies;};
+            const auto snapshot=[&](ID3D11Texture2D* destination){context->OMSetRenderTargets(0,nullptr,nullptr);context->CopyResource(destination,attachment);context->OMSetRenderTargets(1,&render,nullptr);++statistics.backdrop_copies;};
             if(i==1&&content_snapshot)snapshot(content_snapshot.Get());
             if(layer.backdrop&&layer.backdrop->source==BackdropSource::previous_layers)snapshot(current_snapshot.Get());
-            const auto clip=clip_pixels(layer,scale,width,height);
-            if(!clip.width || !clip.height) { cached.foreground.Reset();cached.key={};continue; }
+            const auto clip=scene_clip_pixels(layer,crop,scale,width,height);
+            if(!clip.width || !clip.height) { cached.foreground.Reset();cached.key={};if(!cached.geometry.matches(batches.panel_layers(i))){cached.panels.Reset();cached.panel_view.Reset();cached.geometry.clear();}continue; }
             const D3D11_RECT scissor{LONG(clip.x),LONG(clip.y),LONG(clip.x+clip.width),LONG(clip.y+clip.height)};
             context->RSSetScissorRects(1,&scissor);
             const auto effect_draw=[&](bool shadow){const auto params=effect_parameters(layer,frame.viewport,scale,shadow);context->UpdateSubresource(view.Get(),0,nullptr,&params,0,0);
                 auto* source=(!shadow&&layer.backdrop->source==BackdropSource::previous_layers)?current_view.Get():content_view.Get();
-                ID3D11ShaderResourceView* sources[]{source,effect_image(shadow?layer.shadow->mask:layer.backdrop->mask),effect_image(shadow?std::shared_ptr<const RasterImage>{}:layer.backdrop->underlay)};context->PSSetShaderResources(1,3,sources);auto* sampler=effect_sampler.Get();context->PSSetSamplers(0,1,&sampler);
+                const auto* material=shadow?nullptr:&*layer.backdrop;
+                const auto scene=[&](const std::optional<std::size_t>& index)->ID3D11ShaderResourceView* {
+                    return index?scene_targets[*index].sampled.Get():nullptr;
+                };
+                ID3D11ShaderResourceView* sources[]{source,
+                    effect_image(shadow?layer.shadow->mask:material->mask),
+                    effect_image(shadow?std::shared_ptr<const RasterImage>{}:material->underlay),
+                    material?scene(material->background_scene):nullptr,
+                    material?scene(material->content_scene):nullptr};
+                context->PSSetShaderResources(1,5,sources);auto* sampler=effect_sampler.Get();context->PSSetSamplers(0,1,&sampler);
                 context->VSSetShader(text_vertex.Get(),nullptr,0);context->PSSetShader(effect_fragment.Get(),nullptr,0);context->Draw(6,0);
                 if(shadow){++statistics.shadow_masks;if(layer.shadow->blur_radius>.01)++statistics.shadow_blurs;}
                 else if(layer.backdrop->blur_radius>.01)++statistics.backdrop_blurs;
-                ID3D11ShaderResourceView* empty[3]{};context->PSSetShaderResources(1,3,empty);};
+                ID3D11ShaderResourceView* empty[5]{};context->PSSetShaderResources(1,5,empty);};
             if(layer.shadow)effect_draw(true);if(layer.backdrop)effect_draw(false);
             context->UpdateSubresource(view.Get(),0,nullptr,&size,0,0);
             context->VSSetShader(vertex.Get(),nullptr,0); context->PSSetShader(fragment.Get(),nullptr,0);
-            const auto panels=pack_panels(layer.panels,layer.content_transform);
-            if (!panels.empty()) {
-                D3D11_BUFFER_DESC desc{}; desc.ByteWidth=static_cast<UINT>(panels.size()*sizeof(GpuPanel));
-                desc.Usage=D3D11_USAGE_IMMUTABLE; desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
-                desc.MiscFlags=D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; desc.StructureByteStride=sizeof(GpuPanel);
-                D3D11_SUBRESOURCE_DATA data{panels.data(),0,0};
-                ComPtr<ID3D11Buffer> instances;
-                checked(device->CreateBuffer(&desc,&data,&instances),"Cannot allocate D3D11 panel instances");
-                D3D11_SHADER_RESOURCE_VIEW_DESC srv{}; srv.ViewDimension=D3D11_SRV_DIMENSION_BUFFER;
-                srv.Buffer.NumElements=static_cast<UINT>(panels.size());
-                ComPtr<ID3D11ShaderResourceView> resource;
-                checked(device->CreateShaderResourceView(instances.Get(),&srv,&resource),"Cannot create D3D11 instance view");
-                auto* input=resource.Get(); context->VSSetShaderResources(0,1,&input);
-                context->DrawInstanced(6,static_cast<UINT>(panels.size()),0,0);
+            const auto count=batches.panel_count(i);const auto geometry=batches.panel_layers(i);
+            if (count) {
+                if(!cached.panels||!cached.panel_view||!cached.geometry.matches(geometry)){
+                    const auto packed=pack_panel_batch(geometry,count);PanelKey next;next.assign(geometry);
+                    D3D11_BUFFER_DESC desc{}; desc.ByteWidth=static_cast<UINT>(packed.size()*sizeof(GpuPanel));
+                    desc.Usage=D3D11_USAGE_IMMUTABLE; desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+                    desc.MiscFlags=D3D11_RESOURCE_MISC_BUFFER_STRUCTURED; desc.StructureByteStride=sizeof(GpuPanel);
+                    D3D11_SUBRESOURCE_DATA data{packed.data(),0,0};
+                    ComPtr<ID3D11Buffer> instances;
+                    checked(device->CreateBuffer(&desc,&data,&instances),"Cannot allocate D3D11 panel instances");
+                    D3D11_SHADER_RESOURCE_VIEW_DESC srv{}; srv.ViewDimension=D3D11_SRV_DIMENSION_BUFFER;
+                    srv.Buffer.NumElements=static_cast<UINT>(packed.size());
+                    ComPtr<ID3D11ShaderResourceView> resource;
+                    checked(device->CreateShaderResourceView(instances.Get(),&srv,&resource),"Cannot create D3D11 instance view");
+                    cached.panels=std::move(instances);cached.panel_view=std::move(resource);cached.geometry=std::move(next);++statistics.geometry_uploads;
+                }
+                auto* input=cached.panel_view.Get(); context->VSSetShaderResources(0,1,&input);
+                context->DrawInstanced(6,static_cast<UINT>(count),0,0);++statistics.geometry_draw_batches;
                 ID3D11ShaderResourceView* empty=nullptr; context->VSSetShaderResources(0,1,&empty);
-            }
+            }else{cached.panels.Reset();cached.panel_view.Reset();cached.geometry.clear();}
             if (layer.foreground()) {
                 if(!cached.foreground || !cached.key.matches(frame.viewport,scale,layer,true)) {
                 auto raster=rasterize_foreground_region(frame.viewport,layer,scale,true);const auto& bitmap=raster.pixels;cached.region=raster.region;
@@ -311,15 +330,104 @@ struct PlatformCanvas::Impl final {
                 context->Draw(6,0);
                 ID3D11ShaderResourceView* empty=nullptr; context->PSSetShaderResources(1,1,&empty);
             } else { cached.foreground.Reset();cached.key={}; }
-            }
+        }
+        context->OMSetRenderTargets(0,nullptr,nullptr);
+        ++statistics.scene_renders;
+    }
+    void draw(const CanvasFrame& frame,double scale,std::stop_token stop={}) {
+        const auto check_cancelled=[&]{if(stop.stop_requested())throw std::runtime_error("Direct3D frame was cancelled");};
+        check_cancelled();
+        const auto [width,height]=canvas_pixels(frame,scale);
+        const bool resized=!texture||statistics.pixel_width!=width||statistics.pixel_height!=height;
+        const bool changed=resized||!previous||*previous!=frame||previous_scale!=scale;
+        std::optional<Direct3DScenePlan> plan;
+        if(changed){
+            plan=direct3d_scene_plan(frame,width,height);
+            if(!plan)throw std::invalid_argument("Invalid Direct3D source scene graph");
+            statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);
+            if(!direct3d_scene_budget_ok(*plan,width,height))
+                throw std::runtime_error("Direct3D source scene and effect textures exceed the effect budget");
+        }
+        bool committed=false;
+        struct Guard final {std::optional<CanvasFrame>& previous;bool& committed;~Guard(){if(!committed)previous.reset();}} guard{previous,committed};
+        if(!external_swapchain && !SetWindowPos(window,nullptr,static_cast<int>(std::lround(frame.viewport.x*scale)),
+            static_cast<int>(std::lround(frame.viewport.y*scale)),width,height,SWP_NOZORDER|SWP_NOACTIVATE|SWP_SHOWWINDOW))
+            throw std::runtime_error("Cannot position D3D11 canvas child surface");
+        if(external_swapchain){
+            ComPtr<ID3D11Texture2D> external_buffer;
+            checked(swapchain->GetBuffer(0,IID_PPV_ARGS(&external_buffer)),"Cannot access external D3D11 swapchain buffer");
+            D3D11_TEXTURE2D_DESC description{};external_buffer->GetDesc(&description);
+            if(description.Width!=width || description.Height!=height || description.SampleDesc.Count!=1 ||
+               (description.Format!=DXGI_FORMAT_R8G8B8A8_UNORM && description.Format!=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB))
+                throw std::runtime_error("External D3D11 swapchain must match the requested size and RGBA8 format");
+        }
+        if(resized){
+            ID3D11ShaderResourceView* empty[5]{};context->PSSetShaderResources(1,5,empty);
             context->OMSetRenderTargets(0,nullptr,nullptr);
-            ++statistics.scene_renders;
+            target.Reset();texture.Reset();
+            for(auto& scene:scene_targets){scene.render.Reset();scene.sampled.Reset();scene.texture.Reset();}
+            content_snapshot.Reset();current_snapshot.Reset();content_view.Reset();current_view.Reset();
+            if(!external_swapchain)
+                checked(swapchain->ResizeBuffers(0,width,height,DXGI_FORMAT_UNKNOWN,0),"Cannot resize D3D11 swapchain");
+            D3D11_TEXTURE2D_DESC desc{};desc.Width=width;desc.Height=height;
+            desc.MipLevels=desc.ArraySize=1;desc.SampleDesc.Count=1;
+            desc.Format=DXGI_FORMAT_R8G8B8A8_TYPELESS;desc.Usage=D3D11_USAGE_DEFAULT;
+            desc.BindFlags=D3D11_BIND_RENDER_TARGET;
+            checked(device->CreateTexture2D(&desc,nullptr,&texture),"Cannot allocate D3D11 canvas attachment");
+            D3D11_RENDER_TARGET_VIEW_DESC rtv{};rtv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            rtv.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
+            checked(device->CreateRenderTargetView(texture.Get(),&rtv,&target),"Cannot create D3D11 sRGB view");
+            statistics.pixel_width=width;statistics.pixel_height=height;
+        }
+        if(changed){
+            if(plan->effects&&!content_snapshot){
+                D3D11_TEXTURE2D_DESC desc{};texture->GetDesc(&desc);desc.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+                ComPtr<ID3D11Texture2D> content,current;
+                ComPtr<ID3D11ShaderResourceView> content_sampler,current_sampler;
+                checked(device->CreateTexture2D(&desc,nullptr,&content),"Cannot allocate D3D11 content snapshot");
+                checked(device->CreateTexture2D(&desc,nullptr,&current),"Cannot allocate D3D11 layer snapshot");
+                D3D11_SHADER_RESOURCE_VIEW_DESC srv{};srv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                srv.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
+                checked(device->CreateShaderResourceView(content.Get(),&srv,&content_sampler),"Cannot create D3D11 content sampler");
+                checked(device->CreateShaderResourceView(current.Get(),&srv,&current_sampler),"Cannot create D3D11 layer sampler");
+                content_snapshot=std::move(content);current_snapshot=std::move(current);
+                content_view=std::move(content_sampler);current_view=std::move(current_sampler);
+            }
+            statistics.cached_texture_bytes=std::uint64_t(width)*height*(content_snapshot?12:4);
+            statistics.backdrop_texture_bytes=plan->captures?plan->snapshot_bytes:0;
+            statistics.scene_texture_bytes=plan->scene_bytes;
+            statistics.effect_image_texture_bytes=plan->asset_bytes;
+            statistics.foreground_texture_bytes=0;
+            std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(plan->assets,asset.image)==plan->assets.end();});
+            for(const auto& image:plan->assets)effect_image(image);
+            scene_targets.resize(frame.scenes.size());
+            std::array<bool,maximum_canvas_scenes> active{};
+            for(std::size_t i=0;i<plan->order.count;++i)active[plan->order.order[i]]=true;
+            for(std::size_t i=0;i<scene_targets.size();++i)if(!active[i])scene_targets[i]={};
+            std::array<bool,maximum_canvas_scenes> available{};
+            for(std::size_t i=0;i<plan->order.count;++i){const auto index=plan->order.order[i];available[index]=scene_targets[index].texture.Get()!=nullptr;}
+            const auto dirty=scene_rebuilds(frame,plan->order,previous?&*previous:nullptr,available,resized||previous_scale!=scale);
+            // Dependencies are rendered first. Each source owns its target and
+            // foreground cache, while snapshots are reused in command order.
+            for(std::size_t i=0;i<plan->order.count;++i){
+                const auto index=plan->order.order[i];auto& state=scene_targets[index];
+                if(dirty[index]){
+                    allocate_scene(state,width,height);
+                    const auto source=canvas_scene_frame(frame.scenes[index]);
+                    draw_pass(source,state.texture.Get(),state.render.Get(),state.layers,frame.scenes[index].bounds,scale,width,height);
+                }else for(const auto& layer:state.layers)if(layer.foreground)
+                    statistics.foreground_texture_bytes+=std::uint64_t(layer.region.width)*layer.region.height*4;
+            }
+            draw_pass(frame,texture.Get(),target.Get(),layers,{},scale,width,height);
         }
         ComPtr<ID3D11Texture2D> back;
+        CanvasFrame retained_frame=frame;
+        check_cancelled();
         checked(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)),"Cannot access D3D11 presentation buffer");
         context->CopyResource(back.Get(),texture.Get());
+        check_cancelled();
         checked(swapchain->Present(1,0),"Cannot present D3D11 canvas (device may have been removed)");
-        ++statistics.presentations; previous=frame;previous_scale=scale;
+        ++statistics.presentations;previous=std::move(retained_frame);previous_scale=scale;committed=true;
     }
     PixelBuffer capture() {
         if (!texture) throw std::runtime_error("D3D11 canvas has not rendered");
@@ -340,8 +448,12 @@ struct PlatformCanvas::Impl final {
 PlatformCanvas::PlatformCanvas(void* parent,void*,Acceleration policy) : impl_(std::make_unique<Impl>()) {
     impl_->initialize(static_cast<HWND>(parent),policy);
 }
+PlatformCanvas::PlatformCanvas(ExternalDirect3DSwapChain target,Acceleration policy) : impl_(std::make_unique<Impl>()) {
+    impl_->initialize(nullptr,policy,static_cast<IDXGISwapChain*>(target.swapchain));
+}
 PlatformCanvas::~PlatformCanvas()=default;
 void PlatformCanvas::draw(const CanvasFrame& f,double s,double) { impl_->draw(f,s); }
+void PlatformCanvas::draw(const CanvasFrame& f,double s,double,std::stop_token stop) { impl_->draw(f,s,stop); }
 PixelBuffer PlatformCanvas::capture() { return impl_->capture(); }
 GraphicsInfo PlatformCanvas::info() const { return impl_->statistics; }
 bool PlatformCanvas::native_event(const void*) { return false; }

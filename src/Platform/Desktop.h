@@ -2,6 +2,7 @@
 #include <iiGUI/Export.h>
 #include <iiSDKCore/Core/Result/Result.h>
 #include <iiSDKCore/Runtime/Thread.h>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -9,6 +10,7 @@
 #include <vector>
 
 namespace ii::gui {
+inline constexpr std::size_t maximum_clipboard_text_bytes = std::size_t{64} * 1024 * 1024;
 // Bytes are encoded PNG/TIFF/JPEG data. The image codec owns pixel decoding;
 // FileProvider owns all file access after the user's OS selection/drop.
 struct ClipboardContent final {

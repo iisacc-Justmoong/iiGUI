@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/VirtualViewports.md",
-    "sha256": "221d8137707031ae8ace7c4d5e3ade6ad06e272c4328e90982b3cb7c06050c1c",
-    "bytes": 7320,
+    "sha256": "9d4fcff248ccefb4fe87838d20ea7541fea8ccc3f702ba51aba6fd6f6099f519",
+    "bytes": 7326,
     "line_count": 92,
     "encoding": "utf-8",
     "language": "ko"
@@ -187,7 +187,7 @@
       "kind": "paragraph",
       "start_line": 51,
       "end_line": 56,
-      "raw": "보관한 그리기는 해당 스택의 기하에 맞춰 이동하고 스택 경계와 조상 viewport에 clip한다. `TextRun::clip`은 텍스트 조판 경계를\n바꾸지 않는 추가 지역 clip이며 스택 이동과 중첩 팝업의 좌표 이동을 함께 따른다.\n그 뒤 실제 자식 위젯이 그려지므로, 표의 많은 읽기 셀은 하나의 그리기 목록으로 표현하고\n활성 편집기만 실제 iiGUI 편집기로 둘 수 있다. primitive마다 노드를 만들지 않는다.\n모든 그리기 목록은 기존 frame의 64개 레이어·패널/텍스트/이미지·텍스트 바이트 한도를\n함께 사용한다. 이 API가 한도를 무제한으로 확장한 것은 아니다.\n"
+      "raw": "보관한 그리기는 해당 스택의 기하에 맞춰 이동하고 스택 경계와 조상 viewport에 clip한다. `TextRun::clip`은 텍스트 조판 경계를\n바꾸지 않는 추가 지역 clip이며 스택 이동과 중첩 팝업의 좌표 이동을 함께 따른다.\n그 뒤 실제 자식 위젯이 그려지므로, 표의 많은 읽기 셀은 하나의 그리기 목록으로 표현하고\n활성 편집기만 실제 iiGUI 편집기로 둘 수 있다. primitive마다 노드를 만들지 않는다.\n모든 그리기 목록은 frame의 최대 512개 오버레이와 패널/텍스트/이미지·텍스트 바이트 한도를\n함께 사용한다. 이 API가 한도를 무제한으로 확장한 것은 아니다.\n"
     },
     {
       "id": "b000024",

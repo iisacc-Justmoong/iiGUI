@@ -1,5 +1,6 @@
 #include <iiGUI/NativeView.h>
 #include <iiGUI/WidgetState.h>
+#include "../src/Platform/TouchScrollPolicy.h"
 #include <iostream>
 #include <limits>
 #include <thread>
@@ -59,6 +60,28 @@ void drawing(){Mounted f;auto s=std::make_shared<Source>();gui::Widget canvas;in
 
 }
 }
+void touch_scroll_probe(){
+    Mounted f;auto source=std::make_shared<Source>();gui::Widget viewport,canvas;
+    source->body=[&](gui::WidgetBuilder& b)->core::Result<void>{
+        auto root=take(b.hstack({},"probe-row"));
+        viewport=take(b.scroll_view(root,"probe-scroll",{.width=120,.height=120}));
+        (void)take(b.absolute_stack(viewport,"probe-content",{120,360}));
+        canvas=take(b.button(root,"probe-canvas",{.text="Canvas",.width=120,.height=120}));
+        return {};
+    };
+    f.mount(source);(void)take(f.tree->drawing_snapshot({640,480}));
+    const auto a=take(viewport.snapshot()).bounds,b=take(canvas.snapshot()).bounds;
+    check(f.tree->touch_scrollable_at(a.x+20,a.y+20),"Embedded scroll viewport was not found");
+    check(!f.tree->touch_scrollable_at(b.x+20,b.y+20),"Canvas was mistaken for a scroll viewport");
+    good(viewport.set_enabled(false));
+    check(!f.tree->touch_scrollable_at(a.x+20,a.y+20),"Disabled viewport accepted a scroll gesture");
+    using namespace gui::detail;
+    check(touch_scroll_candidate(gui::PointerDevice::touch,true),"Finger scroll was rejected");
+    check(touch_scroll_candidate(gui::PointerDevice::pen,true),"Pencil could not scroll a viewport");
+    check(!touch_scroll_candidate(gui::PointerDevice::pen,false),"Canvas pen input was captured for scrolling");
+    check(!touch_scroll_candidate(gui::PointerDevice::touch,false),"Non-scrollable content accepted a pan");
+    check(touch_scroll_vertical(2,20)&&!touch_scroll_vertical(20,2),"Slider and scroll directions were not separated");
+}
 void frame_data(){
     Mounted f;auto s=std::make_shared<Source>();gui::Widget image;
     auto current=take(gui::rgba_image(2,2,std::vector<std::uint8_t>(16,255)));
@@ -73,4 +96,4 @@ void frame_data(){
         check(take(f.tree->snapshots()).size()==nodes&&image.snapshot()&&s->builds==1&&s->file_revision==7,"Native video-frame data recreated a view or changed file state");
     }
 }
-int main(int argc,char** argv){try{std::string n=argc>1?argv[1]:"initial";if(n=="initial")initial();else if(n=="empty")empty();else if(n=="identity")identity();else if(n=="replace")replace();else if(n=="returned"||n=="exception"||n=="empty_candidate")failed(n);else if(n=="invalid")invalid();else if(n=="independent")independent();else if(n=="clear")clear();else if(n=="retirement")retirement();else if(n=="foreign")foreign();else if(n=="reentry")reentry();else if(n=="retire_during_build")retire_during_build();else if(n=="nested")nested();else if(n=="drawing")drawing();else if(n=="frame_data")frame_data();else throw std::runtime_error("Unknown native view test");std::cout<<"Native C++ view "<<n<<" passed without a window\n";}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
+int main(int argc,char** argv){try{std::string n=argc>1?argv[1]:"initial";if(n=="initial")initial();else if(n=="empty")empty();else if(n=="identity")identity();else if(n=="replace")replace();else if(n=="returned"||n=="exception"||n=="empty_candidate")failed(n);else if(n=="invalid")invalid();else if(n=="independent")independent();else if(n=="clear")clear();else if(n=="retirement")retirement();else if(n=="foreign")foreign();else if(n=="reentry")reentry();else if(n=="retire_during_build")retire_during_build();else if(n=="nested")nested();else if(n=="drawing")drawing();else if(n=="touch_scroll_probe")touch_scroll_probe();else if(n=="frame_data")frame_data();else throw std::runtime_error("Unknown native view test");std::cout<<"Native C++ view "<<n<<" passed without a window\n";}catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

@@ -1,12 +1,19 @@
 #include <windows.h>
-#include <d2d1.h>
-#include <dwrite.h>
-#include <wrl/client.h>
 #include <iiGUI/Host.h>
+#include "DisplayPixelsPolicy.h"
 #include <iiGUI/DispatchState.h>
 #include <iiGUI/HostCommon.h>
+#include <iiGUI/HostActivity.h>
+#include "HostFailure.h"
+#include "HostLegacyText.h"
+#include "HostCallback.h"
+#include "HostDriverPolicy.h"
+#include "FrameDemand.h"
+#include "WindowForeground.h"
+#include "Win32Foreground.h"
 #include <iiGUI/CanvasState.h>
 #include <iiGUI/WidgetState.h>
+#include <iiGUI/WidgetSurfaceNative.h>
 #include <iiGUI/WidgetSurface.h>
 #include <iiGUI/DesktopCommon.h>
 #include <iiGUI/NativeDesktop_p.hpp>
@@ -22,11 +29,6 @@ namespace {
 constexpr UINT wake_message = WM_APP + 0x149;
 constexpr UINT_PTR deadline_timer = 0x49494755;
 std::atomic_flag active_host = ATOMIC_FLAG_INIT;
-using Microsoft::WRL::ComPtr;
-void checked(HRESULT value, const char* operation) {
-    if (FAILED(value)) throw std::runtime_error(std::string(operation)+" (HRESULT "+std::to_string(value)+")");
-}
-
 std::runtime_error native_error(const char* operation) {
     return std::runtime_error(std::string(operation)+" (Win32 error "+std::to_string(GetLastError())+")");
 }
@@ -91,16 +93,17 @@ struct Host::Impl {
         state.size = options.size;
         state.title = options.title;
         state.text = "HelloGUI\n\nNative C++23 desktop host\niiSDKCore + iiSDKBuilder";
-        text = native_text(state.text);
     }
     std::shared_ptr<detail::WidgetState> widgets;
-    bool mounting=false;
+    Widget legacy_text;
+    bool mounting=false, application_driver=false;
     Impl* parent=nullptr;
     std::vector<Impl*> children;
     std::shared_ptr<detail::NativeDialog> dialog;
     std::shared_ptr<MotionPreferences> motion_preferences=std::make_shared<MotionPreferences>();
     std::unique_ptr<runtime::FrameLoop> motion_frames;
     runtime::TaskToken cadence;
+    detail::FrameDemand frame_demand;
     HMENU app_menu=nullptr;HACCEL shortcuts=nullptr;std::map<UINT,runtime::Task> menu_actions;bool fullscreen=false;LONG_PTR saved_style=0;RECT saved_bounds{};
     HostOptions options;
     std::shared_ptr<detail::DispatchState> dispatch;
@@ -109,20 +112,17 @@ struct Host::Impl {
     const std::thread::id owner = std::this_thread::get_id();
     Phase phase = Phase::created;
     HostCallbacks callbacks;
+    detail::HostActivity activity;
+    detail::WindowForeground foreground;
+    detail::Win32WindowVisibility window_visibility;
     WindowSnapshot state;
     HostStats statistics;
     detail::CanvasState canvas;
-    std::optional<core::Error> failure;
+    detail::HostFailure failure;
     bool draining = false, opened_delivered = false;
     HWND window = nullptr;
-    ComPtr<ID2D1Factory> drawing_factory;
-    ComPtr<IDWriteFactory> text_factory;
-    ComPtr<IDWriteTextFormat> text_format;
-    ComPtr<IDWriteTextLayout> text_layout;
-    ComPtr<ID2D1HwndRenderTarget> drawing;
-    ComPtr<ID2D1SolidColorBrush> text_brush;
     HINSTANCE instance = GetModuleHandleW(nullptr);
-    std::wstring class_name, text;
+    std::wstring class_name;
     bool registered = false;
     UINT dpi = 96;
     DPI_AWARENESS_CONTEXT previous_dpi = nullptr;
@@ -154,9 +154,22 @@ struct Host::Impl {
                       (content.bottom-content.top)/state.backing_scale};
         state.visible = IsWindowVisible(window) != FALSE;
     }
+    Impl* primary_host() noexcept {
+        auto* host=this;
+        while(host->parent)host=host->parent;
+        return host;
+    }
+    void forget_foreground_window() noexcept {
+        if(!parent)return;
+        auto* primary=primary_host();
+        if(primary->phase!=Phase::running)return;
+        primary->guard([&]{primary->foreground.remove_window(this);primary->gate->signal();});
+    }
     void did_close() noexcept {
         if (phase != Phase::running) return;
         phase = Phase::closing;
+        activity.close();
+        if(parent)forget_foreground_window();else foreground.close();
         dispatch->retire();
         if(!parent)dispatch->loop.request_stop();
         if(widgets){widgets->close();widgets.reset();}
@@ -165,6 +178,23 @@ struct Host::Impl {
         state.visible = false;
         state.closed = true;presentations->close();
         phase = Phase::closed;
+        if (parent) {
+            auto endpoint = parent->dispatch;
+            try {
+                detail::defer_host_closed(std::move(callbacks.closed), [endpoint, owner = parent](auto callback) {
+                    if (!endpoint->accepting.load()) return;
+                    auto sender = endpoint->loop.sender();
+                    if (!endpoint->track(endpoint->tasks.post(sender, std::move(callback)))) {
+                        owner->remember_failure("Cannot deliver secondary window close");
+                        endpoint->loop.request_stop();
+                    }
+                });
+            } catch (...) {
+                parent->remember_failure("Cannot defer secondary window close", std::current_exception());
+                endpoint->loop.request_stop();
+            }
+            return;
+        }
         guard([&] { if (callbacks.closed) callbacks.closed(); });
     }
     void force_close() noexcept {
@@ -197,24 +227,43 @@ struct Host::Impl {
             throw native_error("Cannot arm GUI deadline timer");
     }
     runtime::FrameLoop* frames(){return options.frame_loop?options.frame_loop:motion_frames.get();}
+    void frame_tick(){
+        if(phase!=Phase::running)return;
+        if(frames())(void)frames()->step();
+        if(phase!=Phase::running)return;
+        if(parent)drain();else if(widgets)widgets->present();
+        auto active=children;
+        for(auto* child:active)
+            if(std::ranges::find(children,child)!=children.end()&&child->phase==Phase::running)
+                child->frame_tick();
+    }
     void ensure_cadence(){
-        if(parent){parent->ensure_cadence();return;}if(cadence.pending())return;
+        if(parent){parent->ensure_cadence();return;}
+        frame_demand.foreground(phase==Phase::running);
+        frame_demand.continuous(options.frame_loop!=nullptr);
+        if(!frame_demand.needed()){
+            (void)cadence.cancel();cadence={};return;
+        }
+        if(cadence.pending())return;
         auto weak=std::weak_ptr<detail::DispatchState>(dispatch);
-        auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{if(frames())(void)frames()->step();if(widgets)widgets->present();auto active=children;for(auto* child:active)if(child->phase==Phase::running)child->drain();});});}));
+        auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{frame_tick();});});}));
         if(!scheduled)throw std::runtime_error("Cannot admit native frame cadence");cadence=scheduled.token;
     }
-    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);ensure_cadence();return frames();},.activity=[this](bool active){if(active)ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations};}
+    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);return frames();},.activity=[this](bool active){auto* primary=primary_host();primary->frame_demand.motion(active);primary->ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations};}
     void drain() noexcept {
         if (phase != Phase::running || draining) return;
-        if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;if(callbacks.opened)callbacks.opened();}if(widgets)widgets->present();});return;}
+        if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;detail::deliver_host_opened(callbacks.opened);}if(widgets)widgets->present();});return;}
         guard([&] {
             struct Reset final { bool& value; ~Reset() { value = false; } } reset{draining};
             draining = true;
             ++statistics.dispatches;
             if (!opened_delivered) {
                 opened_delivered = true;
-                if (callbacks.opened) callbacks.opened();
+                detail::deliver_host_opened(callbacks.opened);
+                if (phase == Phase::running) { activity.open(); foreground.open(); }
             }
+            if (phase == Phase::running) activity.deliver();
+            if (phase == Phase::running) foreground.deliver();
             if (phase == Phase::running) dispatch->loop.poll(options.budget);
             if (phase == Phase::running && dispatch->loop.state()==runtime::LoopState::stopped) force_close();
             if(phase==Phase::running&&widgets)widgets->present();
@@ -222,43 +271,12 @@ struct Host::Impl {
             arm_timer();
         });
     }
-    void make_font() {
-        if (!drawing_factory) checked(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,drawing_factory.GetAddressOf()), "Cannot create Direct2D factory");
-        if (!text_factory) checked(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),
-            reinterpret_cast<IUnknown**>(text_factory.GetAddressOf())), "Cannot create DirectWrite factory");
-        if (!text_format) checked(text_factory->CreateTextFormat(L"Segoe UI",nullptr,DWRITE_FONT_WEIGHT_NORMAL,
-            DWRITE_FONT_STYLE_NORMAL,DWRITE_FONT_STRETCH_NORMAL,17,L"",&text_format),"Cannot create native text format");
-        text_layout.Reset();
-    }
     void paint() {
-        if(widgets){PAINTSTRUCT paint{};BeginPaint(window,&paint);widgets->present();EndPaint(window,&paint);return;}
         PAINTSTRUCT paint_state{};
         if (!BeginPaint(window, &paint_state)) return;
         struct End final { HWND window; PAINTSTRUCT& state; ~End() { EndPaint(window,&state); } } end{window,paint_state};
-        make_font_if_needed();
-        RECT content{};
-        GetClientRect(window, &content);
-        const auto size=D2D1::SizeU(std::max<LONG>(1,content.right),std::max<LONG>(1,content.bottom));
-        if (!drawing) {
-            checked(drawing_factory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
-                D2D1::HwndRenderTargetProperties(window,size),&drawing),"Cannot create Direct2D text surface");
-            checked(drawing->CreateSolidColorBrush(D2D1::ColorF(0.13f,0.13f,0.13f),&text_brush),"Cannot create text brush");
-        }
-        if (drawing->GetPixelSize().width!=size.width || drawing->GetPixelSize().height!=size.height)
-            checked(drawing->Resize(size),"Cannot resize Direct2D text surface");
-        drawing->SetDpi(float(dpi),float(dpi));
-        if (!text_layout) checked(text_factory->CreateTextLayout(text.data(),static_cast<UINT32>(text.size()),
-            text_format.Get(),float(std::max(1.0,state.size.width-56)),float(std::max(1.0,state.size.height-56)),
-            &text_layout),"Cannot shape DirectWrite text layout");
-        drawing->BeginDraw();
-        drawing->Clear(D2D1::ColorF(D2D1::ColorF::White));
-        drawing->DrawTextLayout(D2D1::Point2F(28,28),text_layout.Get(),text_brush.Get(),D2D1_DRAW_TEXT_OPTIONS_CLIP);
-        const auto result=drawing->EndDraw();
-        if (result==D2DERR_RECREATE_TARGET) {
-            text_brush.Reset(); drawing.Reset(); InvalidateRect(window,nullptr,FALSE);
-        } else {checked(result,"Cannot paint DirectWrite text");if(presentations->has_observers())(void)presentations->queued(runtime::Clock::now(),GraphicsApi::none);}
+        if (widgets) widgets->present();
     }
-    void make_font_if_needed() { if (!text_format) make_font(); }
     static LRESULT CALLBACK procedure(HWND handle, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
         auto* self = reinterpret_cast<Impl*>(GetWindowLongPtrW(handle, GWLP_USERDATA));
         if (message == WM_NCCREATE) {
@@ -267,7 +285,18 @@ struct Host::Impl {
             self->window = handle;
         }
         if (!self) return DefWindowProcW(handle, message, wparam, lparam);
-        if(self->widgets){MSG event{handle,message,wparam,lparam,static_cast<DWORD>(GetMessageTime()),{}};if(self->widgets->native_event(&event))return 0;}
+        if(message==WM_ACTIVATEAPP && !self->parent && self->phase==Phase::running)
+            self->guard([&]{self->activity.observe(wparam!=0);self->gate->signal();});
+        if(self->phase==Phase::running && !self->application_driver &&
+           (message==WM_SHOWWINDOW || message==WM_SIZE || message==WM_WINDOWPOSCHANGED))
+            self->guard([&]{
+                if(!self->window_visibility.update(message,wparam,lparam))return;
+                auto* primary=self->primary_host();
+                if(primary->phase==Phase::running){primary->foreground.set_window_visible(self,self->window_visibility.visible());primary->gate->signal();}
+            });
+        if(auto widgets=self->widgets){MSG event{handle,message,wparam,lparam,static_cast<DWORD>(GetMessageTime()),{}};
+            if(auto result=widgets->native_result(&event))return static_cast<LRESULT>(*result);
+            if(widgets->native_event(&event))return 0;}
         if(message==WM_COMMAND){auto found=self->menu_actions.find(LOWORD(wparam));if(found!=self->menu_actions.end()){self->guard([&]{if(found->second){auto task=found->second;(void)self->dispatch->track(self->dispatch->loop.post([weak=std::weak_ptr<detail::DispatchState>(self->dispatch),task=std::move(task)]{if(auto endpoint=weak.lock();endpoint&&endpoint->accepting.load())(void)endpoint->tasks.run(task);}));}});return 0;}}
         bool handled = true;
         LRESULT result = 0;
@@ -283,7 +312,6 @@ struct Host::Impl {
             case WM_SIZE:
                 if (self->phase == Phase::running) {
                     self->update_snapshot();
-                    self->text_layout.Reset();
                     self->canvas.dirty = true;
                     self->gate->signal();
                     InvalidateRect(handle,nullptr,FALSE);
@@ -299,12 +327,22 @@ struct Host::Impl {
             }
             case WM_DPICHANGED: {
                 self->dpi = HIWORD(wparam);
-                self->make_font();
                 const auto& rectangle = *reinterpret_cast<RECT*>(lparam);
                 if (!SetWindowPos(handle, nullptr, rectangle.left, rectangle.top,
                     rectangle.right-rectangle.left, rectangle.bottom-rectangle.top,
                     SWP_NOZORDER | SWP_NOACTIVATE)) throw native_error("Cannot update DPI frame");
-                InvalidateRect(handle, nullptr, TRUE);
+                if(self->phase!=Phase::running || self->window!=handle)break;
+                // WM_SIZE may already have delivered the new metrics reentrantly.
+                // If it did not, publish the scale-only transition exactly once.
+                const auto before_size=self->state.size;
+                const auto before_scale=self->state.backing_scale;
+                self->update_snapshot();
+                self->canvas.dirty=true;
+                self->gate->signal();
+                InvalidateRect(handle, nullptr, FALSE);
+                if(self->opened_delivered && self->callbacks.resized &&
+                   (before_size!=self->state.size || before_scale!=self->state.backing_scale))
+                    self->callbacks.resized(self->state.size);
                 break;
             }
             case WM_CLOSE: if (self->may_close()) self->force_close(); break;
@@ -326,7 +364,7 @@ struct Host::Impl {
         class_name = L"iiGUI.Host."+std::to_wstring(reinterpret_cast<std::uintptr_t>(this));
         WNDCLASSEXW type{};
         type.cbSize = sizeof(type);
-        type.style = CS_HREDRAW | CS_VREDRAW;
+        type.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
         type.lpfnWndProc = procedure;
         type.hInstance = instance;
         type.hCursor = LoadCursorW(nullptr, IDC_ARROW);
@@ -344,7 +382,6 @@ struct Host::Impl {
         if (failure) throw std::runtime_error(failure->message);
         dpi = GetDpiForWindow(window);
         if (!dpi) dpi = 96;
-        make_font();
         const auto actual_frame = frame(options.size);
         if (!SetWindowPos(window, nullptr, 0, 0, actual_frame.right-actual_frame.left,
             actual_frame.bottom-actual_frame.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
@@ -352,10 +389,21 @@ struct Host::Impl {
         gate->attach(window);
         if(!parent)dispatch->connect([wake=gate]() noexcept { wake->signal(); });
         phase = Phase::running;
-        ShowWindow(window, SW_SHOWNORMAL);
-        UpdateWindow(window);
+        const bool show_window=detail::show_native_window(application_driver);
+        if (show_window) {
+            ShowWindow(window, SW_SHOWNORMAL);
+            UpdateWindow(window);
+        }
+        if(show_window){
+            window_visibility.seed(IsWindowVisible(window)!=FALSE,IsIconic(window)!=FALSE);
+            auto* primary=primary_host();primary->foreground.open_window(this,window_visibility.visible());primary->gate->signal();
+        }
+        if(!parent)if(auto foreground=GetForegroundWindow()){
+            DWORD process=0;GetWindowThreadProcessId(foreground,&process);
+            if(process)activity.observe(process==GetCurrentProcessId());
+        }
         update_snapshot();
-        if(options.frame_loop)ensure_cadence();
+        if(!parent)ensure_cadence();
         gate->signal();
     }
     void execute() {
@@ -380,6 +428,8 @@ struct Host::Impl {
         }
     }
     void cleanup() {
+        activity.close();
+        if(parent)forget_foreground_window();else foreground.close();
         dispatch->retire();
         if(!parent)dispatch->loop.request_stop();
         if(widgets){widgets->close();widgets.reset();}dialog.reset();(void)cadence.cancel();
@@ -388,8 +438,6 @@ struct Host::Impl {
             remember_failure(detached.error().message,detached.error().cause);
         gate->detach();
         canvas.clear();
-        text_brush.Reset(); drawing.Reset(); text_layout.Reset();
-        text_format.Reset(); text_factory.Reset(); drawing_factory.Reset();
         if (window) {
             KillTimer(window, deadline_timer);
             SetWindowLongPtrW(window, GWLP_USERDATA, 0);
@@ -414,12 +462,36 @@ Host::Host(HostOptions options) : impl_(std::make_unique<Impl>(std::move(options
 Host::~Host() {
     if (!is_ui_thread() || impl_->phase == Impl::Phase::running || impl_->phase == Impl::Phase::closing)
         std::terminate();
+    if (impl_->parent) impl_->cleanup();
     impl_->presentations->close();impl_->dispatch->retire();
     if (impl_->dispatch->owned_loop) impl_->dispatch->loop.request_stop();
     impl_->gate->detach();
 }
 UiExecutor Host::executor() const noexcept { return UiExecutor(impl_->dispatch); }
 bool Host::is_ui_thread() const noexcept { return impl_->on_owner(); }
+core::Result<void> Host::set_application_driver(bool enabled) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Application driver requires the owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Application driver must be configured before run");
+    if (enabled && impl_->options.frame_loop) return core::fail(core::ErrorCode::invalid_argument, "A hidden application driver cannot own a window frame loop");
+    impl_->application_driver = enabled;
+    return {};
+}
+core::Result<void> Host::set_application_activity_handler(std::function<void(bool)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor,"Application activity requires the host owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy,"Application activity must be configured before run");
+    impl_->activity.set_handler(std::move(handler)); return {};
+}
+core::Result<void> Host::set_application_foreground_handler(std::function<void(bool)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Application foreground requires the host owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Application foreground must be configured before run");
+    impl_->foreground.set_handler(std::move(handler)); return {};
+}
+core::Result<void> Host::set_failure_handler(std::function<void(const core::Error&)> handler) {
+    if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Host failure handling requires the owner thread");
+    if (impl_->phase != Impl::Phase::created) return core::fail(core::ErrorCode::busy, "Host failure handling must be configured before run or show");
+    impl_->failure.set_handler(std::move(handler));
+    return {};
+}
 core::Result<void> Host::run(HostCallbacks callbacks) {
     if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Host::run requires its owning UI thread");
     if (impl_->phase != Impl::Phase::created)
@@ -451,13 +523,24 @@ core::Result<void> Host::set_title(std::string_view title) {
 }
 core::Result<void> Host::set_text(std::string_view text) {
     if (auto ready = impl_->ready(); !ready) return ready;
-    if (!core::valid_utf8(text) || text.size() > INT_MAX)
-        return core::fail(core::ErrorCode::invalid_argument, "Display text must be UTF-8 and fit native text limits");
-    if (impl_->state.text == text) return {};
-    impl_->text = native_text(text);
-    impl_->state.text = text;
-    impl_->text_layout.Reset();
-    InvalidateRect(impl_->window, nullptr, FALSE);
+    if (!detail::valid_title(text) || text.size()>65536)
+        return core::fail(core::ErrorCode::invalid_argument, "Display text must be valid UTF-8 without NUL, up to 64 KiB");
+    if (impl_->widgets && !impl_->legacy_text.snapshot())
+        return core::fail(core::ErrorCode::busy, "Use the mounted widget's text property");
+    if (impl_->widgets) {
+        if (impl_->state.text == text) return {};
+        auto changed = impl_->legacy_text.set_text(std::string(text));
+        if (!changed) return changed;
+        impl_->state.text = text;
+        return {};
+    }
+    Widget label;
+    auto mounted = mount_widgets([&](WidgetBuilder& builder)->core::Result<void> {
+        return detail::build_legacy_text(builder, text, label);
+    });
+    if (!mounted) return std::unexpected(mounted.error());
+    impl_->legacy_text=label;
+    impl_->state.text=text;
     return {};
 }
 core::Result<void> Host::set_content_size(Size size) {
@@ -528,6 +611,19 @@ core::Result<WindowSnapshot> Host::snapshot() const {
     impl_->update_snapshot();
     return impl_->state;
 }
+core::Result<DisplayPixels> Host::display_pixels() const {
+    if (auto ready=impl_->ready(); !ready) return std::unexpected(ready.error());
+    MONITORINFO info{sizeof(info)};
+    const HMONITOR monitor=MonitorFromWindow(impl_->window,MONITOR_DEFAULTTONEAREST);
+    if (!monitor || !GetMonitorInfoW(monitor,&info))
+        return core::fail(core::ErrorCode::busy,"The window display is not yet available");
+    const auto width=std::int64_t(info.rcMonitor.right)-info.rcMonitor.left;
+    const auto height=std::int64_t(info.rcMonitor.bottom)-info.rcMonitor.top;
+    if (width<=0 || height<=0) return core::fail(core::ErrorCode::failed,"The display dimensions are invalid");
+    const auto pixels=detail::checked_display_pixels(std::uint64_t(width),std::uint64_t(height));
+    if (!pixels) return core::fail(core::ErrorCode::failed,"The display dimensions are invalid");
+    return *pixels;
+}
 core::Result<HostStats> Host::stats() const {
     if (!is_ui_thread()) return core::fail(core::ErrorCode::wrong_executor, "Stats require their owning UI thread");
     auto result = impl_->statistics;
@@ -539,11 +635,17 @@ core::Result<HostStats> Host::stats() const {
 
 namespace ii::gui {
 
+core::Result<void> Host::show_external(HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External event-loop hosting is not implemented on Windows");}
+core::Result<void> Host::attach_external(void*,HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Windows");}
 core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
     if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Native windows require the UI owner thread");
-    if(auto ready=parent.impl_->ready();!ready)return ready;
+    if(this==&parent||impl_->application_driver)return core::fail(core::ErrorCode::invalid_argument,"A secondary window cannot be an application driver");
     if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Window was already opened");
-    try{impl_->parent=parent.impl_.get();impl_->options.event_loop=&parent.impl_->dispatch->loop;impl_->dispatch=std::make_shared<detail::DispatchState>(impl_->options.task_capacity,impl_->options.event_loop);impl_->callbacks=std::move(callbacks);parent.impl_->children.push_back(impl_.get());impl_->open_native();parent.impl_->ensure_cadence();return {};}catch(...){impl_->cleanup();return core::fail(core::ErrorCode::failed,"Cannot open a native secondary window",std::current_exception());}
+    if(impl_->activity.has_handler()||impl_->foreground.has_handler())return core::fail(core::ErrorCode::invalid_argument,"Application lifecycle belongs to the primary host");
+    if(auto ready=parent.impl_->ready();!ready)return ready;
+    if(impl_->options.event_loop&&impl_->options.event_loop!=&parent.impl_->dispatch->loop)return core::fail(core::ErrorCode::invalid_argument,"Secondary windows must share their parent's EventLoop");
+    if(impl_->options.frame_loop)return core::fail(core::ErrorCode::invalid_argument,"A secondary window manages its own display cadence");
+    try{impl_->parent=parent.impl_.get();impl_->options.event_loop=&parent.impl_->dispatch->loop;impl_->dispatch=std::make_shared<detail::DispatchState>(impl_->options.task_capacity,impl_->options.event_loop);impl_->callbacks=std::move(callbacks);parent.impl_->children.push_back(impl_.get());impl_->open_native();return {};}catch(...){impl_->cleanup();return core::fail(core::ErrorCode::failed,"Cannot open a native secondary window",std::current_exception());}
 }
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory){return mount_widgets(std::move(factory),WidgetAppearance{});}
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const WidgetAppearance& appearance){
@@ -552,7 +654,7 @@ core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const Widget
     try{
             auto hooks=impl_->frame_hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,std::move(hooks));if(auto built=replacement->construct(std::move(factory));!built)return std::unexpected(built.error());
         if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());
-        if(auto attached=replacement->attach(impl_->window);!attached)return std::unexpected(attached.error());
+        if(auto attached=replacement->attach(impl_->window, detail::make_native_widget_surface);!attached)return std::unexpected(attached.error());
         if(auto committed=replacement->commit_window_properties();!committed)return std::unexpected(committed.error());
             impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);auto published=impl_->widgets;published->commit_publication();if(auto alive=published->ready();!alive)return std::unexpected(alive.error());return WidgetMount(published);
     }catch(...){return core::fail(core::ErrorCode::failed,"Native widget factory failed",std::current_exception());}

@@ -17,9 +17,30 @@
 namespace ii::gui::detail {
 namespace {
 class Line final: public NativeTextLine {
+    struct Paragraph final {
+        CTTypesetterRef typesetter=nullptr;
+        TextIndex display;
+        double line_height=0,ascent=0,descent=0,leading=0;
+        ~Paragraph(){if(typesetter)CFRelease(typesetter);}
+    };
     CTLineRef line_ = nullptr;
+    std::shared_ptr<Paragraph> paragraph_;
     TextLineMetrics metrics_;
-    std::size_t length_ = 0;
+    std::size_t first_=0,length_ = 0;
+    void measure() {
+        CGFloat ascent=0,descent=0,leading=0;
+        const auto width=CTLineGetTypographicBounds(line_,&ascent,&descent,&leading);
+        if(!length_){ascent=paragraph_->ascent;descent=paragraph_->descent;leading=paragraph_->leading;}
+        const auto natural=std::ceil(ascent+descent+leading);
+        metrics_={width,paragraph_->line_height>0?paragraph_->line_height:std::max(1.,natural),0};
+        metrics_.baseline=(metrics_.height-ascent-descent)/2+ascent;
+    }
+    Line(std::shared_ptr<Paragraph> paragraph,std::size_t first,std::size_t last)
+        :paragraph_(std::move(paragraph)),first_(first),length_(last-first) {
+        line_=CTTypesetterCreateLine(paragraph_->typesetter,CFRangeMake(CFIndex(first),CFIndex(last-first)));
+        if(!line_)throw std::runtime_error("CoreText cannot shape a wrapped line");
+        measure();
+    }
 public:
     Line(TextIndex display, const TextLineStyle& style): length_(display.utf16_size()) {
         @autoreleasepool {
@@ -40,26 +61,28 @@ public:
             auto attributed = [[NSAttributedString alloc] initWithString:string attributes:@{
                 NSFontAttributeName:font, NSParagraphStyleAttributeName:paragraph,
                 (id)kCTForegroundColorFromContextAttributeName:@YES}];
+            auto paragraph_state=std::make_shared<Paragraph>();
+            paragraph_state->display=std::move(display);paragraph_state->line_height=style.line_height;
+            paragraph_state->ascent=font.ascender;paragraph_state->descent=-font.descender;paragraph_state->leading=font.leading;
+            paragraph_state->typesetter=CTTypesetterCreateWithAttributedString((__bridge CFAttributedStringRef)attributed);
+            if(!paragraph_state->typesetter)throw std::runtime_error("CoreText cannot create the native typesetter");
+            paragraph_=std::move(paragraph_state);
             line_ = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)attributed);
             if (!line_) throw std::runtime_error("CoreText cannot shape the native paragraph");
-            CGFloat ascent = 0, descent = 0, leading = 0;
-            const auto width = CTLineGetTypographicBounds(line_, &ascent, &descent, &leading);
-            if (!length_) { ascent = font.ascender; descent = -font.descender; leading = font.leading; }
-            const auto natural = std::ceil(ascent + descent + leading);
-            metrics_ = {width, style.line_height > 0 ? style.line_height : std::max(1., natural), 0};
-            metrics_.baseline = (metrics_.height - ascent - descent) / 2 + ascent;
+            measure();
         }
     }
     ~Line() override { if (line_) CFRelease(line_); }
     TextLineMetrics metrics() const override { return metrics_; }
-    double caret(std::size_t position) const override { return CTLineGetOffsetForStringIndex(line_, CFIndex(position), nullptr); }
+    double caret(std::size_t position) const override { return CTLineGetOffsetForStringIndex(line_, CFIndex(first_+position), nullptr); }
     std::size_t hit(double x) const override {
         const auto index = CTLineGetStringIndexForPosition(line_, CGPointMake(x, 0));
-        if (index == kCFNotFound) return x <= 0 ? 0 : length_;
-        return std::size_t(index);
+        if (index == kCFNotFound) return std::abs(caret(0)-x)<=std::abs(caret(length_)-x)?0:length_;
+        return std::clamp(std::size_t(index),first_,first_+length_)-first_;
     }
     std::vector<TextLineSpan> selection(std::size_t first, std::size_t last) const override {
         std::vector<TextLineSpan> spans; if (first == last) return spans;
+        first+=first_;last+=first_;
         auto runs = CTLineGetGlyphRuns(line_);
         for (CFIndex i = 0; i < CFArrayGetCount(runs); ++i) {
             auto run = static_cast<CTRunRef>(CFArrayGetValueAtIndex(runs, i)); const auto range = CTRunGetStringRange(run);
@@ -81,6 +104,28 @@ public:
             const auto a = edge(start), b = edge(end); spans.push_back({std::min(a,b), std::abs(a-b)});
         }
         return spans;
+    }
+    std::vector<NativeLineSlice> wrap(double width,std::size_t maximum_lines) const override {
+        std::vector<NativeLineSlice> result;
+        const auto& source=paragraph_->display;
+        const auto end=first_+length_;
+        auto start=first_;
+        do {
+            if(result.size()==maximum_lines)throw std::length_error("Wrapped paragraph exceeds its line budget");
+            auto next=end;
+            if(start<end){
+                const auto count=CTTypesetterSuggestLineBreak(paragraph_->typesetter,CFIndex(start),width);
+                next=count>0?std::min(end,start+std::size_t(count)):start;
+                if(next<end&&next>start&&source.next_grapheme(source.previous_grapheme(next))!=next){
+                    const auto before=source.previous_grapheme(next);
+                    next=before>start?before:source.next_grapheme(start);
+                }
+                if(next<=start)next=source.next_grapheme(start);
+            }
+            auto child=std::unique_ptr<NativeTextLine>(new Line(paragraph_,start,next));
+            result.push_back({start-first_,next-first_,std::move(child)});start=next;
+        } while(start<end);
+        return result;
     }
     TextBitmap render(double x, double width, Color color, double scale) const override {
         const auto w = std::uint32_t(std::ceil(width * scale)), h = std::uint32_t(std::ceil(metrics_.height * scale));

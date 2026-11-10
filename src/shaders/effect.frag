@@ -2,6 +2,8 @@
 layout(set=0,binding=1) uniform sampler2D source_image;
 layout(set=0,binding=2) uniform sampler2D shape_image;
 layout(set=0,binding=3) uniform sampler2D underlay_image;
+layout(set=0,binding=4) uniform sampler2D background_scene;
+layout(set=0,binding=5) uniform sampler2D content_scene;
 layout(push_constant) uniform Parameters {vec4 view;vec4 bounds;vec4 tint;vec4 border;vec4 style;vec4 underlay;vec4 base;vec4 highlight;} parameters;
 layout(location=0) out vec4 output_color;
 bool flag(int n){return (int(parameters.style.w)&n)!=0;}
@@ -13,7 +15,10 @@ float mask(vec2 point){
 vec4 over(vec4 a,vec4 b){return a+b*(1-a.a);}
 vec4 input_at(vec2 point){
     vec4 value=vec4(parameters.base.rgb*parameters.base.a,parameters.base.a);
-    if(flag(8)){vec4 scene=texture(source_image,point/parameters.view.xy);scene.rgb*=scene.a;value=over(scene,value);}
+    // Render attachments are already linear-premultiplied after sRGB decode.
+    if(flag(8))value=over(texture(source_image,point/parameters.view.xy),value);
+    if(flag(32))value=over(texture(background_scene,point/parameters.view.xy),value);
+    if(flag(64))value=over(texture(content_scene,point/parameters.view.xy),value);
     if(flag(4)){vec2 uv=(point-parameters.underlay.xy)/parameters.underlay.zw;if(all(greaterThanEqual(uv,vec2(0)))&&all(lessThanEqual(uv,vec2(1)))){vec4 image=texture(underlay_image,uv);if(flag(16)){vec4 tint=vec4(unpackHalf2x16(floatBitsToUint(parameters.highlight.z)),unpackHalf2x16(floatBitsToUint(parameters.highlight.w)));image=vec4(tint.rgb,image.a*tint.a);}image.rgb*=image.a;value=over(image,value);}}
     return value;
 }

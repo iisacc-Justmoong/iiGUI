@@ -1,4 +1,6 @@
 #include <iiGUI/NativeWidgets.h>
+#include <iiGUI/TextLine.h>
+#include <LVUI/NativeTextLayout.h>
 #include <LVUI/NativeWidgetLayout.h>
 #include "LayoutPackage.generated.h"
 #include "WindowPackage.generated.h"
@@ -29,5 +31,10 @@ int main() {
     ii::core::Observable<LayoutRecord> record{{"Record",1}};int updates=0;
     auto lease=std::as_const(record).observe([&](const auto&,auto){++updates;});
     if(!record.set({"Record",1})||updates!=1||!installed_readonly_factory||!installed_object_input_factory||!installed_method_factory||!installed_method_reference_factory)return 6;
-    std::cout<<"Relocated native layout, Window and readonly value factories and public contracts passed\n";
+    auto index=ii::gui::TextIndex::create("installed text wrapping");if(!index)return 7;
+    auto line=ii::gui::TextLine::create(*index);if(!line)return 8;
+    auto wrapped=line->wrap(35);if(!wrapped||wrapped->size()<2||wrapped->front().first!=0||wrapped->back().last!=index->utf16_size())return 9;
+    auto field_layout=lvui::native::NativeTextLayout::create("installed LVUI text wrapping",{},false,35);
+    if(!field_layout||field_layout->lines().size()<2||field_layout->lines().back().last!=field_layout->length())return 10;
+    std::cout<<"Relocated native layout, Window, iiGUI and LVUI wrapped text and readonly value contracts passed\n";
 }

@@ -18,13 +18,14 @@ struct Owner final {
     explicit Owner(Counters& value) : counts(value) { ++counts.created; }
     ~Owner() { ++counts.destroyed; }
 };
-gui::KeyedContentItem row(std::string key, Counters& counts, bool fail=false) {
-    return {std::move(key), [&counts,fail](gui::WidgetBuilder& builder) -> core::Result<void> {
+gui::KeyedContentItem row(std::string key, Counters& counts, bool fail=false,gui::Widget* created_root=nullptr) {
+    return {std::move(key), [&counts,fail,created_root](gui::WidgetBuilder& builder) -> core::Result<void> {
         auto owner=std::make_shared<Owner>(counts);
         if(auto r=builder.retain(owner);!r)return r;
         if(auto r=builder.on_retire([&counts]{++counts.retired;});!r)return r;
         auto root=builder.vstack({},"row",{.spacing=0,.minimum_height=48});
         if(!root)return std::unexpected(root.error());
+        if(created_root)*created_root=*root;
         auto text=builder.input_field(*root,"input",{.text="Initial"});
         if(!text)return std::unexpected(text.error());
         auto action=builder.button(*root,"action",{.text="Action"},[&counts]{++counts.actions;});
@@ -86,6 +87,203 @@ void rollback() {
     check(counts.created==4 && !a.snapshot(),"A valid candidate did not recover after a factory failure");
     state->close();
     check(counts.created==counts.retired && counts.retired==counts.destroyed,"Collection teardown leaked an owner");
+}
+void commit() {
+    Counters counts;
+    auto state=std::make_shared<gui::detail::WidgetState>([](runtime::Task task){task();});
+    auto host=take(state->content_host({},"list",{}));
+    good(host.set_keyed_content({row("A",counts),row("B",counts)}));
+    auto a=take(host.keyed_content_item("A","input"));
+    auto b=take(host.keyed_content_item("B","input"));
+    good(b.set_text("Retained"));good(b.focus());
+    const auto epoch=take(host.snapshot()).content_generation;
+    int calls=0;bool new_published=false;gui::Widget staged;
+    gui::KeyedContentItem candidate{"C",[&](gui::WidgetBuilder& builder)->core::Result<void>{
+        if(auto r=builder.on_publish([&]{new_published=true;});!r)return r;
+        return row("C",counts,false,&staged).factory(builder);
+    }};
+    auto failed=host.set_keyed_content({row("B",counts),candidate},{},[&]()->core::Result<void>{
+        ++calls;
+        check(!new_published&&a.snapshot()&&b.snapshot(),"Commit ran after publication or retirement");
+        check(take(staged.is_within(host))&&!take(staged.is_within(a)),"Candidate ancestry was lost before publication");
+        check(take(host.keyed_content_keys())==std::vector<std::string>{"A","B"},"Commit saw a partially published list");
+        auto nested=host.set_keyed_content({});
+        check(!nested&&nested.error().code==core::ErrorCode::busy,"Commit admitted a reentrant structural replacement");
+        return core::fail(core::ErrorCode::invalid_argument,"reject candidate");
+    });
+    check(!failed&&calls==1&&!new_published&&!staged.is_within(host)&&take(host.snapshot()).content_generation==epoch,
+          "Rejected commit changed the visible generation");
+    check(take(b.snapshot()).text=="Retained"&&take(b.interaction()).focused&&
+          take(host.keyed_content_keys())==std::vector<std::string>{"A","B"},"Rejected commit lost retained state");
+    check(counts.created==3&&counts.retired==1&&counts.destroyed==1,"Rejected commit leaked candidate rows");
+    failed=host.set_keyed_content({row("B",counts),candidate},{},[]()->core::Result<void>{throw std::runtime_error("commit failed");});
+    check(!failed&&failed.error().cause&&a.snapshot()&&!new_published,"Throwing commit replaced the old list");
+    good(host.set_keyed_content({row("B",counts),candidate},{},[&]()->core::Result<void>{
+        ++calls;check(!new_published&&a.snapshot(),"Accepted commit followed publication");return {};
+    }));
+    check(calls==2&&new_published&&!a.snapshot()&&b.snapshot()&&
+          take(host.keyed_content_keys())==std::vector<std::string>{"B","C"},"Accepted commit failed to publish once");
+    const auto updated=take(host.snapshot()).content_generation;
+    failed=host.set_keyed_content({row("B",counts),candidate},{},[&]()->core::Result<void>{
+        ++calls;auto nested=host.set_keyed_content({});
+        check(!nested&&nested.error().code==core::ErrorCode::busy,"Unchanged commit admitted recursive replacement");
+        return core::fail(core::ErrorCode::busy,"reject unchanged candidate");
+    });
+    check(!failed&&calls==3&&take(host.snapshot()).content_generation==updated,
+          "Unchanged keyed content skipped commit or changed generation on failure");
+    good(host.set_keyed_content({row("B",counts),candidate},{},[&]()->core::Result<void>{++calls;return {};}));
+    check(calls==4&&take(host.snapshot()).content_generation==updated,"Unchanged commit rebuilt the retained rows");
+    bool invalid_called=false;
+    failed=host.set_keyed_content({row("bad",counts,true)},{},[&]()->core::Result<void>{invalid_called=true;return {};});
+    check(!failed&&!invalid_called&&take(host.snapshot()).content_generation==updated,"Commit ran after a factory failure");
+    failed=host.set_keyed_content({row("same",counts),row("same",counts)},{},[&]()->core::Result<void>{invalid_called=true;return {};});
+    check(!failed&&!invalid_called,"Commit ran after invalid keys");
+    bool foreign_called=false,foreign_rejected=false,foreign_ancestry_rejected=false;
+    std::thread foreign([&]{auto r=host.set_keyed_content({}, {}, [&]()->core::Result<void>{foreign_called=true;return {};});foreign_rejected=!r;foreign_ancestry_rejected=!b.is_within(host);});
+    foreign.join();check(foreign_rejected&&foreign_ancestry_rejected&&!foreign_called,"Foreign widget access was invoked or accepted");
+    state->close();
+    check(counts.created==counts.retired&&counts.retired==counts.destroyed,"Commit test leaked retained owners");
+
+    auto positioned=std::make_shared<gui::detail::WidgetState>([](runtime::Task task){task();});
+    auto cells=take(positioned->content_host({},"cells",{200,200}));
+    auto cell=row("X",counts);cell.frame=gui::Rect{0,0,80,50};
+    const gui::KeyedContentOptions options{.viewport=gui::Size{200,200}};
+    good(cells.set_keyed_content({cell},options));
+    auto kept=take(cells.keyed_content_item("X","row"));
+    const auto original=take(kept.snapshot()).bounds;
+    const auto cell_epoch=take(cells.snapshot()).content_generation;
+    cell.frame=gui::Rect{35,25,100,80};
+    failed=cells.set_keyed_content({cell},options,[]()->core::Result<void>{return core::fail(core::ErrorCode::invalid_argument,"reject frame");});
+    check(!failed&&take(kept.snapshot()).bounds==original&&take(cells.snapshot()).content_generation==cell_epoch,
+          "Rejected commit published cell geometry");
+    good(cells.set_keyed_content({cell},options,[&]()->core::Result<void>{
+        auto nested=cells.set_keyed_content({});
+        check(!nested&&nested.error().code==core::ErrorCode::busy,"Geometry commit admitted recursive replacement");
+        check(take(kept.snapshot()).bounds==original,"Geometry changed before commit");return {};
+    }));
+    auto moved=take(kept.snapshot()).bounds;
+    check(moved.x!=original.x&&moved.y!=original.y&&take(cells.snapshot()).content_generation==cell_epoch,
+          "Accepted geometry did not preserve the row generation");
+    failed=cells.set_keyed_content({cell},options,[&]()->core::Result<void>{positioned->close();return {};});
+    check(!failed&&failed.error().code==core::ErrorCode::closed&&!kept.snapshot(),
+          "Owner retirement during commit was not reported");
+
+    auto retiring=std::make_shared<gui::detail::WidgetState>([](runtime::Task task){task();});
+    auto changing=take(retiring->content_host({},"changing",{}));
+    good(changing.set_keyed_content({row("old",counts)}));
+    failed=changing.set_keyed_content({row("new",counts)},{},[&]()->core::Result<void>{retiring->close();return {};});
+    check(!failed&&failed.error().code==core::ErrorCode::closed,"Replacement published after owner retirement");
+    check(counts.created==counts.retired&&counts.retired==counts.destroyed,"Retirement during commit leaked rows");
+}
+void nested_layout() {
+    using namespace gui;
+    auto state=std::make_shared<detail::WidgetState>([](runtime::Task task){task();});
+    auto outer=take(state->content_host({},"outer",{300,300}));Widget list,a,b;
+    good(outer.set_content([&](WidgetBuilder& builder)->core::Result<void>{
+        auto body=take(builder.vstack({},"body",{.spacing=5,.alignment=StackAlignment::stretch}));
+        take(builder.action_surface(body,"before",{.height=20}));
+        list=take(builder.content_host(body,"list",{}));return list.set_collapse_when_empty(true);
+    }));
+    const auto row=[&](std::string key,Widget& output)->KeyedContentItem{
+        return {std::move(key),[&output](WidgetBuilder& builder)->core::Result<void>{
+            auto branch=builder.content_host({},"branch",{});if(!branch)return std::unexpected(branch.error());
+            if(auto result=branch->set_collapse_when_empty(true);!result)return result;
+            return branch->set_content([&output](WidgetBuilder& child)->core::Result<void>{
+                auto value=child.action_surface({},"item",{.height=20});if(!value)return std::unexpected(value.error());output=*value;return {};
+            });
+        }};
+    };
+    const KeyedContentOptions options{.layout={.spacing=5,.alignment=StackAlignment::stretch}};
+    good(list.set_keyed_content({row("a",a),row("b",b)},options));
+    (void)take(state->snapshots());const auto first=take(a.snapshot());
+    good(list.set_keyed_content({row("b",b),row("a",a)},options));
+    const auto moved=take(a.snapshot());
+    check(moved.visible&&moved.bounds.height==20&&moved.bounds.y==first.bounds.y+25,
+        "First nested snapshot after keyed reorder used stale ancestor layout");
+    good(list.set_keyed_content({row("a",a),row("b",b)},options));
+    const auto interaction=take(a.interaction());
+    check(interaction.visible&&interaction.bounds.height==20&&interaction.bounds.y==first.bounds.y,
+        "First nested interaction after keyed reorder used stale ancestor layout");
+    state->close();
+}
+void collapse() {
+    using namespace gui;
+    auto state=std::make_shared<detail::WidgetState>([](runtime::Task task){task();});
+    auto outer=take(state->content_host({},"outer",{300,300}));
+    Widget body,list,after;int clicks=0;
+    good(outer.set_content([&](WidgetBuilder& builder)->core::Result<void>{
+        body=take(builder.vstack({},"body",{.spacing=5,.alignment=StackAlignment::stretch}));
+        take(builder.action_surface(body,"before",{.height=20}));
+        list=take(builder.content_host(body,"list",{}));good(list.set_collapse_when_empty(true));
+        after=take(builder.action_surface(body,"after",{.height=20},[&]{++clicks;}));
+        return {};
+    }));
+    const auto height=[&]{return take(body.measure(200)).height;};
+    check(height()==45&&!take(list.snapshot()).visible,"An empty collapsed host left a stack gap");
+    const auto factory=[](std::string key,bool fail=false)->KeyedContentItem{
+        return {std::move(key),[fail](WidgetBuilder& b)->core::Result<void>{
+            auto item=b.action_surface({},"item",{.height=20});if(!item)return std::unexpected(item.error());
+            if(fail)return core::fail(core::ErrorCode::failed,"row rejected");return {};
+        }};
+    };
+    const KeyedContentOptions options{.layout={.spacing=5,.alignment=StackAlignment::stretch}};
+    good(list.set_keyed_content({factory("A"),factory("B"),factory("C")},options));
+    auto a=take(list.keyed_content_item("A")),b=take(list.keyed_content_item("B")),c=take(list.keyed_content_item("C"));
+    check(height()==120&&take(list.snapshot()).visible,"A nonempty collapsed list did not participate in layout");
+    good(b.set_visible(false));
+    check(height()==95&&!take(b.snapshot()).visible,"A hidden keyed row retained its internal spacing");
+    good(a.set_visible(false));good(c.set_visible(false));
+    check(height()==45&&!take(list.snapshot()).visible,"All-hidden keyed rows left an outer gap");
+    const auto r=take(after.snapshot()).bounds;
+    good(state->input({.kind=WidgetInputKind::pointer_down,.x=r.x+2,.y=r.y+2,.buttons=1}));
+    good(state->input({.kind=WidgetInputKind::pointer_up,.x=r.x+2,.y=r.y+2}));
+    check(clicks==1,"A collapsed host intercepted its visible sibling's input");
+    good(b.set_visible(true));
+    check(height()==70&&take(list.snapshot()).visible,"Showing a retained row did not restore layout");
+    good(b.focus());good(b.set_visible(false));
+    check(height()==45&&!take(list.interaction()).focused,"Hiding the last focused row retained its outer focus");
+    good(b.set_visible(true));
+    check(height()==70&&!take(b.snapshot()).focused,"A shown row unexpectedly recovered a retired focus");
+    auto id=take(b.snapshot()).id;
+    good(list.set_collapse_when_empty(false));
+    check(height()==120,"Disabling collapse did not restore keyed wrapper layout");
+    good(list.set_collapse_when_empty(true));
+    check(height()==70&&take(b.snapshot()).id==id,"Re-enabling collapse changed retained rows");
+    auto failed=list.set_keyed_content({factory("B"),factory("new",true)},options);
+    check(!failed&&height()==70&&take(b.snapshot()).id==id,"A failed candidate changed collapsed layout");
+    good(list.set_keyed_content({factory("C"),factory("B"),factory("A")},options));
+    check(height()==70&&take(b.snapshot()).id==id&&take(b.is_within(list)),"Reordering changed collapsed row identity, ancestry or spacing");
+    good(list.clear_content());check(height()==45&&!take(list.snapshot()).visible,"Clearing did not collapse the host");
+    Widget conditional,inner;bool retired_after_collapse=false;
+    good(list.set_keyed_content({{"nested",[&](WidgetBuilder& builder)->core::Result<void>{
+        conditional=take(builder.content_host({},"conditional",{}));return conditional.set_collapse_when_empty(true);
+    }}},options));
+    check(height()==45&&!take(list.snapshot()).visible,"A nested empty branch occupied its parent list");
+    good(conditional.set_content([&](WidgetBuilder& builder)->core::Result<void>{
+        inner=take(builder.action_surface({},"inner",{.height=20}));
+        return builder.on_retire([&]{retired_after_collapse=!take(list.snapshot()).visible;});
+    }));
+    check(height()==70&&take(list.snapshot()).visible,"Activating a nested branch did not restore parent layout");
+    check(take(inner.is_within(list))&&take(inner.is_within(conditional))&&take(inner.is_within(inner))&&
+          !take(list.is_within(inner))&&!take(inner.is_within(after)),"Embedded ancestry did not follow content ownership");
+    auto foreign_tree=std::make_shared<detail::WidgetState>([](runtime::Task task){task();});
+    auto foreign_host=take(foreign_tree->content_host({},"foreign",{}));
+    check(!take(inner.is_within(foreign_host)),"Unrelated widget trees shared ancestry");
+    foreign_tree->close();check(!inner.is_within(foreign_host),"Retired ancestry target was accepted");
+    bool focus_failure=false;auto provider=std::make_shared<TextInputProvider>();
+    provider->state=[]()->core::Result<TextInputState>{return TextInputState{};};
+    provider->read=[](TextRange range)->core::Result<TextContent>{return TextContent{range,{}};};
+    provider->focus_changed=[&](bool active)->core::Result<void>{if(!active){focus_failure=true;throw std::runtime_error("focus callback failed");}return {};};
+    good(list.set_text_input_provider(provider));
+    good(inner.focus());
+    good(conditional.clear_content());
+    check(height()==45&&!take(list.snapshot()).visible&&retired_after_collapse,
+        "Nested retirement observed stale parent layout");
+    check(focus_failure&&!take(list.interaction()).focused&&!inner.is_within(list),"Focus failure interrupted collapse or retained a retired child");
+    good(list.set_collapse_when_empty(false));check(height()==50&&take(list.snapshot()).visible,
+        "Disabling empty collapse did not restore ordinary host spacing");
+    check(!after.set_collapse_when_empty(true),"A non-container accepted the empty collapse policy");
+    state->close();
 }
 void bounded() {
     Counters counts;
@@ -249,7 +447,7 @@ void measurement(){
 int main(int argc,char** argv) {
     try {
         const std::string name=argc>1?argv[1]:"identity";
-        if(name=="identity")identity();else if(name=="rollback")rollback();else if(name=="bounded")bounded();else if(name=="capacity")capacity();
+        if(name=="identity")identity();else if(name=="rollback")rollback();else if(name=="commit")commit();else if(name=="collapse")collapse();else if(name=="nested_layout")nested_layout();else if(name=="bounded")bounded();else if(name=="capacity")capacity();
         else if(name=="retirement")retirement();else if(name=="popup")popup();else if(name=="positioned")positioned();else if(name=="virtual_scroll")virtual_scroll();else if(name=="measurement")measurement();
         else throw std::runtime_error("Unknown keyed content test");
         std::cout<<"Native keyed content "<<name<<" passed without a window\n";

@@ -47,6 +47,14 @@ after existing popup dismissal. The handler belongs to that widget generation;
 it does not create a process-wide keyboard hook. The LVRS ColorPicker uses these
 primitives to reuse iiGUI fields, sliders, buttons, images and color domains.
 
+If a focused content host contains a pressed control, Escape reaches that
+control through every nested host and cancels the press before the containing
+generation handles a later unclaimed Escape. This also applies inside popup
+content; a subsequent release must not activate the canceled control. An
+existing Escape handler in the same generation retains its normal behavior.
+The headless action-surface regression covers two nested hosts and popup content,
+including cancellation followed by a separate Escape to the parent or popup.
+
 `iiGUI.composition_layout`, `composition_input` and `composition_images` test
 geometry, hidden focus, restoring a subtree, Unicode length bounds, focus-loss
 commit and reentrant retirement, image replacement and actual GPU thumb ordering.

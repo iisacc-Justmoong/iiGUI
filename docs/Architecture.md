@@ -1,5 +1,10 @@
 # Native host boundary
 
+> 현재 시각 컴포넌트와 언어의 책임 기준은 [프레임워크 경계](FrameworkBoundary.md)를
+> 따른다. 아래 데스크톱 호스트 설명은 과거 기록이며 플랫폼 범위는
+> [호스트 계약](HostPlatforms.md), 현재 자체 렌더링 경로는
+> [GPU 장면 합성](GpuSceneComposition.md)을 따른다.
+
 ## Dependency and platform boundary
 
 `application -> iiGUI -> iiSDKCore Runtime -> C++23 / native runtime`.

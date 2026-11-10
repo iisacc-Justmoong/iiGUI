@@ -21,7 +21,18 @@ public:
             }
         }
     }
+    void prepare(const CanvasFrame& frame) {
+        const auto plan=plan_canvas_scenes(frame);
+        if(!plan)throw std::invalid_argument("Invalid source scene graph");
+        if(!plan->count||info().scene_sources_supported)return;
+        if(primary_&&renderer_==Renderer::automatic){
+            fallback("Native accelerator does not support source scenes",&frame,0,0,false);
+            return;
+        }
+        throw std::runtime_error("GPU source scenes are not supported by this renderer");
+    }
     void draw(const CanvasFrame& frame,double scale,double height) {
+        prepare(frame);
         if (vulkan_) { vulkan_->draw(frame,scale,height); return; }
         try { primary_->draw(frame,scale,height); }
         catch (const std::exception& error) {
@@ -37,13 +48,15 @@ public:
     }
     bool native_event(const void* event) { return primary_?primary_->native_event(event):vulkan_->native_event(event); }
 private:
-    void fallback(std::string reason,const CanvasFrame* frame,double scale,double height) {
+    void fallback(std::string reason,const CanvasFrame* frame,double scale,double height,bool render=true) {
         try {
             auto replacement=std::make_unique<Vulkan>(parent_,display_,acceleration_);
+            if(frame){const auto plan=plan_canvas_scenes(*frame);if(!plan)throw std::invalid_argument("Invalid source scene graph");
+                if(plan->count&&!replacement->info().scene_sources_supported)throw std::runtime_error("Vulkan source scenes are not implemented");}
             if(frame&&std::ranges::any_of(frame->overlays,[](const auto& l){return bool(l.backdrop);})&&!replacement->info().backdrop_supported)throw std::runtime_error("Vulkan backdrop materials are not implemented");
             if(frame&&std::ranges::any_of(frame->overlays,[](const auto& l){return bool(l.shadow);})&&!replacement->info().shadow_supported)throw std::runtime_error("Vulkan box shadows are not implemented");
             if(frame&&std::ranges::any_of(frame->overlays,[](const auto& l){return !l.content_transform.identity();})&&!replacement->info().content_transform_supported)throw std::runtime_error("Vulkan content transforms are not implemented");
-            if (frame) replacement->draw(*frame,scale,height);
+            if(frame&&render)replacement->draw(*frame,scale,height);
             primary_.reset(); vulkan_=std::move(replacement); reason_=std::move(reason);
         } catch (const std::exception& error) {
             throw std::runtime_error(reason+"; Vulkan fallback failed: "+error.what());

@@ -1,8 +1,10 @@
 #include <iiGUI/VulkanCanvas.h>
+#include <iiGUI/VulkanPaintDevice.h>
 #include <iiGUI/VulkanWindow.h>
 #include <iiGUI/NativeText.h>
 #include <iiGUI/Image.h>
 #include <iiGUI/GpuEffects.h>
+#include <iiGUI/VulkanScenePlan.h>
 #include <iiGUI/VulkanShaders.h>
 #include <algorithm>
 #include <array>
@@ -60,7 +62,7 @@ struct VulkanCanvas::Impl final {
     VkCommandPool command_pool=VK_NULL_HANDLE;
     VkCommandBuffer command=VK_NULL_HANDLE;
     VkFence fence=VK_NULL_HANDLE;
-    bool pending=false;
+    bool pending=false,faulted=false;
     VkSemaphore available=VK_NULL_HANDLE;
     VkSwapchainKHR swapchain=VK_NULL_HANDLE;
     VkExtent2D swap_extent{};
@@ -68,25 +70,42 @@ struct VulkanCanvas::Impl final {
     std::vector<VkSemaphore> presented;
     bool swap_invalid=false;
     VkRenderPass render_pass=VK_NULL_HANDLE,load_pass=VK_NULL_HANDLE;
-    static constexpr std::size_t MaximumLayers=65;
-    VkFramebuffer framebuffer=VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptor_layout=VK_NULL_HANDLE;
     VkDescriptorPool descriptors=VK_NULL_HANDLE;
-    std::array<VkDescriptorSet,MaximumLayers*4> descriptor{};
+    std::vector<VkDescriptorSet> descriptor;
+    std::size_t descriptor_capacity=0;
     VkPipelineLayout pipeline_layout=VK_NULL_HANDLE;
     VkPipeline panels_pipeline=VK_NULL_HANDLE,text_pipeline=VK_NULL_HANDLE,effect_pipeline=VK_NULL_HANDLE;
     VkSampler sampler=VK_NULL_HANDLE;
-    std::unique_ptr<Image> color,effect_content,effect_current;
+    std::unique_ptr<Image> effect_content,effect_current;
     bool content_initialized=false,current_initialized=false;
     struct Layer final {
         std::unique_ptr<Image> glyphs;
         std::unique_ptr<Buffer> panels,glyph_upload;
         ForegroundKey key;
+        PanelKey geometry;
         PixelClip region{};
         std::size_t panel_count=0;
         bool glyph_initialized=false,upload=false,foreground=false;
     };
-    std::vector<Layer> layers;
+    struct Target final {
+        VkDevice device=VK_NULL_HANDLE;
+        VkFramebuffer framebuffer=VK_NULL_HANDLE;
+        std::unique_ptr<Image> color;
+        std::vector<Layer> layers;
+        std::uint32_t width=0,height=0;
+        Target()=default;
+        Target(const Target&)=delete;
+        Target& operator=(const Target&)=delete;
+        ~Target(){clear();}
+        void clear_attachment()noexcept {
+            if(framebuffer)vkDestroyFramebuffer(device,framebuffer,nullptr);
+            framebuffer=VK_NULL_HANDLE;color.reset();width=height=0;
+        }
+        void clear()noexcept {clear_attachment();layers.clear();}
+    };
+    Target output;
+    std::vector<std::unique_ptr<Target>> scene_targets;
     struct EffectAsset{std::shared_ptr<const RasterImage> source;std::unique_ptr<Image> texture;std::unique_ptr<Buffer> upload;bool pending=true;};
     std::vector<EffectAsset> effect_assets;
     VkImageView effect_image(std::shared_ptr<const RasterImage> source){
@@ -105,7 +124,7 @@ struct VulkanCanvas::Impl final {
         if (device) {
             (void)vkDeviceWaitIdle(device);
             clear_swapchain();
-            if (framebuffer) vkDestroyFramebuffer(device,framebuffer,nullptr);
+            scene_targets.clear();output.clear();
             if (panels_pipeline) vkDestroyPipeline(device,panels_pipeline,nullptr);
             if (text_pipeline) vkDestroyPipeline(device,text_pipeline,nullptr);
             if(effect_pipeline)vkDestroyPipeline(device,effect_pipeline,nullptr);
@@ -118,7 +137,7 @@ struct VulkanCanvas::Impl final {
             if (command_pool) vkDestroyCommandPool(device,command_pool,nullptr);
             if (fence) vkDestroyFence(device,fence,nullptr);
             if (available) vkDestroySemaphore(device,available,nullptr);
-            color.reset();effect_content.reset();effect_current.reset(); layers.clear();effect_assets.clear();
+            effect_content.reset();effect_current.reset();effect_assets.clear();
             vkDestroyDevice(device,nullptr);
         }
         if (surface) vkDestroySurfaceKHR(instance,surface,nullptr);
@@ -170,24 +189,34 @@ struct VulkanCanvas::Impl final {
         checked(vkCreateImageView(device,&view,nullptr,&result->view),"Cannot view Vulkan image");
         return result;
     }
-    void initialize(void* parent,void* display,Acceleration acceleration) {
+    void initialize(void* parent,void* display,Acceleration acceleration,const VulkanSurfaceProvider* external=nullptr) {
         std::uint32_t count=0;
         checked(vkEnumerateInstanceExtensionProperties(nullptr,&count,nullptr),"Cannot enumerate Vulkan instance extensions");
         std::vector<VkExtensionProperties> supported(count);
         checked(vkEnumerateInstanceExtensionProperties(nullptr,&count,supported.data()),"Cannot read Vulkan instance extensions");
-        std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME,VulkanWindow::extension()};
+        std::vector<const char*> extensions{VK_KHR_SURFACE_EXTENSION_NAME};
+        if (external) {
+            for (const auto& name : external->extensions)
+                if (name != VK_KHR_SURFACE_EXTENSION_NAME) extensions.push_back(name.c_str());
+        } else extensions.push_back(VulkanWindow::extension());
         for (auto name:extensions) if (!extension(supported,name)) throw std::runtime_error(std::string("Vulkan instance lacks ")+name);
         VkInstanceCreateInfo info{}; info.sType=VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         VkApplicationInfo app{}; app.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
         app.pApplicationName="iiGUI"; app.pEngineName="iiGUI"; app.apiVersion=VK_API_VERSION_1_1;
         info.pApplicationInfo=&app;
         if (extension(supported,VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)) {
-            extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+            if(std::ranges::none_of(extensions,[](const char* name){return std::strcmp(name,VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)==0;}))
+                extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
             info.flags|=VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
         }
         info.enabledExtensionCount=std::uint32_t(extensions.size()); info.ppEnabledExtensionNames=extensions.data();
         checked(vkCreateInstance(&info,nullptr,&instance),"Cannot create Vulkan instance");
-        window=std::make_unique<VulkanWindow>(parent,display); surface=window->surface(instance);
+        if (external) {
+            auto supplied=external->create(instance);
+            if(!supplied)throw VulkanSurfaceFailure{supplied.error()};
+            surface=*supplied;
+            if(!surface)throw VulkanSurfaceFailure{{core::ErrorCode::invalid_argument,"Surface provider returned a null Vulkan surface"}};
+        } else { window=std::make_unique<VulkanWindow>(parent,display); surface=window->surface(instance); }
         choose_device(acceleration);
         VkCommandPoolCreateInfo pool{}; pool.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         pool.queueFamilyIndex=family; pool.flags=VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -245,7 +274,8 @@ struct VulkanCanvas::Impl final {
         info.enabledExtensionCount=std::uint32_t(extensions.size()); info.ppEnabledExtensionNames=extensions.data();
         checked(vkCreateDevice(physical,&info,nullptr,&device),"Cannot create Vulkan graphics device");
         vkGetDeviceQueue(device,family,0,&queue); vkGetPhysicalDeviceMemoryProperties(physical,&memory);
-        statistics.api=GraphicsApi::vulkan; statistics.srgb_attachment=true;statistics.backdrop_supported=statistics.shadow_supported=statistics.content_transform_supported=true;
+        statistics.api=GraphicsApi::vulkan;statistics.srgb_attachment=true;
+        statistics.backdrop_supported=statistics.shadow_supported=statistics.content_transform_supported=statistics.scene_sources_supported=true;
     }
     VkShaderModule shader(std::span<const std::uint32_t> code) {
         VkShaderModuleCreateInfo info{}; info.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -307,29 +337,56 @@ struct VulkanCanvas::Impl final {
             {0,VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,1,VK_SHADER_STAGE_VERTEX_BIT,nullptr},
             {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
             {2,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
-            {3,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr}};
+            {3,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
+            {4,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
+            {5,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr}};
         VkDescriptorSetLayoutCreateInfo layout{}; layout.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layout.bindingCount=4; layout.pBindings=bindings;
+        layout.bindingCount=std::size(bindings); layout.pBindings=bindings;
         checked(vkCreateDescriptorSetLayout(device,&layout,nullptr,&descriptor_layout),"Cannot create Vulkan descriptors");
         VkPushConstantRange push{VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(GpuEffect)};
         VkPipelineLayoutCreateInfo pipeline_info{}; pipeline_info.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipeline_info.setLayoutCount=1; pipeline_info.pSetLayouts=&descriptor_layout;
         pipeline_info.pushConstantRangeCount=1; pipeline_info.pPushConstantRanges=&push;
         checked(vkCreatePipelineLayout(device,&pipeline_info,nullptr,&pipeline_layout),"Cannot create Vulkan pipeline layout");
-        const VkDescriptorPoolSize sizes[]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,MaximumLayers*4},{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,MaximumLayers*12}};
-        VkDescriptorPoolCreateInfo pool{}; pool.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        pool.maxSets=MaximumLayers*4; pool.poolSizeCount=2; pool.pPoolSizes=sizes;
-        checked(vkCreateDescriptorPool(device,&pool,nullptr,&descriptors),"Cannot create Vulkan descriptor pool");
-        VkDescriptorSetAllocateInfo allocation{}; allocation.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        std::array<VkDescriptorSetLayout,MaximumLayers*4> layouts; layouts.fill(descriptor_layout);
-        allocation.descriptorPool=descriptors; allocation.descriptorSetCount=MaximumLayers*4; allocation.pSetLayouts=layouts.data();
-        checked(vkAllocateDescriptorSets(device,&allocation,descriptor.data()),"Cannot allocate Vulkan layer descriptor sets");
         VkSamplerCreateInfo sampling{}; sampling.sType=VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         sampling.magFilter=sampling.minFilter=VK_FILTER_LINEAR; sampling.mipmapMode=VK_SAMPLER_MIPMAP_MODE_NEAREST;
         sampling.addressModeU=sampling.addressModeV=sampling.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         sampling.maxLod=0;
         checked(vkCreateSampler(device,&sampling,nullptr,&sampler),"Cannot create Vulkan text sampler");
         panels_pipeline=pipeline(panels_vert,panels_frag); text_pipeline=pipeline(text_vert,text_frag);effect_pipeline=pipeline(text_vert,effect_frag);
+    }
+    void ensure_descriptors(std::size_t layers) {
+        const auto capacity=vulkan_descriptor_capacity(descriptor_capacity,layers);
+        if(capacity==descriptor_capacity)return;
+        if(capacity>std::numeric_limits<std::uint32_t>::max()/20)throw std::runtime_error("Vulkan descriptor capacity is too large");
+        const auto sets=static_cast<std::uint32_t>(capacity*4);
+        const VkDescriptorPoolSize sizes[]{{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,sets},{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,sets*5}};
+        VkDescriptorPoolCreateInfo pool{};pool.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        pool.maxSets=sets;pool.poolSizeCount=std::size(sizes);pool.pPoolSizes=sizes;
+        VkDescriptorPool replacement=VK_NULL_HANDLE;
+        checked(vkCreateDescriptorPool(device,&pool,nullptr,&replacement),"Cannot create Vulkan descriptor pool");
+        try{
+            std::vector<VkDescriptorSetLayout> layouts(sets,descriptor_layout);
+            std::vector<VkDescriptorSet> values(sets);
+            VkDescriptorSetAllocateInfo allocation{};allocation.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            allocation.descriptorPool=replacement;allocation.descriptorSetCount=sets;allocation.pSetLayouts=layouts.data();
+            checked(vkAllocateDescriptorSets(device,&allocation,values.data()),"Cannot allocate Vulkan layer descriptor sets");
+            if(descriptors)vkDestroyDescriptorPool(device,descriptors,nullptr);
+            descriptors=replacement;descriptor=std::move(values);descriptor_capacity=capacity;
+        }catch(...){vkDestroyDescriptorPool(device,replacement,nullptr);throw;}
+    }
+    [[nodiscard]] VkDescriptorSet layer_descriptor(std::size_t bank,std::size_t layer)const noexcept {
+        return descriptor[bank*descriptor_capacity+layer];
+    }
+    void ensure_target(Target& target,std::uint32_t width,std::uint32_t height,bool sampled) {
+        if(target.color&&target.width==width&&target.height==height)return;
+        auto color=image(width,height,VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT|
+            (sampled?VK_IMAGE_USAGE_SAMPLED_BIT:VkImageUsageFlags{}));
+        VkFramebufferCreateInfo info{};info.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        info.renderPass=render_pass;info.attachmentCount=1;info.pAttachments=&color->view;
+        info.width=width;info.height=height;info.layers=1;VkFramebuffer framebuffer=VK_NULL_HANDLE;
+        checked(vkCreateFramebuffer(device,&info,nullptr,&framebuffer),"Cannot create Vulkan scene framebuffer");
+        target.clear_attachment();target.device=device;target.framebuffer=framebuffer;target.color=std::move(color);target.width=width;target.height=height;
     }
     void clear_swapchain() {
         for (auto semaphore:presented) if (semaphore) vkDestroySemaphore(device,semaphore,nullptr);
@@ -385,12 +442,36 @@ struct VulkanCanvas::Impl final {
         if (!pending) return;
         checked(vkWaitForFences(device,1,&fence,VK_TRUE,gpu_timeout),"Vulkan GPU completion failed or timed out"); pending=false;
     }
+    void abort_frame(bool acquired) noexcept {
+        // An acquired image signals `available` even if encoding later fails.
+        // Consume that signal before reusing the semaphore and retire the old
+        // swapchain on the next explicit frame request.
+        if(acquired && !pending){
+            VkPipelineStageFlags stage=VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            VkSubmitInfo consume{};consume.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            consume.waitSemaphoreCount=1;consume.pWaitSemaphores=&available;consume.pWaitDstStageMask=&stage;
+            if(vkResetFences(device,1,&fence)!=VK_SUCCESS || vkQueueSubmit(queue,1,&consume,fence)!=VK_SUCCESS)
+                faulted=true;
+            else pending=true;
+        }
+        if(pending){
+            if(vkWaitForFences(device,1,&fence,VK_TRUE,gpu_timeout)!=VK_SUCCESS)faulted=true;
+            else pending=false;
+        }
+        if(acquired)swap_invalid=true;
+        // If GPU completion cannot be established, keep all resources alive
+        // and reject further frames until the device is destroyed.
+        if(faulted)return;
+        previous.reset();output.layers.clear();scene_targets.clear();
+        effect_assets.clear();effect_content.reset();effect_current.reset();
+        content_initialized=current_initialized=false;
+    }
     void begin() {
         checked(vkResetCommandPool(device,command_pool,0),"Cannot reset Vulkan commands");
         VkCommandBufferBeginInfo info{}; info.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO; info.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         checked(vkBeginCommandBuffer(command,&info),"Cannot begin Vulkan commands");
     }
-    void submit(std::optional<std::uint32_t> acquired) {
+    bool submit(std::optional<std::uint32_t> acquired) {
         checked(vkEndCommandBuffer(command),"Cannot finish Vulkan commands");
         checked(vkResetFences(device,1,&fence),"Cannot reset Vulkan fence");
         VkPipelineStageFlags stage=VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -409,7 +490,9 @@ struct VulkanCanvas::Impl final {
             if (result==VK_ERROR_OUT_OF_DATE_KHR || result==VK_SUBOPTIMAL_KHR) swap_invalid=true;
             else checked(result,"Cannot present Vulkan native surface");
             if (result==VK_SUCCESS || result==VK_SUBOPTIMAL_KHR) ++statistics.presentations;
+            return result==VK_SUCCESS || result==VK_SUBOPTIMAL_KHR;
         }
+        return true;
     }
     void barrier(VkImage image,VkImageLayout old_layout,VkImageLayout layout,
                  VkAccessFlags source_access,VkAccessFlags destination_access,VkPipelineStageFlags source_stage,VkPipelineStageFlags destination_stage) {
@@ -420,29 +503,152 @@ struct VulkanCanvas::Impl final {
         info.image=image; info.subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
         vkCmdPipelineBarrier(command,source_stage,destination_stage,0,0,nullptr,0,nullptr,1,&info);
     }
-    void draw(const CanvasFrame&,double,double);
+    bool draw(const CanvasFrame&,double,double,bool=false,std::stop_token={});
     PixelBuffer capture();
 };
 
-void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double parent_height) {
-    const auto [width,height]=canvas_pixels(frame,scale);
-    wait(); window->resize(frame.viewport,scale,parent_height);
+bool VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double parent_height,bool external,std::stop_token stop) {
+    if(faulted)throw std::runtime_error("Vulkan paint device must be recreated after an unrecoverable frame failure");
+    if(stop.stop_requested())throw VulkanSurfaceFailure{{core::ErrorCode::cancelled,"Vulkan frame was cancelled"}};
+    const auto [width,height]=external ? canvas_pixels(frame,scale,CanvasPixelRounding::outward) : canvas_pixels(frame,scale);
+    const auto plan=vulkan_scene_plan(frame,width,height);
+    if(!plan)throw std::invalid_argument("Invalid Vulkan source scene graph");
+    statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);
+    if(!vulkan_scene_budget_ok(*plan,width,height))
+        throw std::runtime_error("Vulkan source scene and effect textures exceed the effect budget");
+    wait(); if(window)window->resize(frame.viewport,scale,parent_height);
     const bool can_present=ensure_swapchain(width,height);
+    if(external&&!can_present)return false;
+    const bool target_changed=!output.color || output.width!=width || output.height!=height || previous_scale!=scale;
     bool changed=!previous || *previous!=frame || previous_scale!=scale;
-    if (!color || statistics.pixel_width!=width || statistics.pixel_height!=height) {
-        if (framebuffer) { vkDestroyFramebuffer(device,framebuffer,nullptr); framebuffer=VK_NULL_HANDLE; }
-        color=image(width,height,VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-        VkFramebufferCreateInfo info{}; info.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        info.renderPass=render_pass; info.attachmentCount=1; info.pAttachments=&color->view;
-        info.width=width; info.height=height; info.layers=1;
-        checked(vkCreateFramebuffer(device,&info,nullptr,&framebuffer),"Cannot create Vulkan canvas framebuffer");
+    std::optional<std::uint32_t> acquired;
+    bool committed=false;
+    struct Guard final {
+        Impl& canvas;std::optional<std::uint32_t>& acquired;bool& committed;
+        ~Guard(){if(!committed)canvas.abort_frame(bool(acquired));}
+    } guard{*this,acquired,committed};
+    if (!output.color || output.width!=width || output.height!=height) {
+        ensure_target(output,width,height,false);
         statistics.pixel_width=width; statistics.pixel_height=height;
         effect_content.reset();effect_current.reset();content_initialized=current_initialized=false;
         statistics.cached_texture_bytes=std::uint64_t(width)*height*4; changed=true;
-        for(auto& layer:layers) { layer.glyphs.reset();layer.key={};layer.glyph_initialized=false; }
     }
-    std::optional<std::uint32_t> acquired;
+    struct PreparedPass final {
+        Target* target=nullptr;
+        const CanvasFrame* frame=nullptr;
+        std::optional<Rect> crop;
+        std::size_t first_layer=0;
+        bool source=false;
+        CanvasBatchLayers batches;
+    };
+    std::vector<CanvasFrame> source_frames;
+    std::vector<PreparedPass> passes;
+    if (changed) {
+        ensure_descriptors(plan->layers);
+        scene_targets.resize(frame.scenes.size());source_frames.resize(frame.scenes.size());
+        std::array<bool,maximum_canvas_scenes> active{};
+        for(const auto& pass:plan->passes)if(pass.source)active[*pass.source]=true;
+        for(std::size_t i=0;i<scene_targets.size();++i)if(!active[i])scene_targets[i].reset();
+        CanvasScenePlan order{};
+        std::array<bool,maximum_canvas_scenes> available{};
+        for(const auto& pass:plan->passes)if(pass.source){
+            const auto index=*pass.source;order.order[order.count++]=index;
+            const auto& target=scene_targets[index];
+            available[index]=target&&target->color&&target->width==width&&target->height==height;
+        }
+        const auto dirty=scene_rebuilds(frame,order,previous?&*previous:nullptr,available,target_changed);
+        for(const auto& pass:plan->passes)if(pass.source){
+            const auto index=*pass.source;
+            if(!scene_targets[index])scene_targets[index]=std::make_unique<Target>();
+            ensure_target(*scene_targets[index],width,height,true);
+            source_frames[index]=canvas_scene_frame(frame.scenes[index]);
+        }
+        if(plan->effects&&(!effect_content||!effect_current)){
+            auto content=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+            auto current=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+            effect_content=std::move(content);effect_current=std::move(current);
+            content_initialized=current_initialized=false;
+        }
+        statistics.cached_texture_bytes=std::uint64_t(width)*height*(effect_content?12:4);
+        statistics.scene_texture_bytes=plan->scene_bytes;
+        statistics.effect_image_texture_bytes=plan->asset_bytes;
+        std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(plan->assets,asset.source)==plan->assets.end();});
+        for(const auto& image:plan->assets)effect_image(image);
+        statistics.foreground_texture_bytes=0;passes.reserve(plan->passes.size());
+        for(const auto& item:plan->passes){
+            auto* target=item.source?scene_targets[*item.source].get():&output;
+            if(item.source&&!dirty[*item.source]){
+                for(const auto& layer:target->layers)if(layer.foreground&&layer.glyphs)
+                    statistics.foreground_texture_bytes+=std::uint64_t(layer.region.width)*layer.region.height*4;
+                continue;
+            }
+            const auto* input=item.source?&source_frames[*item.source]:&frame;
+            const auto crop=item.source?frame.scenes[*item.source].bounds:std::optional<Rect>{};
+            auto batches=canvas_batch_layers(*input);
+            if(batches.views.size()!=item.layer_count)throw std::logic_error("Vulkan scene layer plan changed");
+            target->layers.resize(batches.views.size());
+            passes.push_back({target,input,crop,item.first_layer,bool(item.source),std::move(batches)});
+        }
+        const auto transparent=std::shared_ptr<const RasterImage>{};
+        for(auto& pass:passes)for(std::size_t i=0;i<pass.batches.views.size();++i){
+            auto& layer=pass.target->layers[i];const auto view=pass.batches.views[i];const auto slot=pass.first_layer+i;
+            if(view.backdrop||view.shadow){
+                const auto set_images=[&](std::size_t bank,std::shared_ptr<const RasterImage> mask,
+                        std::shared_ptr<const RasterImage> underlay,const BackdropMaterial* material){
+                    const auto background=material&&material->background_scene?scene_targets[*material->background_scene]->color->view:effect_image(transparent);
+                    const auto content=material&&material->content_scene?scene_targets[*material->content_scene]->color->view:effect_image(transparent);
+                    const VkDescriptorImageInfo images[]{
+                        {sampler,bank==2?effect_current->view:effect_content->view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                        {sampler,effect_image(mask),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                        {sampler,effect_image(underlay),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                        {sampler,background,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                        {sampler,content,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+                    VkWriteDescriptorSet writes[5]{};
+                    for(unsigned index=0;index<std::size(writes);++index){auto& write=writes[index];write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                        write.dstSet=layer_descriptor(bank,slot);write.dstBinding=index+1;write.descriptorCount=1;
+                        write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pImageInfo=&images[index];}
+                    vkUpdateDescriptorSets(device,std::size(writes),writes,0,nullptr);
+                };
+                if(view.shadow)set_images(3,view.shadow->mask,transparent,nullptr);
+                if(view.backdrop){set_images(1,view.backdrop->mask,view.backdrop->underlay,&*view.backdrop);set_images(2,view.backdrop->mask,view.backdrop->underlay,&*view.backdrop);}
+            }
+            const auto geometry=pass.batches.panel_layers(i);layer.panel_count=pass.batches.panel_count(i);
+            const auto bytes=std::max<std::size_t>(sizeof(GpuPanel),layer.panel_count*sizeof(GpuPanel));
+            if(layer.panel_count&&(!layer.panels||layer.panels->capacity<bytes||!layer.geometry.matches(geometry))){
+                const auto packed=pack_panel_batch(geometry,layer.panel_count);PanelKey next;next.assign(geometry);
+                if(!layer.panels||layer.panels->capacity<bytes)layer.panels=buffer(bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                // wait() retired the previous submission before this mapped buffer is modified.
+                std::memcpy(layer.panels->mapped,packed.data(),packed.size()*sizeof(GpuPanel));
+                layer.geometry=std::move(next);++statistics.geometry_uploads;
+            }else if(!layer.panel_count){
+                if(!layer.panels||layer.panels->capacity>sizeof(GpuPanel))layer.panels=buffer(sizeof(GpuPanel),VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+                layer.geometry.clear();
+            }
+            VkDescriptorBufferInfo input{layer.panels->handle,0,bytes};VkWriteDescriptorSet write{};
+            write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;write.dstSet=layer_descriptor(0,slot);write.dstBinding=0;
+            write.descriptorCount=1;write.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;write.pBufferInfo=&input;
+            vkUpdateDescriptorSets(device,1,&write,0,nullptr);layer.upload=false;layer.foreground=view.foreground();
+            if(layer.foreground){
+                if(!layer.glyphs||!layer.key.matches(pass.frame->viewport,scale,view,true)){
+                    auto raster=rasterize_foreground_region(pass.frame->viewport,view,scale,true);const auto& bitmap=raster.pixels;
+                    if(!layer.glyphs||layer.region.width!=bitmap.width||layer.region.height!=bitmap.height){layer.glyphs=image(bitmap.width,bitmap.height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);layer.glyph_initialized=false;}
+                    layer.region=raster.region;
+                    if(!layer.glyph_upload||layer.glyph_upload->capacity<bitmap.rgba.size())layer.glyph_upload=buffer(bitmap.rgba.size(),VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+                    std::memcpy(layer.glyph_upload->mapped,bitmap.rgba.data(),bitmap.rgba.size());layer.upload=true;
+                    layer.key.assign(pass.frame->viewport,scale,view,true);++statistics.foreground_rasterizations;
+                }
+                VkDescriptorImageInfo text{sampler,layer.glyphs->view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                write.dstBinding=1;write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pBufferInfo=nullptr;write.pImageInfo=&text;
+                vkUpdateDescriptorSets(device,1,&write,0,nullptr);
+                statistics.foreground_texture_bytes+=std::uint64_t(layer.region.width)*layer.region.height*4;
+            }else{layer.glyphs.reset();layer.glyph_upload.reset();layer.key={};layer.glyph_initialized=false;}
+        }
+    }
+    // Prepare all fallible CPU allocations before acquiring a presentation
+    // image, so a preparation error cannot strand its semaphore.
+    CanvasFrame retained_frame=frame;
     if (can_present) {
+        if(stop.stop_requested())throw VulkanSurfaceFailure{{core::ErrorCode::cancelled,"Vulkan frame was cancelled"}};
         std::uint32_t index=0;
         const auto result=vkAcquireNextImageKHR(device,swapchain,1'000'000'000,available,VK_NULL_HANDLE,&index);
         if (result==VK_SUCCESS || result==VK_SUBOPTIMAL_KHR) {
@@ -450,60 +656,12 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
         } else if (result==VK_ERROR_OUT_OF_DATE_KHR) swap_invalid=true;
         else if (result!=VK_TIMEOUT && result!=VK_NOT_READY) checked(result,"Cannot acquire native Vulkan image");
     }
-    if (!changed && !acquired) return;
-    const auto views=changed?canvas_layers(frame):std::vector<CanvasLayerView>{};
-    if (changed) {
-        layers.resize(views.size());statistics.foreground_texture_bytes=0;
-        const bool effects=std::ranges::any_of(views,[](const auto& layer){return layer.backdrop||layer.shadow;});
-        if(effects&&!effect_content){effect_content=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);effect_current=image(width,height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);statistics.cached_texture_bytes+=std::uint64_t(width)*height*8;}
-        if(effects)for(std::size_t i=0;i<views.size();++i)for(unsigned bank:{1u,2u,3u}){VkDescriptorImageInfo texture{sampler,bank==2?effect_current->view:effect_content->view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};VkWriteDescriptorSet write{};write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;write.dstSet=descriptor[bank*MaximumLayers+i];write.dstBinding=1;write.descriptorCount=1;write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pImageInfo=&texture;vkUpdateDescriptorSets(device,1,&write,0,nullptr);}
-        std::vector<std::shared_ptr<const RasterImage>> needed;if(effects)needed.push_back({});
-        const auto need=[&](const auto& image){if(image&&std::ranges::find(needed,image)==needed.end())needed.push_back(image);};
-        for(const auto& view:views){if(view.shadow)need(view.shadow->mask);if(view.backdrop){need(view.backdrop->mask);need(view.backdrop->underlay);}}
-        std::uint64_t effect_bytes=0;for(const auto& image:needed)effect_bytes+=image?image->rgba().size():4;
-        statistics.effect_texture_budget_bytes=effect_texture_budget(width,height);if(effect_bytes>statistics.effect_texture_budget_bytes)throw std::runtime_error("Effect image storage exceeds the effect budget");
-        std::erase_if(effect_assets,[&](const auto& asset){return std::ranges::find(needed,asset.source)==needed.end();});
-        statistics.effect_image_texture_bytes=effect_bytes;
-        for(const auto& image:needed)effect_image(image);
-        if(effects)for(std::size_t i=0;i<views.size();++i){
-            const auto set_images=[&](std::size_t bank,std::shared_ptr<const RasterImage> mask,std::shared_ptr<const RasterImage> underlay){
-                const VkDescriptorImageInfo images[]{{sampler,effect_image(mask),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},{sampler,effect_image(underlay),VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
-                VkWriteDescriptorSet writes[2]{};for(unsigned index=0;index<2;++index){auto& w=writes[index];w.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;w.dstSet=descriptor[bank*MaximumLayers+i];w.dstBinding=index+2;w.descriptorCount=1;w.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;w.pImageInfo=&images[index];}vkUpdateDescriptorSets(device,2,writes,0,nullptr);
-            };
-            // Shadow and backdrop have independent descriptor banks so one draw
-            // cannot retroactively change another draw in the command buffer.
-            const auto& view=views[i];set_images(3,view.shadow?view.shadow->mask:std::shared_ptr<const RasterImage>{},{});set_images(1,view.backdrop?view.backdrop->mask:std::shared_ptr<const RasterImage>{},view.backdrop?view.backdrop->underlay:std::shared_ptr<const RasterImage>{});set_images(2,view.backdrop?view.backdrop->mask:std::shared_ptr<const RasterImage>{},view.backdrop?view.backdrop->underlay:std::shared_ptr<const RasterImage>{});
-        }
-        for(std::size_t i=0;i<views.size();++i) {
-            auto& layer=layers[i];const auto view=views[i];
-            const auto instances=pack_panels(view.panels,view.content_transform);layer.panel_count=instances.size();
-            const auto bytes=std::max<std::size_t>(sizeof(GpuPanel),instances.size()*sizeof(GpuPanel));
-            if (!layer.panels || layer.panels->capacity<bytes) layer.panels=buffer(bytes,VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-            if (!instances.empty()) std::memcpy(layer.panels->mapped,instances.data(),instances.size()*sizeof(GpuPanel));
-            VkDescriptorBufferInfo input{layer.panels->handle,0,bytes};
-            VkWriteDescriptorSet write{}; write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet=descriptor[i]; write.dstBinding=0; write.descriptorCount=1;
-            write.descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; write.pBufferInfo=&input;
-            vkUpdateDescriptorSets(device,1,&write,0,nullptr);
-            layer.upload=false;layer.foreground=view.foreground();
-            if(layer.foreground) {
-                if(!layer.glyphs || !layer.key.matches(frame.viewport,scale,view,true)) {
-                    auto raster=rasterize_foreground_region(frame.viewport,view,scale,true);const auto& bitmap=raster.pixels;
-                    if (!layer.glyphs||layer.region.width!=bitmap.width||layer.region.height!=bitmap.height){layer.glyphs=image(bitmap.width,bitmap.height,VK_IMAGE_USAGE_SAMPLED_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT);layer.glyph_initialized=false;}layer.region=raster.region;
-                    if (!layer.glyph_upload || layer.glyph_upload->capacity<bitmap.rgba.size())
-                        layer.glyph_upload=buffer(bitmap.rgba.size(),VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-                    std::memcpy(layer.glyph_upload->mapped,bitmap.rgba.data(),bitmap.rgba.size());
-                    layer.upload=true;layer.key.assign(frame.viewport,scale,view,true);
-                    ++statistics.foreground_rasterizations;
-                }
-                VkDescriptorImageInfo text{sampler,layer.glyphs->view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-                write.dstBinding=1; write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                write.pBufferInfo=nullptr; write.pImageInfo=&text;
-                vkUpdateDescriptorSets(device,1,&write,0,nullptr);
-                statistics.foreground_texture_bytes+=std::uint64_t(layer.region.width)*layer.region.height*4;
-            } else { layer.glyphs.reset();layer.glyph_upload.reset();layer.key={};layer.glyph_initialized=false; }
-        }
+    if(external&&!acquired){
+        if(stop.stop_requested())throw VulkanSurfaceFailure{{core::ErrorCode::cancelled,"Vulkan frame was cancelled"}};
+        return false;
     }
+    if(!changed&&!acquired){committed=true;return true;}
+    if(stop.stop_requested())throw VulkanSurfaceFailure{{core::ErrorCode::cancelled,"Vulkan frame was cancelled"}};
     begin();
     if (changed) {
         for(auto& asset:effect_assets)if(asset.pending){
@@ -512,7 +670,7 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
             vkCmdCopyBufferToImage(command,asset.upload->handle,asset.texture->handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
             barrier(asset.texture->handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);asset.pending=false;
         }
-        for(auto& layer:layers) if(layer.upload) {
+        for(auto& pass:passes)for(auto& layer:pass.target->layers)if(layer.upload) {
             barrier(layer.glyphs->handle,layer.glyph_initialized?VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:VK_IMAGE_LAYOUT_UNDEFINED,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,layer.glyph_initialized?VK_ACCESS_SHADER_READ_BIT:0,VK_ACCESS_TRANSFER_WRITE_BIT,
                 layer.glyph_initialized?VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT:VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT);
@@ -522,28 +680,47 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
                 VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
             layer.glyph_initialized=true;
         }
-        const bool has_effects=std::ranges::any_of(views,[](const auto& layer){return layer.backdrop||layer.shadow;});
-        const auto snapshot=[&](Image& target,bool& initialized){
+        const auto snapshot=[&](Image& source,Image& target,bool& initialized){
             barrier(target.handle,initialized?VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:VK_IMAGE_LAYOUT_UNDEFINED,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,initialized?VK_ACCESS_SHADER_READ_BIT:0,VK_ACCESS_TRANSFER_WRITE_BIT,initialized?VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT:VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT);
-            VkImageCopy copy{};copy.srcSubresource=copy.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};copy.extent={width,height,1};vkCmdCopyImage(command,color->handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,target.handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
+            VkImageCopy copy{};copy.srcSubresource=copy.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};copy.extent={width,height,1};vkCmdCopyImage(command,source.handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,target.handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
             barrier(target.handle,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);initialized=true;
         };
-        for(std::size_t i=0;i<layers.size();++i){
-            if(i&&views[i].backdrop&&views[i].backdrop->source==BackdropSource::previous_layers)snapshot(*effect_current,current_initialized);
-            VkClearValue clear{};clear.color={{frame.background.red,frame.background.green,frame.background.blue,1}};
-            VkRenderPassBeginInfo pass{};pass.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;pass.renderPass=i?load_pass:render_pass;pass.framebuffer=framebuffer;pass.renderArea={{0,0},{width,height}};pass.clearValueCount=1;pass.pClearValues=&clear;
-            vkCmdBeginRenderPass(command,&pass,VK_SUBPASS_CONTENTS_INLINE);
+        for(auto& pass:passes){
+          for(std::size_t i=0;i<pass.batches.views.size();++i){
+            const auto& view=pass.batches.views[i];const auto slot=pass.first_layer+i;
+            if(i&&view.backdrop&&view.backdrop->source==BackdropSource::previous_layers)snapshot(*pass.target->color,*effect_current,current_initialized);
+            const auto background=pass.frame->background;VkClearValue clear{};
+            clear.color={{background.red*background.alpha,background.green*background.alpha,background.blue*background.alpha,background.alpha}};
+            VkRenderPassBeginInfo begin_pass{};begin_pass.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;begin_pass.renderPass=i?load_pass:render_pass;begin_pass.framebuffer=pass.target->framebuffer;begin_pass.renderArea={{0,0},{width,height}};begin_pass.clearValueCount=1;begin_pass.pClearValues=&clear;
+            vkCmdBeginRenderPass(command,&begin_pass,VK_SUBPASS_CONTENTS_INLINE);
             VkViewport viewport{0,0,float(width),float(height),0,1};vkCmdSetViewport(command,0,1,&viewport);
-            const auto clip=clip_pixels(views[i],scale,width,height);
+            const auto clip=scene_clip_pixels(view,pass.crop,scale,width,height);
             if(clip.width&&clip.height){
                 const VkRect2D scissor{{std::int32_t(clip.x),std::int32_t(clip.y)},{clip.width,clip.height}};vkCmdSetScissor(command,0,1,&scissor);
-                const auto effect=[&](bool shadow){const auto parameters=effect_parameters(views[i],frame.viewport,scale,shadow);const auto descriptor_index=(shadow?3:views[i].backdrop->source==BackdropSource::content?1:2)*MaximumLayers+i;vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&descriptor[descriptor_index],0,nullptr);vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(parameters),&parameters);vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,effect_pipeline);vkCmdDraw(command,6,1,0,0);};
-                if(views[i].shadow)effect(true);if(views[i].backdrop)effect(false);
-                const float size[]{frame.viewport.width,frame.viewport.height};vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT,0,sizeof(size),size);
-                vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&descriptor[i],0,nullptr);
-                const auto& layer=layers[i];if(layer.panel_count){vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,panels_pipeline);vkCmdDraw(command,6,std::uint32_t(layer.panel_count),0,0);}if(layer.foreground){GpuEffect foreground{{frame.viewport.width,frame.viewport.height,float(scale),1},{float(layer.region.x),float(layer.region.y),float(layer.region.width),float(layer.region.height)},{},{},{}};vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(foreground),&foreground);vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,text_pipeline);vkCmdDraw(command,6,1,0,0);}
+                const auto effect=[&](bool shadow){const auto parameters=effect_parameters(view,pass.frame->viewport,scale,shadow);const auto bank=shadow?3:view.backdrop->source==BackdropSource::content?1:2;const auto set=layer_descriptor(bank,slot);vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&set,0,nullptr);vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(parameters),&parameters);vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,effect_pipeline);vkCmdDraw(command,6,1,0,0);};
+                if(view.shadow)effect(true);if(view.backdrop)effect(false);
+                const float size[]{pass.frame->viewport.width,pass.frame->viewport.height};vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT,0,sizeof(size),size);
+                const auto set=layer_descriptor(0,slot);vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipeline_layout,0,1,&set,0,nullptr);
+                const auto& layer=pass.target->layers[i];
+                if(layer.panel_count){
+                    vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,panels_pipeline);
+                    vkCmdDraw(command,6,std::uint32_t(layer.panel_count),0,0);++statistics.geometry_draw_batches;
+                }
+                if(layer.foreground){
+                    GpuEffect foreground{};
+                    foreground.view[0]=pass.frame->viewport.width;foreground.view[1]=pass.frame->viewport.height;
+                    foreground.view[2]=float(scale);foreground.view[3]=1;
+                    foreground.bounds[0]=float(layer.region.x);foreground.bounds[1]=float(layer.region.y);
+                    foreground.bounds[2]=float(layer.region.width);foreground.bounds[3]=float(layer.region.height);
+                    vkCmdPushConstants(command,pipeline_layout,VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(foreground),&foreground);
+                    vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_GRAPHICS,text_pipeline);vkCmdDraw(command,6,1,0,0);
+                }
             }
-            vkCmdEndRenderPass(command);if(i==0&&has_effects)snapshot(*effect_content,content_initialized);
+            vkCmdEndRenderPass(command);if(i==0&&plan->effects)snapshot(*pass.target->color,*effect_content,content_initialized);
+          }
+          if(pass.source)barrier(pass.target->color->handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+              VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT|VK_ACCESS_TRANSFER_READ_BIT,VK_ACCESS_SHADER_READ_BIT,
+              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT|VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
         }
     }
     if (acquired) {
@@ -553,22 +730,24 @@ void VulkanCanvas::Impl::draw(const CanvasFrame& frame,double scale,double paren
         VkImageBlit copy{}; copy.srcSubresource=copy.dstSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};
         copy.srcOffsets[1]={std::int32_t(width),std::int32_t(height),1};
         copy.dstOffsets[1]={std::int32_t(swap_extent.width),std::int32_t(swap_extent.height),1};
-        vkCmdBlitImage(command,color->handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,destination,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy,VK_FILTER_NEAREST);
+        vkCmdBlitImage(command,output.color->handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,destination,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy,VK_FILTER_NEAREST);
         barrier(destination,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,VK_ACCESS_TRANSFER_WRITE_BIT,0,
             VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
     }
-    submit(acquired);
-    if (changed) ++statistics.scene_renders;
-    previous=frame; previous_scale=scale;
+    if(stop.stop_requested())throw VulkanSurfaceFailure{{core::ErrorCode::cancelled,"Vulkan frame was cancelled"}};
+    const bool presented_frame=submit(acquired);
+    if(changed)statistics.scene_renders+=passes.size();
+    previous=std::move(retained_frame); previous_scale=scale;committed=true;
+    return presented_frame;
 }
 
 PixelBuffer VulkanCanvas::Impl::capture() {
-    if (!color) throw std::runtime_error("Vulkan canvas has not rendered");
+    if (!output.color) throw std::runtime_error("Vulkan canvas has not rendered");
     wait(); const auto width=statistics.pixel_width,height=statistics.pixel_height;
     auto output=buffer(std::uint64_t(width)*height*4,VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     begin();
     VkBufferImageCopy copy{}; copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1}; copy.imageExtent={width,height,1};
-    vkCmdCopyImageToBuffer(command,color->handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,output->handle,1,&copy);
+    vkCmdCopyImageToBuffer(command,this->output.color->handle,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,output->handle,1,&copy);
     VkBufferMemoryBarrier host{}; host.sType=VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     host.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; host.dstAccessMask=VK_ACCESS_HOST_READ_BIT;
     host.srcQueueFamilyIndex=host.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
@@ -581,11 +760,16 @@ PixelBuffer VulkanCanvas::Impl::capture() {
 VulkanCanvas::VulkanCanvas(void* parent,void* display,Acceleration acceleration):impl_(std::make_unique<Impl>()) {
     impl_->initialize(parent,display,acceleration);
 }
+VulkanCanvas::VulkanCanvas(const VulkanSurfaceProvider& external,Acceleration acceleration):impl_(std::make_unique<Impl>()) {
+    impl_->initialize(nullptr,nullptr,acceleration,&external);
+}
 VulkanCanvas::~VulkanCanvas()=default;
-void VulkanCanvas::draw(const CanvasFrame& frame,double scale,double height) { impl_->draw(frame,scale,height); }
+void VulkanCanvas::draw(const CanvasFrame& frame,double scale,double height) { (void)impl_->draw(frame,scale,height); }
+bool VulkanCanvas::draw_external(const CanvasFrame& frame,double scale,std::stop_token stop) { return impl_->draw(frame,scale,frame.viewport.height,true,stop); }
 PixelBuffer VulkanCanvas::capture() { return impl_->capture(); }
 GraphicsInfo VulkanCanvas::info() const { return impl_->statistics; }
 bool VulkanCanvas::native_event(const void* event) {
+    if(!impl_->window)return false;
     const auto result=impl_->window->event(event);
     if (result==VulkanWindowEvent::exposed && impl_->previous)
         impl_->draw(*impl_->previous,impl_->previous_scale,0);

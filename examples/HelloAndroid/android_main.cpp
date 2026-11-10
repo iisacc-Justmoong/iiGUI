@@ -2,7 +2,14 @@
 #include <android/log.h>
 #include <android_native_app_glue.h>
 
+#if defined(IIGUI_ANDROID_OS_SMOKE)
+void bind_android_os_fixture(android_app*) noexcept;
+#endif
 extern "C" void android_main(android_app* native){
+#if defined(IIGUI_ANDROID_OS_SMOKE)
+    bind_android_os_fixture(native);
+    struct ResetFixture final {~ResetFixture(){bind_android_os_fixture(nullptr);}} reset;
+#endif
     auto result=ii::gui::run_android_application(native,ii::runtime::configure_application);
     if(!result){
         auto message=result.error().message;

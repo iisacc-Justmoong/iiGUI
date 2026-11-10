@@ -1,11 +1,15 @@
 """Build-host regression tests for the native AOT desktop delivery contract."""
 import importlib.util
+import contextlib
+import io
 import json
 from pathlib import Path
 import struct
 import sys
-import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
+import resource_workspace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -80,17 +84,16 @@ class AotDesktop(unittest.TestCase):
             verify.check_linkage("", "main")
 
     def test_exact_font_resources_are_required(self):
-        with tempfile.TemporaryDirectory(dir=ROOT / "build") as temporary:
-            root = Path(temporary)
+        with resource_workspace.temporary(ROOT, "aot-") as root:
             source = root / "prefix/share/iiGUI/resources/native"
             destination = root / "app/resources"
-            source.mkdir(parents=True)
-            destination.mkdir(parents=True)
+            resource_workspace.provider.mkdir(source, parents=True)
+            resource_workspace.provider.mkdir(destination, parents=True)
             for name in verify.RESOURCES:
-                (source / name).write_bytes(name.encode())
-                (destination / name).write_bytes(name.encode())
+                resource_workspace.provider.write_bytes(source / name, name.encode())
+                resource_workspace.provider.write_bytes(destination / name, name.encode())
             self.assertEqual(len(verify.check_resources(root / "prefix", root / "app", "linux")), len(verify.RESOURCES))
-            (destination / "Pretendard-Regular.ttf").write_bytes(b"replaced")
+            resource_workspace.provider.write_bytes(destination / "Pretendard-Regular.ttf", b"replaced")
             with self.assertRaises(ValueError):
                 verify.check_resources(root / "prefix", root / "app", "linux")
 
@@ -100,6 +103,31 @@ class AotDesktop(unittest.TestCase):
         self.assertEqual({kit["platform"] for kit in data["kits"]}, {"windows", "linux", "macos"})
         self.assertNotIn("/Users/", text)
         self.assertNotIn("/Volumes/", text)
+
+    def test_consumer_inputs_and_build_outputs_use_separate_owned_locations(self):
+        with verify.verification_workspace.temporary(ROOT, 'aot-') as workspace:
+            output = ROOT / 'build/test-aot'
+            paths = verify.consumer_paths(output, workspace)
+            self.assertTrue(paths['prefix'].is_relative_to(workspace))
+            self.assertTrue(paths['source'].is_relative_to(workspace))
+            self.assertTrue(paths['install'].is_relative_to(workspace))
+            self.assertTrue(paths['build'].is_relative_to(output))
+
+    def test_failed_aot_build_cleans_its_verification_workspace(self):
+        calls = []
+        def failed(command, **kwargs):
+            calls.append([str(value) for value in command])
+            return SimpleNamespace(returncode=1)
+        with resource_workspace.temporary(ROOT, 'aot-test-') as owner:
+            with patch.object(verify, 'checked_build_root', return_value=owner/'build'), \
+                 patch.object(verify.subprocess, 'run', side_effect=failed), \
+                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                result = verify.main(['--platform', verify.host_platform(), '--builder', 'fake-builder',
+                                      '--host-compiler', str(Path(__file__))])
+            self.assertEqual(result, 1)
+            manifest = Path(calls[0][calls[0].index('--manifest') + 1])
+            self.assertTrue(manifest.is_relative_to(ROOT/'resources/.state/verification'))
+            self.assertFalse(manifest.exists())
 
 
 if __name__ == "__main__":

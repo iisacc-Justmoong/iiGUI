@@ -1,5 +1,5 @@
 #pragma once
-#include <iiGUI/Host.h>
+#include <iiGUI/WindowGeometry.h>
 #include <cmath>
 #include <initializer_list>
 #include <optional>

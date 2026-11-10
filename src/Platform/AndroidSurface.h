@@ -8,11 +8,12 @@ namespace ii::gui::detail {
 android_app* android_application() noexcept;
 struct AndroidSurfaceParent final {
     android_app* app=nullptr;
+    runtime::EventLoop::Sender sender;
     ANativeWindow* window=nullptr; // Borrowed until APP_CMD_TERM_WINDOW.
     double scale=1;
     bool active=false;
 };
-enum class AndroidSurfaceEventKind { input, window, activation, resize };
+enum class AndroidSurfaceEventKind { input, window, activation, resize, focus_lost };
 struct AndroidSurfaceEvent final {
     AndroidSurfaceEventKind kind;
     AInputEvent* input=nullptr;

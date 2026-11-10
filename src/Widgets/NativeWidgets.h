@@ -1,5 +1,7 @@
 #pragma once
-#include <iiGUI/Host.h>
+#include <iiGUI/Graphics.h>
+#include <iiGUI/Desktop.h>
+#include <iiSDKCore/Runtime/EventLoop.h>
 #include <iiGUI/WidgetLayout.h>
 #include <iiGUI/WindowProperties.h>
 #include <iiGUI/Appearance.h>
@@ -8,11 +10,38 @@
 #include <iiGUI/Motion.h>
 #include <iiGUI/WidgetInteraction.h>
 #include <iiSDKCore/Animation/Timeline.h>
+#include <functional>
+#include <cmath>
+#include <cstdint>
+#include <memory>
 #include <thread>
 #include <optional>
+#include <utility>
+
+#define IIGUI_COMMITTED_PUBLICATION_API 1
+#define IIGUI_ACCESSIBILITY_VALUE_HANDLER_API 1
+#define IIGUI_KEY_CANCEL_API 1
+#define IIGUI_TEXT_SELECTION_API 1
+#define IIGUI_DIRECTIONAL_TEXT_SELECTION_API 1
+#define IIGUI_TEXT_REPLACEMENT_CURSOR_API 1
+#define IIGUI_TEXT_SERVICE_INPUT_API 1
+#define IIGUI_TEXT_REPLACEMENT_SELECTION_API 1
+#define IIGUI_TEXT_COMPOSITION_REGION_API 1
+#define IIGUI_TEXT_SURROUNDING_DELETE_API 1
+#define IIGUI_TEXT_REVISION_API 1
+#define IIGUI_TEXT_GEOMETRY_API 1
+#define IIGUI_TEXT_CHANGE_SCOPE_API 1
+#define IIGUI_REVEAL_LOCAL_RECT_API 1
+#define IIGUI_TEXT_COMPOSITION_PRESENTATION_API 1
+#define IIGUI_POPOVER_UNDERLAY_BOUNDS_API 1
+#define IIGUI_POPOVER_COMBINED_MATERIAL_MOTION_API 1
+#define IIGUI_POPOVER_UNTINTED_UNDERLAY_API 1
 
 namespace ii::gui {
-namespace detail { class WidgetState; }
+// New-header/old-library combinations must not silently lose publication behavior.
+IIGUI_EXPORT void require_committed_publication_abi_v1() noexcept;
+namespace detail { class WidgetState; struct PopoverMotionAbiV2 final {}; }
+enum class WidgetInputKind;
 class WidgetBuilder;
 using WidgetFactory=std::function<core::Result<void>(WidgetBuilder&)>;
 enum class WidgetKind { vertical_stack, horizontal_stack, label, button, overlay_stack, spacer,
@@ -20,7 +49,7 @@ enum class WidgetKind { vertical_stack, horizontal_stack, label, button, overlay
     combo_box, stepper, segmented_control, menu, menu_item, menu_divider, color_surface, absolute_stack, image, popover, scroll_view, content_host, action_surface };
 // Semantic metadata for application-owned custom containers. It does not
 // create a widget, take ownership of a model, or change input and layout.
-enum class AccessibilityRole { automatic, image, progress, slider, stepper, tab_group, menu };
+enum class AccessibilityRole { automatic, image, progress, slider, stepper, tab_group, menu, table, cell, column_header_group, column_header };
 struct AccessibilityRange final {
     double minimum = 0, maximum = 1, value = 0;
     friend bool operator==(const AccessibilityRange&, const AccessibilityRange&) = default;
@@ -32,6 +61,18 @@ struct AccessibilitySemantics final {
     bool can_increment=true,can_decrement=true;
     friend bool operator==(const AccessibilitySemantics&, const AccessibilitySemantics&) = default;
 };
+// Lightweight accessibility-only children of an application-owned surface.
+// Bounds are local to the owner and clipped to it. Keys retain their identity
+// only while continuously present; no native or iiGUI widget is constructed.
+struct VirtualAccessibilityNode final {
+    std::string key,name,description,value;
+    Rect bounds;
+    bool enabled=true,selected=false,focused=false;
+    AccessibilityRole role=AccessibilityRole::cell;
+    bool actionable=true;
+    friend bool operator==(const VirtualAccessibilityNode&,const VirtualAccessibilityNode&)=default;
+};
+using VirtualAccessibilityAction=std::function<core::Result<void>(std::string_view,WidgetInputKind)>;
 enum class ButtonTone { primary, normal, borderless, destructive, disabled };
 struct KeyedContentItem final {
     std::string key;
@@ -55,6 +96,10 @@ struct ScrollOptions final {
     // Natural content keeps its preferred width when enabled. Supplying a
     // virtual width enables the logical X axis without translating the child.
     bool horizontal_enabled=false;
+    // Suppress direct wheel/trackpad/touch scroll input while retaining the virtual
+    // content extent, current offset and programmatic positioning. An unused
+    // input continues to an eligible ancestor scroll view.
+    bool user_scroll_enabled=true;
     friend bool operator==(const ScrollOptions&,const ScrollOptions&)=default;
 };
 struct ScrollViewport final {
@@ -114,6 +159,7 @@ struct ButtonOptions final {
     std::optional<ButtonStyle> style;
     // Explicit composition metrics; omission retains the existing button layout.
     std::optional<double> left_padding,right_padding,content_spacing,indicator_size,width;
+    bool checkable=false,checked=false;
 };
 // Semantic role for an application-owned interactive surface. The role does
 // not determine its state transitions; the application may implement them.
@@ -133,6 +179,8 @@ struct ActionOptions final {
     bool interaction_enabled=true;
     bool checkable=false,checked=false,tab_focusable=true,pointer_focusable=true;
     std::string accessibility_description;
+    bool enter_key_activation=true;
+    friend bool operator==(const ActionOptions&,const ActionOptions&)=default;
 };
 enum class TabStyle { underline,surface };
 struct TabOptions final {
@@ -171,12 +219,12 @@ struct ComboBoxOptions final {
     double width=97;
     std::shared_ptr<const RasterImage> indicator;
 };
-// A styled row of independent children; there is no implicit selection model.
+// A styled row or column of independent children; there is no implicit selection model.
 struct SegmentedOptions final {
-    double horizontal_padding=4,vertical_padding=3.5,spacing=2,border_width=2,corner_radius=12;
+    double horizontal_padding=0,vertical_padding=0,spacing=2,border_width=0,corner_radius=default_widget_corner_radius;
     // Opaque authored surfaces. Translucent borders/fills return invalid_argument.
     WidgetColor background{.1370945126,.1402995437,.1419020444,1},border{.1935568452,.1978072077,.1999323964,1};
-    bool cylinder=false,force_borderless_tone=true;
+    bool cylinder=false,force_borderless_tone=true,vertical=false;
 };
 enum class MenuStyle { regular,context };
 enum class MenuItemState { normal,selected,inactive };
@@ -197,6 +245,10 @@ struct PopoverShadow final {
     double offset_x=0,offset_y=16,blur_radius=32;
     WidgetColor color{0,0,0,.28};
 };
+struct PopoverOpacityTransition final {
+    runtime::Clock::duration enter_duration{},exit_duration{};
+    animation::Easing enter_easing=animation::Easing::linear,exit_easing=animation::Easing::linear;
+};
 struct PopoverTransition final {
     runtime::Clock::duration enter_duration{},exit_duration{};
     animation::Easing enter_easing=animation::Easing::linear,exit_easing=animation::Easing::linear;
@@ -204,6 +256,9 @@ struct PopoverTransition final {
     bool enabled=true;
     std::shared_ptr<MotionPreferences> preferences;
     Size origin{.5,.5}; // Normalized scale pivot; existing popovers stay centered.
+    // Omitted preserves the original shared scale/opacity progress.
+    std::optional<PopoverOpacityTransition> opacity;
+    bool hold_scale_on_exit=false;
 };
 enum class SheetDetent { fit,medium,large };
 // Retained modal surface: desktop center or a full-width mobile bottom sheet.
@@ -251,8 +306,15 @@ struct PopoverOptions final {
     // When omitted, context requests follow the ordinary outside-press policy.
     std::optional<bool> dismiss_on_context_request;
     std::optional<PopoverAdaptiveLayout> adaptive_layout;
+    double inner_highlight_opacity=0,inner_highlight_offset_y=1;
 };
 struct PopoverEvents final {runtime::Task opened,closed,canceled;};
+// Called on the widget owner thread while producing a popup material. The
+// returned image is immutable and may be cached by the provider.
+using PopoverUnderlayProvider=std::function<core::Result<std::shared_ptr<const RasterImage>>(Size,double)>;
+// Bounds are in the popup's local logical coordinates and may extend outside it.
+struct PopoverUnderlayFrame final {std::shared_ptr<const RasterImage> image;Rect bounds;};
+using PopoverUnderlayBoundsProvider=std::function<core::Result<PopoverUnderlayFrame>(Size,double)>;
 struct MenuItemOptions final {
     MenuStyle style=MenuStyle::regular;
     std::string label="Label";
@@ -318,7 +380,8 @@ struct ColorSurfaceOptions final {
     std::string accessibility_name="Color field";
 };
 enum class WidgetInputKind { pointer_move, pointer_down, pointer_up, pointer_leave, key_down, key_up,
-    text, composition, focus_lost, activate, focus, increment, decrement, context_request, close_popup, scroll, drop, commit_composition };
+    text, composition, focus_lost, activate, focus, increment, decrement, context_request, close_popup, scroll, drop, commit_composition, key_cancel, text_selection, text_composition_region, text_surrounding_delete, pointer_cancel };
+#define IIGUI_POINTER_CANCEL_API 1
 enum class WidgetKey { none, tab, enter, space, escape, left, right, up, down, home, end, backspace, delete_forward, select_all, character, copy, cut, page_up, page_down, insert, undo, redo };
 enum class PointerDevice { mouse, pen, eraser, touch };
 struct WidgetPoint final {
@@ -330,17 +393,51 @@ struct TextRange final {
     std::size_t location=0,length=0;
     friend bool operator==(const TextRange&,const TextRange&)=default;
 };
+// An opaque owner identity and two non-reusing generations. Keeping a token
+// alive also keeps its identity unique after the originating widget retires.
+struct TextInputRevision final {
+    std::shared_ptr<const void> identity;
+    std::uint64_t owner=0,value=0,focus=0;
+    friend bool operator==(const TextInputRevision&,const TextInputRevision&)=default;
+};
 struct TextInputState final {
     std::size_t length = 0;
     TextRange selection;
     std::optional<TextRange> marked;
     Rect caret; // Local widget coordinates, already clipped to its viewport.
     bool read_only = false, multiline = true, auto_focus_on_press = true, password = false;
+    // A nonempty selection has its anchor at the end and caret at the start.
+    bool selection_reversed = false;
+    // Providers opt into atomic text-service operations by advancing this on
+    // every content, selection or composition change. Never wrap or reuse it.
+    std::optional<std::uint64_t> revision;
 };
 struct TextContent final { TextRange range; std::string text; };
+// Geometry is local to the widget in providers and surface-relative when
+// returned by Widget::text_geometry. Empty rectangles denote offscreen carets.
+struct TextInputGeometry final {
+    Rect start_caret, end_caret;
+    std::vector<Rect> selection;
+};
+using TextGeometryProvider = std::function<core::Result<TextInputGeometry>(TextRange)>;
+// Paired native text-service notification. Keep this on the UI owner thread.
+class TextInputChange final {
+public:
+    explicit TextInputChange(runtime::Task finish = {}) : finish_(std::move(finish)) {}
+    TextInputChange(const TextInputChange&) = delete;
+    TextInputChange& operator=(const TextInputChange&) = delete;
+    TextInputChange(TextInputChange&& value) noexcept : finish_(std::exchange(value.finish_,{})) {}
+    TextInputChange& operator=(TextInputChange&&) = delete;
+    ~TextInputChange(){if(finish_)try{finish_();}catch(...){}}
+private:
+    runtime::Task finish_;
+};
 // OS text services query bounded ranges rather than copying the whole document
 // into WidgetSnapshot. state/read/position are owner-thread read providers and
 // must not call Widget APIs. focus_changed is an ordinary mutation callback.
+// If an input handler shares mutable text with other threads, it must compare
+// expected_text_revision.value under the same lock/transaction as its edit;
+// the host check cannot make an external source mutation atomic.
 struct TextInputProvider final {
     std::function<core::Result<TextInputState>()> state;
     std::function<core::Result<TextContent>(TextRange)> read;
@@ -366,13 +463,48 @@ struct WidgetInput final {
     std::uint32_t buttons=0; // Primary=1, secondary=2, middle=4, remaining OS buttons follow.
     bool text_input_active=false; // Set by targeting before ancestor shortcut handlers run.
     bool native_control_active=false,native_navigation_active=false;
+    // Pointer target is a control inside an opt-in passthrough content host.
+    bool native_content_control_active=false;
+    // For text_selection or text_composition_region, this is the requested
+    // UTF-16 range, not a replacement. For text_surrounding_delete it spans
+    // both deletion ranges and the preserved current selection between them.
     std::optional<TextRange> replacement_range;
     std::optional<TextRange> composition_selection;
     std::shared_ptr<const ClipboardContent> content;
     // Filled by the host for pointer-like delivery to a handler; coordinates
     // are relative to that handler's surface, including nested content hosts.
     std::optional<WidgetPoint> local_position;
+    // A native press sequence count, when supplied by the platform. Zero means
+    // unknown and leaves multi-click recognition to the receiving control.
+    std::uint32_t native_click_count=0;
+    // For text_selection, composition_selection or text_selection_after,
+    // retain anchor/caret order without changing the normalized range.
+    bool selection_reversed=false;
+    // Cursor relative to inserted text: 1=end, 0=start; clamped to document.
+    // On composition an empty string with this field is an empty candidate.
+    std::optional<std::int32_t> text_cursor_offset;
+    // A platform text service addresses the focused editor without interception.
+    bool text_service=false;
+    // An atomic post-replacement UTF-16 selection. Its direction uses
+    // selection_reversed, and it is mutually exclusive with text_cursor_offset.
+    std::optional<TextRange> text_selection_after;
+    // Optional optimistic guard, checked immediately before text dispatch.
+    std::optional<TextInputRevision> expected_text_revision;
+    // Hide the caret of this composing candidate while retaining its marked
+    // text, selection and caret geometry. Valid only for composition input.
+    bool composition_cursor_hidden=false;
 };
+// Touch scroll displacement follows the fingers; wheel deltas retain the
+// host's scroll convention. A pinch is an incremental log-scale encoded as a
+// precise control-modified touch scroll. Other scroll sources are not pinches.
+inline constexpr double pinch_scroll_units = 500.0;
+[[nodiscard]] inline std::optional<double> pinch_scale_factor(const WidgetInput& value) noexcept {
+    if(value.kind!=WidgetInputKind::scroll||value.device!=PointerDevice::touch||
+       !value.control||!value.precise_scroll||!std::isfinite(value.scroll_y))return {};
+    const auto factor=std::exp(value.scroll_y/pinch_scroll_units);
+    if(!std::isfinite(factor)||factor<=0)return {};
+    return factor;
+}
 // Ancestor interception before ordinary control behavior. A handled pointer
 // press captures move/release until release, focus loss, hiding or retirement.
 using WidgetInputHandler=std::function<core::Result<bool>(const WidgetInput&)>;
@@ -436,6 +568,10 @@ struct WidgetSnapshot final {
     // Transparency never changes geometry, focus, hit testing or enabled state.
     double opacity=1,effective_opacity=1;
     std::optional<AccessibilitySemantics> accessibility_semantics;
+    bool accessibility_actionable=true;
+    bool text_selection_reversed=false;
+    // Absent when a custom provider cannot guarantee a non-reusing revision.
+    std::optional<TextInputRevision> text_revision;
 };
 // Opaque generation identity plus actual parent/sibling placement. The weak
 // identity never owns a native tree and cannot expose its implementation.
@@ -444,18 +580,48 @@ struct WidgetPlacement final {
     std::uint64_t parent=std::uint64_t(-1),sibling=0;
     std::weak_ptr<const void> domain;
 };
+// A selected subtree and the immutable scenes referenced by its materials.
+// Scene indices use the same convention as CanvasFrame::scenes.
+struct WidgetSceneSnapshot final {
+    CanvasScene scene;
+    std::vector<CanvasScene> scenes;
+};
 // Weak, generation-specific UI handles. Mutations require the host thread.
 // A replaced/unmounted/closed tree returns closed, never targets its successor.
 class IIGUI_EXPORT Widget final {
 public:
     Widget() = default;
     [[nodiscard]] bool is_null()const noexcept{return owner_==std::thread::id{};}
+    friend bool operator==(const Widget& a,const Widget& b)noexcept {
+        return a.index_==b.index_&&a.owner_==b.owner_&&!a.state_.owner_before(b.state_)&&!b.state_.owner_before(a.state_);
+    }
     [[nodiscard]] core::Result<WidgetPlacement> placement() const;
+    // Immutable, background-free drawing commands for this visible subtree.
+    // Geometry, inherited clips and transforms use window coordinates.
+    [[nodiscard]] core::Result<CanvasScene> snapshot_scene() const;
+    [[nodiscard]] core::Result<WidgetSceneSnapshot> snapshot_scene_graph() const;
+    // Structural membership in the source's captured scene; popup portals
+    // separate the scene even when their logical owner is an ancestor.
+    [[nodiscard]] core::Result<bool> is_in_scene_of(const Widget& source) const;
+    // True for this widget or an ancestor across ordinary and embedded trees.
+    // Both endpoints must be live and accessed on their owner thread.
+    [[nodiscard]] core::Result<bool> is_within(const Widget& ancestor) const;
     [[nodiscard]] core::Result<WidgetInteraction> interaction()const;
+    // Current press in this widget's generation; this query consumes no input.
+    [[nodiscard]] core::Result<WidgetPressOrigin> press_origin()const;
     [[nodiscard]] core::Result<Size> measure(double available_width)const;
+    // Opt-in for content hosts and ordinary stacks. Empty/entirely hidden
+    // content is excluded from layout, drawing, input and accessibility.
+    [[nodiscard]] core::Result<void> set_collapse_when_empty(bool) const;
+    // Let pointer input reach an ancestor when the embedded content has no
+    // interactive hit target. Embedded controls and their captures still win.
+    [[nodiscard]] core::Result<void> set_content_input_passthrough(bool) const;
     // Weak, independent subscription; never replaces an input/focus handler.
     // Coalesced after input/layout settles; final alive=false on retirement.
     [[nodiscard]] core::Result<void> observe_interaction(std::shared_ptr<const WidgetInteractionPort>)const;
+    // Replace or clear this widget's control-owned receiver. It receives committed
+    // changes and a final alive=false, without consuming the external observer quota.
+    [[nodiscard]] core::Result<void> set_interaction_handler(WidgetInteractionHandler)const;
     [[nodiscard]] core::Result<void> set_text(std::string_view) const;
     // Explicit replacement; programmatic changes emit no user-edit callback.
     [[nodiscard]] core::Result<void> set_label_options(LabelOptions) const;
@@ -469,12 +635,20 @@ public:
     // Atomically replace/clear custom-container semantics. Progress ranges are
     // optional for indeterminate progress; host thread and generation apply.
     [[nodiscard]] core::Result<void> set_accessibility_semantics(std::optional<AccessibilitySemantics>) const;
+    // Optional user-originated absolute value adjustment for a custom slider.
+    // The control owns validation, snapping, notifications and model callbacks.
+    [[nodiscard]] core::Result<void> set_accessibility_value_handler(std::function<core::Result<void>(double)>) const;
+    // Replace virtual cells or column headers atomically. Actions are owner-thread callbacks;
+    // clearing the collection retires all of its identities.
+    [[nodiscard]] core::Result<void> set_virtual_accessibility(std::vector<VirtualAccessibilityNode>,VirtualAccessibilityAction={}) const;
     [[nodiscard]] core::Result<void> set_enabled(bool) const;
     [[nodiscard]] core::Result<void> set_checked(bool) const;
     [[nodiscard]] core::Result<void> set_value(double) const;
     [[nodiscard]] core::Result<void> set_selected(bool) const;
     [[nodiscard]] core::Result<void> set_current_index(int) const;
     [[nodiscard]] core::Result<void> focus() const;
+    // Reveal a local rectangle in ordinary scroll ancestors, innermost first.
+    [[nodiscard]] core::Result<void> reveal_local_rect(Rect) const;
     // Invokes iiGUI's control action. Disabled controls do nothing.
     [[nodiscard]] core::Result<void> activate() const;
     // Emits +1/-1 without owning or mutating a numeric value. Disabled or
@@ -522,6 +696,10 @@ public:
     // Reconcile by stable key. Existing row generations retain their widgets,
     // owners, edits and focus. A failed new factory preserves the entire list.
     [[nodiscard]] core::Result<void> set_keyed_content(std::vector<KeyedContentItem>,KeyedContentOptions={}) const;
+    // The participant runs once after candidates are ready and before any
+    // publication, including for an unchanged list or geometry-only update.
+    // Rejection preserves the old list. The participant owns its side effects.
+    [[nodiscard]] core::Result<void> set_keyed_content(std::vector<KeyedContentItem>,KeyedContentOptions,std::function<core::Result<void>()> commit) const;
     [[nodiscard]] core::Result<Widget> keyed_content_item(std::string_view key,std::string_view id={}) const;
     [[nodiscard]] core::Result<std::vector<std::string>> keyed_content_keys() const;
     [[nodiscard]] core::Result<void> set_layout_handler(std::function<void(Rect)>) const;
@@ -530,15 +708,24 @@ public:
     [[nodiscard]] core::Result<void> set_drawing(WidgetDrawing) const;
     [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler) const;
     [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler,Widget interaction_owner) const;
+    // Weak source handles on a container's backdrop drawing. Background is
+    // composited before content. Empty handles clear individual sources.
+    [[nodiscard]] core::Result<void> set_backdrop_sources(Widget background,Widget content) const;
     [[nodiscard]] core::Result<void> request_repaint() const;
     [[nodiscard]] core::Result<void> set_frame_handler(WidgetFrameHandler,bool active=false) const;
     [[nodiscard]] core::Result<void> request_frames() const;
     [[nodiscard]] core::Result<void> set_input_handler(WidgetInputHandler) const;
     [[nodiscard]] core::Result<void> set_text_input_provider(std::shared_ptr<const TextInputProvider>) const;
+    // Geometry is separately registered to preserve the existing provider ABI.
+    // Replacing the text provider removes its associated geometry provider.
+    [[nodiscard]] core::Result<void> set_text_geometry_provider(TextGeometryProvider) const;
+    // System-originated edits are already known to their input delegate.
+    [[nodiscard]] core::Result<TextInputChange> begin_text_input_change(bool value_changed,bool system_initiated=false) const;
     // Publish a custom provider's changed selection, composition or value.
     // Invoke outside its state/read/position callbacks.
     [[nodiscard]] core::Result<void> notify_text_input_changed(bool value_changed=true) const;
     [[nodiscard]] core::Result<TextContent> text_content(TextRange) const;
+    [[nodiscard]] core::Result<TextInputGeometry> text_geometry(TextRange) const;
     // Position in absolute, top-left native surface coordinates.
     [[nodiscard]] core::Result<std::size_t> text_position(double x,double y) const;
     [[nodiscard]] core::Result<void> set_stack_options(StackOptions) const;
@@ -552,7 +739,15 @@ public:
     [[nodiscard]] core::Result<ActionOptions> action_options() const;
     [[nodiscard]] core::Result<void> set_control_events(ControlEvents) const;
     [[nodiscard]] core::Result<void> set_image_options(ImageOptions) const;
-    [[nodiscard]] core::Result<void> set_popover_options(PopoverOptions) const;
+    [[nodiscard]] core::Result<void> set_popover_options(PopoverOptions,detail::PopoverMotionAbiV2={}) const;
+    [[nodiscard]] core::Result<void> set_popover_underlay(PopoverUnderlayProvider,WidgetColor tint={1,1,1,1}) const;
+    [[nodiscard]] core::Result<void> set_popover_underlay_with_bounds(PopoverUnderlayBoundsProvider,WidgetColor tint={1,1,1,1}) const;
+    // Preserve the provider image's sRGB colors rather than replacing them
+    // with a single tint. Empty providers clear the underlay.
+    [[nodiscard]] core::Result<void> set_popover_untinted_underlay_with_bounds(PopoverUnderlayBoundsProvider) const;
+    // When enabled, the whole material and shadow follow the popup content's
+    // transform, including during exit. The default retains separate layers.
+    [[nodiscard]] core::Result<void> set_popover_material_follows_content(bool) const;
     [[nodiscard]] core::Result<void> set_visible(bool) const;
     [[nodiscard]] core::Result<void> set_image(std::shared_ptr<const RasterImage>) const;
     [[nodiscard]] core::Result<void> set_escape_action(runtime::Task) const;
@@ -622,7 +817,7 @@ public:
     [[nodiscard]] core::Result<Widget> menu(Widget parent,std::string_view id,MenuOptions={},MenuEvents={});
     // One content view, plus any separately owned popups. The content remains
     // mounted while closed; opening does not reconstruct its C++ backend.
-    [[nodiscard]] core::Result<Widget> popover(Widget parent,std::string_view id,PopoverOptions={},PopoverEvents={});
+    [[nodiscard]] core::Result<Widget> popover(Widget parent,std::string_view id,PopoverOptions={},PopoverEvents={},detail::PopoverMotionAbiV2={});
     [[nodiscard]] core::Result<Widget> menu_item(Widget parent,std::string_view id,MenuItemOptions={},runtime::Task={});
     [[nodiscard]] core::Result<Widget> menu_divider(Widget parent,std::string_view id,MenuDividerOptions={});
     [[nodiscard]] core::Result<Widget> check_box(Widget parent, std::string_view id, CheckOptions = {}, std::function<void(bool)> = {});

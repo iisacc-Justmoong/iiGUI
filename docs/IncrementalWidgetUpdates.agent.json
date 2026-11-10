@@ -1,0 +1,248 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:06a8b445347ddbbbf12dfd041807c6371d369fc5657852b5a2ba4d8554e5464f",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/IncrementalWidgetUpdates.md",
+    "sha256": "41e1177d4a409b569a085231bd5926e3799368e4ab7e126061a3bcde8e198c93",
+    "bytes": 4205,
+    "line_count": 50,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "위젯 입력과 부분 갱신 계약",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 위젯 입력과 부분 갱신 계약\n",
+      "level": 1,
+      "title": "위젯 입력과 부분 갱신 계약"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "대량의 위젯이 있는 창에서 입력마다 전체 접근성 트리를 재생성하거나 변하지 않은\n위젯의 레이아웃을 무효화해서는 안 된다. iPadOS의 연속 터치와 그 밖의 네이티브\n입력은 순서와 필압을 보존한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "## 변경 단위\n",
+      "level": 2,
+      "title": "변경 단위"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "list",
+      "start_line": 9,
+      "end_line": 35,
+      "raw": "- 텍스트 입력 서비스는 현재 포커스 경로를 따라 해당 편집기만 조회한다. 중첩\n  콘텐츠와 팝업, 가시성·차단 상태, 편집기 교체와 포커스 해제도 기존 접근성\n  스냅샷과 같은 결과를 제공해야 한다.\n- 전체 접근성 조회가 필요한 경우에는 안정된 레이아웃을 공유하여 노드 단위로\n  같은 전체 뷰포트 갱신을 반복하지 않는다. 갱신 중 상태가 바뀌면 변경된 상태를\n  확인하고, 정해진 크기의 묶음 경계에서 다시 동기화한다. 전체 조회 API는 기존과\n  같이 동기식이며 실제 전체 결과를 반환한다.\n- 액션 옵션의 동일한 값은 갱신을 발행하지 않는다. 접근성 설명처럼 기하와 그리기에\n  영향을 주지 않는 값은 레이아웃이나 픽셀을 무효화하지 않고 해당 의미 값만\n  통지한다. 시각 값과 기하 값은 각각 필요한 범위의 그리기와 배치를 갱신한다.\n- 색상 표면의 원본 이미지가 이전과 같으면 이미지 객체를 보존한다. 마커와 접근성\n  값의 변경은 반영하되 변하지 않은 색상 이미지의 렌더러 캐시 키를 유지한다.\n- 사용자 정의 그리기는 위젯을 독립된 보유 묶음으로 취급한다. 크기, 활성·포커스·\n  포인터 상태, 선택값, 배율, 글꼴과 자식 수가 같은 동안 이전 그리기를 재사용한다.\n  `request_repaint()`는 대상과 그 하위 콘텐츠의 캐시를 무효화한다. 다른 형제의\n  결과는 유지하며, 오류가 난 그리기 결과는 캐시하지 않고 다음 표시에서 재시도한다.\n  명시적인 하위 트리 장면 캡처는 기존 계약대로 선택한 그리기 제공자를 다시 호출한다.\n- 입력 대상이 자체 입력 핸들러만 가진 비대화형 컨테이너라면 포인터를 놓을 때\n  존재하지 않는 액션을 실행하지 않는다. 실제 액션과 입력 핸들러의 전달 순서는\n  유지한다.\n- Metal 창은 불투명하고 비지역 효과가 없는 안정된 프레임에서 변경된 이전·현재\n  명령의 경계를 계산하여 겹치는 영역만 합치고 떨어진 영역은 별도로 배경부터 다시\n  합성한다. 영역이 16개를 넘으면 추가 면적이 가장 작은 쌍부터 합친다. 크기·배경 변경, 소스\n  장면과 블러·그림자 등 영향 범위를 보수적으로 다뤄야 하는 경우는 전체 합성한다.\n  `GraphicsInfo::partial_scene_renders`와 `partial_scene_pixels`는 Metal의 부분 영역별\n  합성 횟수와 대상 물리 픽셀 수의 합을 누적한다. 프레임 표시용 화면 버퍼로의 복사와 다른\n  그래픽 백엔드의 동작은 별개다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "텍스트 입력 서비스는 현재 포커스 경로를 따라 해당 편집기만 조회한다. 중첩",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "전체 접근성 조회가 필요한 경우에는 안정된 레이아웃을 공유하여 노드 단위로",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "액션 옵션의 동일한 값은 갱신을 발행하지 않는다. 접근성 설명처럼 기하와 그리기에",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "색상 표면의 원본 이미지가 이전과 같으면 이미지 객체를 보존한다. 마커와 접근성",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "사용자 정의 그리기는 위젯을 독립된 보유 묶음으로 취급한다. 크기, 활성·포커스·",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "입력 대상이 자체 입력 핸들러만 가진 비대화형 컨테이너라면 포인터를 놓을 때",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Metal 창은 불투명하고 비지역 효과가 없는 안정된 프레임에서 변경된 이전·현재",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "이 문서만으로 모든 플랫폼의 물리 픽셀 부분 표시를 보장하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "heading",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "## 검증 계획\n",
+      "level": 2,
+      "title": "검증 계획"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 50,
+      "raw": "`tests/incremental_widget_updates.cpp`는 창 없이 중첩 편집기와 팝업의 포커스 이동,\n다른 편집기 상태를 읽지 않는 조회, 퇴역, 100개 위젯의 묶음 결과, 같은 액션 값 및\n접근성 전용 변경, 색상 원본 픽셀의 동일·변경, 형제 그리기 재사용과 부모의 명시적\n다시 그리기, 비대화형 포인터 누름·놓기를 검증한다. 기존 입력·접근성·색상·콘텐츠\n세대 검사와 iPadOS 빌드는 별도로 수행한다. 실제 기기의 프레임률과 GPU 부분 렌더링은\n기기 계측으로만 확인한다. `tests/canvas_damage.cpp`는 변경·이동·삭제·변환·클립과\n비지역 효과 폴백의 손상 범위를 검사한다. `tests/metal_damage.mm`은 macOS Metal\n대상에서 부분 합성의 픽셀을 매번 새로 전체 합성한 참조와 비교하고 실제 부분 합성\n계수와 떨어진 두 영역의 독립 처리를 확인한다. 이 검사는 iPad GPU 실행이나 성능\n측정을 대신하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "위젯 입력과 부분 갱신 계약",
+      "anchor": "위젯-입력과-부분-갱신-계약",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "변경 단위",
+      "anchor": "변경-단위",
+      "start_line": 7
+    },
+    {
+      "block_id": "b000011",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "검증 계획",
+      "anchor": "검증-계획",
+      "start_line": 39
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "위젯의 레이아웃을 무효화해서는 안 된다. iPadOS의 연속 터치와 그 밖의 네이티브",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 11,
+        "text": "스냅샷과 같은 결과를 제공해야 한다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000007",
+        "line": 13,
+        "text": "같은 전체 뷰포트 갱신을 반복하지 않는다. 갱신 중 상태가 바뀌면 변경된 상태를",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000007",
+        "line": 16,
+        "text": "- 액션 옵션의 동일한 값은 갱신을 발행하지 않는다. 접근성 설명처럼 기하와 그리기에",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000007",
+        "line": 27,
+        "text": "존재하지 않는 액션을 실행하지 않는다. 실제 액션과 입력 핸들러의 전달 순서는",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000009",
+        "line": 37,
+        "text": "이 문서만으로 모든 플랫폼의 물리 픽셀 부분 표시를 보장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 50,
+        "text": "측정을 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

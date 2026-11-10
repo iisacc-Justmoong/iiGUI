@@ -1,11 +1,50 @@
 #include <iiGUI/Graphics.h>
 #include <iiGUI/Image.h>
+#include "GraphicsValidation.h"
 #include <algorithm>
 #include <cmath>
 #include <iiSDKCore/Core/Text/Utf8.h>
 
 namespace ii::gui {
-bool valid_canvas(const CanvasFrame& frame) noexcept {
+std::optional<CanvasScenePlan> plan_canvas_scenes(const CanvasFrame& frame) noexcept {
+    if(frame.scenes.size()>maximum_canvas_scenes||frame.overlays.size()>maximum_canvas_overlays)return std::nullopt;
+    std::size_t total_layers=0;
+    for(const auto& scene:frame.scenes){
+        if(scene.layers.size()>maximum_canvas_overlays)return std::nullopt;
+        total_layers+=scene.layers.size();
+        if(total_layers>maximum_canvas_scene_layers)return std::nullopt;
+    }
+    // Three colors allow cycle detection without recursion through ownership
+    // pointers or allocation. The maximum recursion depth is 64 scenes.
+    std::array<unsigned char,maximum_canvas_scenes> state{};
+    CanvasScenePlan plan;
+    const auto visit=[&](auto&& self,std::size_t index,bool reachable)->bool {
+        if(index>=frame.scenes.size())return false;
+        if(state[index]==1)return false;
+        if(state[index]==2)return true;
+        state[index]=1;
+        for(const auto& layer:frame.scenes[index].layers)if(layer.backdrop){
+            const auto& material=*layer.backdrop;
+            if(material.background_scene&&!self(self,*material.background_scene,reachable))return false;
+            if(material.content_scene&&!self(self,*material.content_scene,reachable))return false;
+        }
+        state[index]=2;
+        if(reachable)plan.order[plan.count++]=index;
+        return true;
+    };
+    for(const auto& layer:frame.overlays)if(layer.backdrop){
+        const auto& material=*layer.backdrop;
+        if(material.background_scene&&!visit(visit,*material.background_scene,true))return std::nullopt;
+        if(material.content_scene&&!visit(visit,*material.content_scene,true))return std::nullopt;
+    }
+    // Validate disconnected values as well, but do not allocate GPU targets
+    // for them. Visit all reachable values first to preserve their ordering.
+    for(std::size_t index=0;index<frame.scenes.size();++index)
+        if(!visit(visit,index,false))return std::nullopt;
+    return plan;
+}
+namespace {
+bool validate_canvas(const CanvasFrame& frame, bool allow_transparent_background, bool scene_plan_validated = false) noexcept {
     const auto color = [](Color c) {
         for (float v : {c.red, c.green, c.blue, c.alpha})
             if (!std::isfinite(v) || v < 0 || v > 1) return false;
@@ -16,12 +55,12 @@ bool valid_canvas(const CanvasFrame& frame) noexcept {
             std::abs(r.y) <= 32767 && std::isfinite(r.width) && std::isfinite(r.height) &&
             r.width > 0 && r.height > 0 && r.width <= 8192 && r.height <= 8192;
     };
-    if (!rect(frame.viewport) || !color(frame.background) || frame.background.alpha != 1 ||
+    if (!rect(frame.viewport) || !color(frame.background) || (!allow_transparent_background && frame.background.alpha != 1) ||
         frame.panels.size() > 4096 ||
         (frame.renderer!=Renderer::automatic && frame.renderer!=Renderer::native && frame.renderer!=Renderer::vulkan) ||
         (frame.acceleration != Acceleration::prefer_hardware && frame.acceleration != Acceleration::require_hardware))
         return false;
-    if(frame.overlays.size()>64) return false;
+    if(frame.overlays.size()>maximum_canvas_overlays||(!scene_plan_validated&&!plan_canvas_scenes(frame))) return false;
     std::size_t panels=0,texts=0,images=0,bytes=0;
     const auto layer=[&](const auto& ps,const auto& ts,const auto& is) {
         panels+=ps.size();texts+=ts.size();images+=is.size();
@@ -45,7 +84,8 @@ bool valid_canvas(const CanvasFrame& frame) noexcept {
         return true;
     };
     if(!layer(frame.panels,frame.texts,frame.images)) return false;
-    for(const auto& overlay:frame.overlays) {
+    const auto overlays=[&](const auto& values) {
+      for(const auto& overlay:values) {
         const auto& t=overlay.content_transform;
         if(!std::isfinite(t.origin_x)||!std::isfinite(t.origin_y)||std::abs(t.origin_x)>32767||std::abs(t.origin_y)>32767||!std::isfinite(t.scale)||t.scale<1.f/1024||t.scale>4||!std::isfinite(t.opacity)||t.opacity<0||t.opacity>1||!std::isfinite(t.offset_x)||!std::isfinite(t.offset_y)||std::abs(t.offset_x)>32767||std::abs(t.offset_y)>32767)return false;
         if(overlay.shadow){const auto& s=*overlay.shadow;if(!rect(s.bounds)||!std::isfinite(s.radius)||s.radius<0||s.radius>std::min(s.bounds.width,s.bounds.height)/2||!std::isfinite(s.blur_radius)||s.blur_radius<0||s.blur_radius>64||!color(s.color))return false;}
@@ -56,7 +96,35 @@ bool valid_canvas(const CanvasFrame& frame) noexcept {
                 std::abs(r.x)>32767 || std::abs(r.y)>32767 || r.width<0 || r.height<0 || r.width>8192 || r.height>8192) return false;
         }
         if(!layer(overlay.panels,overlay.texts,overlay.images)) return false;
+      }
+      return true;
+    };
+    if(!overlays(frame.overlays))return false;
+    std::size_t scene_layers=0;
+    for(const auto& scene:frame.scenes){
+        if(scene.viewport!=frame.viewport||scene.layers.size()>maximum_canvas_overlays)return false;
+        scene_layers+=scene.layers.size();if(scene_layers>maximum_canvas_scene_layers)return false;
+        if(scene.first_is_base){
+            if(scene.layers.empty())return false;
+            const auto& base=scene.layers.front();
+            if(base.clip||base.backdrop||base.shadow||!base.content_transform.identity())return false;
+        }
+        if(scene.bounds){const auto r=*scene.bounds;
+            if(!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>32767||std::abs(r.y)>32767||
+               !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<0||r.height<0||r.width>8192||r.height>8192)return false;
+        }
+        if(!overlays(scene.layers))return false;
     }
     return true;
+}
+} // namespace
+bool valid_canvas(const CanvasFrame& frame) noexcept { return validate_canvas(frame, false); }
+namespace detail {
+bool valid_surface_canvas(const CanvasFrame& frame) noexcept { return validate_canvas(frame, true); }
+std::optional<CanvasScenePlan> valid_surface_scene_plan(const CanvasFrame& frame) noexcept {
+    auto plan = plan_canvas_scenes(frame);
+    if (!plan || !validate_canvas(frame, true, true)) return std::nullopt;
+    return plan;
+}
 }
 } // namespace ii::gui

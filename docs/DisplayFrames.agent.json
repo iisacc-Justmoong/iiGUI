@@ -10,11 +10,11 @@
   },
   "source": {
     "path": "docs/DisplayFrames.md",
-    "sha256": "6d97d5042cc7a9309f8b7e901badecd63e4917f05e9978a90e701216dd608342",
-    "bytes": 5454,
-    "line_count": 85,
+    "sha256": "51de13f367d1f44e356a435adf635478728402085ae6f8c02d3b605d457f3c1e",
+    "bytes": 5779,
+    "line_count": 89,
     "encoding": "utf-8",
-    "language": "en"
+    "language": "ko"
   },
   "document": {
     "title": "One frame runtime for applications and games",
@@ -159,49 +159,63 @@
       "id": "b000015",
       "kind": "paragraph",
       "start_line": 63,
-      "end_line": 69,
-      "raw": "The view's display source may suspend while hidden or off-display. Normal Core\ntimers and background jobs remain independent. Core clamps scaled resume delta\nand bounds fixed-step catch-up; unscaled elapsed time retains the real gap.\nThe current native display connection requires macOS 14+. Windows/Linux accept\nthe same Core frame phases, but this Host option is explicitly rejected until\ntheir native presentation cadence adapters are implemented; it never silently\nsubstitutes a duration timer for synchronization.\n"
+      "end_line": 65,
+      "raw": "The view's display source may suspend while hidden or off-display. Normal Core\ntimers and background jobs remain independent. Core clamps scaled resume delta\nand bounds fixed-step catch-up; unscaled elapsed time retains the real gap.\n"
     },
     {
       "id": "b000016",
       "kind": "blank",
-      "start_line": 70,
-      "end_line": 70,
+      "start_line": 66,
+      "end_line": 66,
       "raw": "\n"
     },
     {
       "id": "b000017",
       "kind": "paragraph",
-      "start_line": 71,
-      "end_line": 75,
-      "raw": "`iiGUI.frame_host_*` checks real display callbacks, fixed/variable phases, GPU\nupdates, owner/event-domain validation, exception shutdown and no-source idle\nbehavior. `LVRSNativeGallery` displays a sampled native frame/update rate instead\nof a 200 ms timer count. Its label refreshes four times per second to avoid\nrebuilding text on every display pulse, while frame callbacks follow the display.\n"
+      "start_line": 67,
+      "end_line": 73,
+      "raw": "iOS의 display link는 전경에 있으며 명시적인 프레임 루프 또는 활성 위젯 모션이\n있는 동안에만 유지한다. 마지막 모션이 끝나면 일반 무효화 기반 표시로 복귀한다.\n여러 모션 중 하나만 종료되어도 나머지 모션과 명시적 게임 프레임은 유지한다.\nThe current native display connection requires macOS 14+. Windows/Linux accept\nthe same Core frame phases, but this Host option is explicitly rejected until\ntheir native presentation cadence adapters are implemented; it never silently\nsubstitutes a duration timer for synchronization.\n"
     },
     {
       "id": "b000018",
       "kind": "blank",
-      "start_line": 76,
-      "end_line": 76,
+      "start_line": 74,
+      "end_line": 74,
       "raw": "\n"
     },
     {
       "id": "b000019",
       "kind": "paragraph",
-      "start_line": 77,
-      "end_line": 82,
-      "raw": "Frame integration tests finish after observing the required actual display\ncallbacks. Process liveness is bounded by the outer CTest timeout; an internal\nfour-second timer no longer infers whether twelve or twenty-four frames should\nhave arrived. The assertions on frame phases, failures, rendering and redundant\npresentation remain in place. Instrumented startup bounds are documented in\n[NativeMotion](NativeMotion.md).\n"
+      "start_line": 75,
+      "end_line": 79,
+      "raw": "`iiGUI.frame_host_*` checks real display callbacks, fixed/variable phases, GPU\nupdates, owner/event-domain validation, exception shutdown and no-source idle\nbehavior. `LVRSNativeGallery` displays a sampled native frame/update rate instead\nof a 200 ms timer count. Its label refreshes four times per second to avoid\nrebuilding text on every display pulse, while frame callbacks follow the display.\n"
     },
     {
       "id": "b000020",
       "kind": "blank",
-      "start_line": 83,
-      "end_line": 83,
+      "start_line": 80,
+      "end_line": 80,
       "raw": "\n"
     },
     {
       "id": "b000021",
       "kind": "paragraph",
-      "start_line": 84,
-      "end_line": 85,
+      "start_line": 81,
+      "end_line": 86,
+      "raw": "Frame integration tests finish after observing the required actual display\ncallbacks. Process liveness is bounded by the outer CTest timeout; an internal\nfour-second timer no longer infers whether twelve or twenty-four frames should\nhave arrived. The assertions on frame phases, failures, rendering and redundant\npresentation remain in place. Instrumented startup bounds are documented in\n[NativeMotion](NativeMotion.md).\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 87,
+      "end_line": 87,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 88,
+      "end_line": 89,
       "raw": "Apple documents the [view-bound display link](https://developer.apple.com/documentation/appkit/nsview/displaylink(target:selector:))\nand [presentation-target timestamp](https://developer.apple.com/documentation/quartzcore/cadisplaylink/targettimestamp).\n"
     }
   ],
@@ -232,22 +246,22 @@
         "context": "paragraph"
       },
       {
-        "block_id": "b000015",
-        "line": 68,
+        "block_id": "b000017",
+        "line": 72,
         "text": "their native presentation cadence adapters are implemented; it never silently",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000019",
-        "line": 77,
+        "block_id": "b000021",
+        "line": 81,
         "text": "Frame integration tests finish after observing the required actual display",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000019",
-        "line": 79,
+        "block_id": "b000021",
+        "line": 83,
         "text": "four-second timer no longer infers whether twelve or twenty-four frames should",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -263,25 +277,25 @@
         "line": 10
       },
       {
-        "block_id": "b000019",
+        "block_id": "b000021",
         "label": "NativeMotion",
         "target": "NativeMotion.md",
         "kind": "relative",
-        "line": 82
+        "line": 86
       },
       {
-        "block_id": "b000021",
+        "block_id": "b000023",
         "label": "view-bound display link",
         "target": "https://developer.apple.com/documentation/appkit/nsview/displaylink(target:selector:)",
         "kind": "external",
-        "line": 84
+        "line": 88
       },
       {
-        "block_id": "b000021",
+        "block_id": "b000023",
         "label": "presentation-target timestamp",
         "target": "https://developer.apple.com/documentation/quartzcore/cadisplaylink/targettimestamp",
         "kind": "external",
-        "line": 85
+        "line": 89
       }
     ],
     "tables": [

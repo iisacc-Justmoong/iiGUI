@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/Composition.md",
-    "sha256": "1e30944307672007252e476a6a60eaebb67255c8a322078defd3b984fa8e1d87",
-    "bytes": 3806,
-    "line_count": 58,
+    "sha256": "679a57d7d4405b3b28a176061c2be78e3e6160a721c8b64d2aa14ea52a5513f4",
+    "bytes": 4343,
+    "line_count": 66,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -140,21 +140,35 @@
       "id": "b000017",
       "kind": "paragraph",
       "start_line": 50,
-      "end_line": 52,
-      "raw": "`iiGUI.composition_layout`, `composition_input` and `composition_images` test\ngeometry, hidden focus, restoring a subtree, Unicode length bounds, focus-loss\ncommit and reentrant retirement, image replacement and actual GPU thumb ordering.\n"
+      "end_line": 56,
+      "raw": "If a focused content host contains a pressed control, Escape reaches that\ncontrol through every nested host and cancels the press before the containing\ngeneration handles a later unclaimed Escape. This also applies inside popup\ncontent; a subsequent release must not activate the canceled control. An\nexisting Escape handler in the same generation retains its normal behavior.\nThe headless action-surface regression covers two nested hosts and popup content,\nincluding cancellation followed by a separate Escape to the parent or popup.\n"
     },
     {
       "id": "b000018",
       "kind": "blank",
-      "start_line": 53,
-      "end_line": 53,
+      "start_line": 57,
+      "end_line": 57,
       "raw": "\n"
     },
     {
       "id": "b000019",
       "kind": "paragraph",
-      "start_line": 54,
-      "end_line": 58,
+      "start_line": 58,
+      "end_line": 60,
+      "raw": "`iiGUI.composition_layout`, `composition_input` and `composition_images` test\ngeometry, hidden focus, restoring a subtree, Unicode length bounds, focus-loss\ncommit and reentrant retirement, image replacement and actual GPU thumb ordering.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 61,
+      "end_line": 61,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 62,
+      "end_line": 66,
       "raw": "Programmatic `focus()` also accepts stack containers. This removes focus from a\nchild editor and allows its owning component to receive Escape without adding a\nnew Tab stop. Labels and images remain nonfocusable. ColorPicker uses container\nfocus for Apply/Cancel and explicit swatch focus for programmatic/AX activation,\nso an old editor cannot keep displaying a stale value after those actions.\n"
     }
   ],
@@ -188,6 +202,13 @@
         "block_id": "b000011",
         "line": 33,
         "text": "pending pointer action must not activate the previous target afterward. An Enter",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000017",
+        "line": 53,
+        "text": "content; a subsequent release must not activate the canceled control. An",
         "basis": "lexical_match",
         "context": "paragraph"
       }

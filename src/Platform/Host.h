@@ -4,6 +4,7 @@
 #include <iiGUI/Graphics.h>
 #include <iiGUI/Presentation.h>
 #include <iiGUI/Desktop.h>
+#include <iiGUI/WindowGeometry.h>
 #include <iiSDKCore/Core/Result/Result.h>
 #include <iiSDKCore/Runtime/EventLoop.h>
 #include <iiSDKCore/Runtime/HostLoop.h>
@@ -15,23 +16,24 @@
 #include <string>
 #include <string_view>
 
+#define IIGUI_HOST_APPLICATION_ACTIVITY_API 1
+#define IIGUI_HOST_APPLICATION_FOREGROUND_API 1
+#define IIGUI_HOST_FAILURE_HANDLER_API 1
+#define IIGUI_HOST_APPLICATION_DRIVER_API 1
+#define IIGUI_HOST_DISPLAY_PIXELS_API 1
+
 namespace ii::gui {
+// New headers must not silently link to a library without driver support.
+IIGUI_EXPORT void require_application_driver_abi_v1() noexcept;
 class WidgetBuilder;
 class WidgetMount;
 struct WidgetAppearance;
 namespace detail { struct DispatchState; }
 
-struct Size final {
-    double width = 0;
-    double height = 0;
-    friend bool operator==(const Size&, const Size&) = default;
-};
-// A declaration update owns only present fields. Unchanged declarations never
-// restore an old size after a user resizes the window.
-struct WindowGeometry final {
-    std::optional<std::string> title;
-    std::optional<double> width,height,minimum_width,minimum_height;
-    friend bool operator==(const WindowGeometry&,const WindowGeometry&)=default;
+// Current full display mode in pixels, oriented to the window's display.
+struct DisplayPixels final {
+    int width = 0, height = 0;
+    friend bool operator==(const DisplayPixels&, const DisplayPixels&) = default;
 };
 struct HostOptions final {
     std::string title = "iiGUI";
@@ -71,6 +73,9 @@ struct HostCapabilities final {
     bool shaped_text=false,text_input=false,accessibility=false;
 };
 [[nodiscard]] IIGUI_EXPORT HostCapabilities host_capabilities() noexcept;
+[[nodiscard]] IIGUI_EXPORT bool supports_application_driver() noexcept;
+// Whether the compiled host has a distinct application foreground signal.
+[[nodiscard]] IIGUI_EXPORT bool supports_application_foreground() noexcept;
 
 struct HostStats final {
     std::uint64_t dispatches = 0;
@@ -122,7 +127,26 @@ public:
 
     [[nodiscard]] UiExecutor executor() const noexcept;
     [[nodiscard]] bool is_ui_thread() const noexcept;
+    // Configure a hidden top-level event-pump owner before run. It cannot be
+    // shown as a secondary window. Unsupported backends return an error.
+    [[nodiscard]] core::Result<void> set_application_driver(bool enabled = true);
+    // Configure before run(). The primary host delivers the last known native
+    // activity after opened(), coalesces duplicates, and stops at close().
+    [[nodiscard]] core::Result<void> set_application_activity_handler(std::function<void(bool)>);
+    // Separate from focus/activity. Unsupported hosts reject a nonempty handler.
+    [[nodiscard]] core::Result<void> set_application_foreground_handler(std::function<void(bool)>);
+    // Configure before run/show. The first internally recorded host failure is
+    // delivered once on the owner thread; returned API errors remain separate.
+    [[nodiscard]] core::Result<void> set_failure_handler(std::function<void(const core::Error&)>);
     [[nodiscard]] core::Result<void> run(HostCallbacks callbacks = {});
+    // Attach a separate iiGUI window to an already-running native event loop.
+    // This does not replace the application's delegate or menu. Currently
+    // supported on macOS only; close the Host before the external loop exits.
+    [[nodiscard]] core::Result<void> show_external(HostCallbacks callbacks = {});
+    // Attach the widget surface to a borrowed native parent. On macOS the
+    // argument is a live NSView belonging to the already-running application.
+    // The owner must retain the parent until the deferred closed callback.
+    [[nodiscard]] core::Result<void> attach_external(void* native_parent, HostCallbacks callbacks = {});
     // Nonblocking secondary window. It shares the parent's Core pump and closes
     // with its parent; callbacks/UiExecutor retire independently of that parent.
     [[nodiscard]] core::Result<void> show(Host& parent,HostCallbacks callbacks = {});
@@ -158,6 +182,9 @@ public:
     // Explicit synchronous GPU readback; normal presentation never reads back.
     [[nodiscard]] core::Result<PixelBuffer> capture_canvas();
     [[nodiscard]] core::Result<WindowSnapshot> snapshot() const;
+    // Requires an open window and its owner thread. Returns busy while the
+    // compositor has not identified an output; never returns the window size.
+    [[nodiscard]] core::Result<DisplayPixels> display_pixels() const;
     [[nodiscard]] core::Result<HostStats> stats() const;
     [[nodiscard]] core::Result<std::shared_ptr<PresentationSource>> presentation_source() const;
 private:

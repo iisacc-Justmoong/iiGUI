@@ -1,5 +1,5 @@
 #include <iiGUI/FontDatabase.h>
-#include <iiGUI/WidgetSurface.h>
+#include <iiGUI/WidgetSurfaceNative.h>
 #include <iiGUI/NativeCanvas.h>
 #include <iiGUI/DesktopCommon.h>
 #include <iiGUI/NativeDesktop_p.hpp>
@@ -20,7 +20,7 @@ namespace {
 WidgetKey key(KeySym symbol){switch(symbol){case XK_Tab:case XK_ISO_Left_Tab:return WidgetKey::tab;case XK_Return:case XK_KP_Enter:return WidgetKey::enter;case XK_Escape:return WidgetKey::escape;case XK_space:return WidgetKey::space;case XK_Left:return WidgetKey::left;case XK_Right:return WidgetKey::right;case XK_Up:return WidgetKey::up;case XK_Down:return WidgetKey::down;case XK_Home:return WidgetKey::home;case XK_End:return WidgetKey::end;case XK_BackSpace:return WidgetKey::backspace;case XK_Delete:return WidgetKey::delete_forward;case XK_Page_Up:return WidgetKey::page_up;case XK_Page_Down:return WidgetKey::page_down;case XK_Insert:return WidgetKey::insert;default:return WidgetKey::character;}}
 WidgetInput input(WidgetInputKind kind,unsigned modifiers,double time){return {.kind=kind,.shift=(modifiers&ShiftMask)!=0,.control=(modifiers&ControlMask)!=0,.alt=(modifiers&Mod1Mask)!=0,.meta=(modifiers&Mod4Mask)!=0,.timestamp=time/1000};}
 }
-struct WidgetSurface::Impl final {
+struct NativeWidgetSurface::Impl final {
     Display* display;Window parent;WidgetSurfaceCallbacks callbacks;std::function<double()> scale;NativeCanvas canvas;
     Window drag_source=0;double drag_x=0,drag_y=0;bool drag_supported=false;
     bool dirty=true,frame_paced=false,xi=false;int xi_opcode=0;XIM method=nullptr;XIC context=nullptr;
@@ -146,12 +146,12 @@ struct WidgetSurface::Impl final {
         }
     }
 };
-WidgetSurface::WidgetSurface(void* parent,WidgetSurfaceCallbacks callbacks):impl_(std::make_unique<Impl>(*static_cast<X11WidgetParent*>(parent),std::move(callbacks))){}
-WidgetSurface::~WidgetSurface()=default;void WidgetSurface::invalidate(){impl_->invalidate();}
-void WidgetSurface::accessibility_changed(){}void WidgetSurface::accessibility_value_changed(std::string_view){}
-void WidgetSurface::set_frame_paced(bool value){impl_->frame_paced=value;}void WidgetSurface::flush(){impl_->flush();}
-Size WidgetSurface::size()const{return impl_->size();}double WidgetSurface::backing_scale()const{return impl_->dpi();}
-std::string WidgetSurface::resolve_font_family(std::string_view value)const{return FontDatabase::application()->resolve_family(value);}
-GraphicsInfo WidgetSurface::info(){return impl_->canvas.info();}PixelBuffer WidgetSurface::capture(){impl_->flush();return impl_->canvas.capture();}
-bool WidgetSurface::native_event(const void* value){try{return impl_->process(*static_cast<const XEvent*>(value));}catch(...){impl_->callbacks.failure(std::current_exception());return true;}}
+NativeWidgetSurface::NativeWidgetSurface(void* parent,WidgetSurfaceCallbacks callbacks):impl_(std::make_unique<Impl>(*static_cast<X11WidgetParent*>(parent),std::move(callbacks))){}
+NativeWidgetSurface::~NativeWidgetSurface()=default;void NativeWidgetSurface::invalidate(){impl_->invalidate();}
+void NativeWidgetSurface::accessibility_changed(){}void NativeWidgetSurface::accessibility_value_changed(std::string_view){}
+void NativeWidgetSurface::set_frame_paced(bool value){impl_->frame_paced=value;}void NativeWidgetSurface::flush(){impl_->flush();}
+Size NativeWidgetSurface::size()const{return impl_->size();}double NativeWidgetSurface::backing_scale()const{return impl_->dpi();}
+std::string NativeWidgetSurface::resolve_font_family(std::string_view value)const{return FontDatabase::application()->resolve_family(value);}
+GraphicsInfo NativeWidgetSurface::info(){return impl_->canvas.info();}PixelBuffer NativeWidgetSurface::capture(){impl_->flush();return impl_->canvas.capture();}
+bool NativeWidgetSurface::native_event(const void* value){try{return impl_->process(*static_cast<const XEvent*>(value));}catch(...){impl_->callbacks.failure(std::current_exception());return true;}}
 }

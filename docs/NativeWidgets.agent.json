@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/NativeWidgets.md",
-    "sha256": "ba5c938a6b6a37e4670ce82e75aacdc0748280fdf88895cbf03dfb410d2686df",
-    "bytes": 5996,
-    "line_count": 105,
+    "sha256": "1ee342d6328749fe09db2f56a63dce854f88befe17efd2a3d38333d52f6a3c16",
+    "bytes": 6161,
+    "line_count": 107,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -215,35 +215,35 @@
       "id": "b000027",
       "kind": "paragraph",
       "start_line": 70,
-      "end_line": 76,
-      "raw": "`examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`\nat build time into `HelloWorld.generated.h`. C++23 then compiles the generated\nnative construction calls and scoped backend callbacks. The app binary does\nnot call or contain the LVUI parser/compiler, and needs neither the source file\nnor the build tool to run. The `.app` is also runnable directly with `--self-test`.\nIts timer, background result 42, resize, two native button actions and normal\nclose are verified, including one backend construction/destruction per mount.\n"
+      "end_line": 78,
+      "raw": "The HelloWorld configuration explicitly requests one Core worker before the\nnative host starts, so its background result does not depend on an implicit\nworker pool. `examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`\nat build time into `HelloWorld.generated.h`. C++23 then compiles the generated\nnative construction calls and scoped backend callbacks. The app binary does\nnot call or contain the LVUI parser/compiler, and needs neither the source file\nnor the build tool to run. The `.app` is also runnable directly with `--self-test`.\nIts timer, background result 42, resize, two native button actions and normal\nclose are verified, including one backend construction/destruction per mount.\n"
     },
     {
       "id": "b000028",
       "kind": "blank",
-      "start_line": 77,
-      "end_line": 77,
+      "start_line": 79,
+      "end_line": 79,
       "raw": "\n"
     },
     {
       "id": "b000029",
       "kind": "paragraph",
-      "start_line": 78,
-      "end_line": 79,
+      "start_line": 80,
+      "end_line": 81,
       "raw": "The legacy `examples/HelloLVUI` remains an explicitly separate runtime-parsed\nGPU canvas demonstration. Embedding that earlier markup is not the AOT route.\n"
     },
     {
       "id": "b000030",
       "kind": "blank",
-      "start_line": 80,
-      "end_line": 80,
+      "start_line": 82,
+      "end_line": 82,
       "raw": "\n"
     },
     {
       "id": "b000031",
       "kind": "heading",
-      "start_line": 81,
-      "end_line": 81,
+      "start_line": 83,
+      "end_line": 83,
       "raw": "## Installed-only consumer\n",
       "level": 2,
       "title": "Installed-only consumer"
@@ -251,15 +251,15 @@
     {
       "id": "b000032",
       "kind": "blank",
-      "start_line": 82,
-      "end_line": 82,
+      "start_line": 84,
+      "end_line": 84,
       "raw": "\n"
     },
     {
       "id": "b000033",
       "kind": "fenced_code",
-      "start_line": 83,
-      "end_line": 88,
+      "start_line": 85,
+      "end_line": 90,
       "raw": "```sh\ncmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n```\n",
       "language": "sh",
       "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n",
@@ -268,29 +268,29 @@
     {
       "id": "b000034",
       "kind": "blank",
-      "start_line": 89,
-      "end_line": 89,
+      "start_line": 91,
+      "end_line": 91,
       "raw": "\n"
     },
     {
       "id": "b000035",
       "kind": "paragraph",
-      "start_line": 90,
-      "end_line": 98,
+      "start_line": 92,
+      "end_line": 100,
       "raw": "Use a fresh destination under `build/`. This stages the installed Core plus\nupdated LVUI/iiGUI, relocates the prefix, copies the installed example and builds\nit using exported targets only. It audits Qt linkage and absence of LVUI parser\nsymbols, removes access to consumer sources and `lvui-compile` during execution,\nthen restores those test-owned paths. Loader override variables are cleared.\nThe Vulkan SDK/loader remains the same external native kit used by iiGUI.\nThe script writes logs, JUnit results and `verification.json` under BUILD_ROOT.\nThis is package consumption validation, not a fully self-contained distribution\nbundle or a replacement of the user's default installed SDKs.\n"
     },
     {
       "id": "b000036",
       "kind": "blank",
-      "start_line": 99,
-      "end_line": 99,
+      "start_line": 101,
+      "end_line": 101,
       "raw": "\n"
     },
     {
       "id": "b000037",
       "kind": "paragraph",
-      "start_line": 100,
-      "end_line": 105,
+      "start_line": 102,
+      "end_line": 107,
       "raw": "Verified on macOS arm64 / AppleClang 21 on 2026-10-22: LVUI 20/20,\niiGUI regression 35/35, focused ASan/UBSan 7/7 and relocated installed consumer\n1/1. The actual app was also opened and its native Say Hello button was clicked\nthrough the macOS accessibility interface; the label changed to Hello World · Cocoa!.\nEvidence is in `build/aot-regression-tests.xml`,\n`build/aot-sanitizer/build/aot-sanitizer-tests.xml` and `build/aot-consumer/`.\n"
     }
   ],
@@ -317,7 +317,7 @@
       "level": 2,
       "title": "Installed-only consumer",
       "anchor": "installed-only-consumer",
-      "start_line": 81
+      "start_line": 83
     }
   ],
   "indexes": {

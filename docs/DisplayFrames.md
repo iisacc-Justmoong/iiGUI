@@ -63,6 +63,10 @@ appeared on screen. OS load and visibility can reduce delivered callbacks.
 The view's display source may suspend while hidden or off-display. Normal Core
 timers and background jobs remain independent. Core clamps scaled resume delta
 and bounds fixed-step catch-up; unscaled elapsed time retains the real gap.
+
+iOS의 display link는 전경에 있으며 명시적인 프레임 루프 또는 활성 위젯 모션이
+있는 동안에만 유지한다. 마지막 모션이 끝나면 일반 무효화 기반 표시로 복귀한다.
+여러 모션 중 하나만 종료되어도 나머지 모션과 명시적 게임 프레임은 유지한다.
 The current native display connection requires macOS 14+. Windows/Linux accept
 the same Core frame phases, but this Host option is explicitly rejected until
 their native presentation cadence adapters are implemented; it never silently

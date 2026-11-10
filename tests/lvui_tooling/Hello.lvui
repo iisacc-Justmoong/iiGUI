@@ -1,0 +1,5 @@
+Window {
+    VStack {
+        Label(text: "Hello from LVUI")
+    }
+}

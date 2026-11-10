@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/AccessibilitySemantics.md",
-    "sha256": "b350a2b1c2b0b9f982d05b99335db860fac4b56f8d3023af46fd06a8cd8968c7",
-    "bytes": 4589,
-    "line_count": 50,
+    "sha256": "b8c006fd14261cefb16bb6e69e8ca475a486c8008f6f241d4a5aac8a21fef5b7",
+    "bytes": 21459,
+    "line_count": 243,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -40,80 +40,460 @@
     },
     {
       "id": "b000003",
-      "kind": "paragraph",
+      "kind": "heading",
       "start_line": 3,
-      "end_line": 6,
-      "raw": "iiGUI의 범용 스택과 ActionSurface는 애플리케이션이 직접 그리는 컴포넌트를 담을 수\n있다. `Widget::set_accessibility_semantics`는 해당 컨테이너에 역할, 이름, 설명과\n선택적 숫자 범위를 전달한다. 이 접점은 컴포넌트의 상태나 그리기를 소유하지 않으며\n특정 상위 SDK의 타입을 참조하지 않는다.\n"
+      "end_line": 3,
+      "raw": "## Linux AT-SPI 기본 전달\n",
+      "level": 2,
+      "title": "Linux AT-SPI 기본 전달"
     },
     {
       "id": "b000004",
       "kind": "blank",
-      "start_line": 7,
-      "end_line": 7,
+      "start_line": 4,
+      "end_line": 4,
       "raw": "\n"
     },
     {
       "id": "b000005",
-      "kind": "paragraph",
-      "start_line": 8,
-      "end_line": 22,
-      "raw": "현재 역할은 기본 `automatic`, `image`, `progress`, `slider`, `stepper`, `tab_group`, `menu`이다. 진행 역할의 숫자 범위는\n유한한 최솟값·최댓값·현재값을 사용하고 최솟값은 최댓값보다 작아야 한다. 숫자\n범위를 생략하면 미정 진행 상태이다. `slider`는 같은 유효 범위가 반드시 필요하며,\n증감 요청은 해당 표면의 입력 핸들러에 전달한다. 범위와 증감 정책은 앱이 소유하고\n비활성·숨김·차단된 표면에는 증감 요청을 전달하지 않는다. `image`와 `automatic`에는\n숫자 범위를 전달하지 않는다. `tab_group`과 `menu`도 숫자 범위를 받지 않으며 직접\n자식의 탭 또는 메뉴 항목 역할을 묶는 의미 정보만 제공한다. 슬라이더에 초점이 있으면 상위 입력 핸들러에 방향키가\n위젯 탐색에 사용 중임을 알려 상위 컬렉션의 단축키가 조절 입력을 가로채지 않게 한다.\n`stepper`는 자체 숫자 범위 없이 증감 요청만 전달한다. `can_increment`와\n`can_decrement`는 허용 방향을 지정하며 적어도 하나는 가능해야 한다. 비활성\n상위 컨테이너 아래의 조절 입력도 전달하지 않는다. `Widget::step`은 사용자 정의\n스테퍼의 같은 입력 경로를 사용한다.\n이름과 설명은 각각 NUL이 없는 UTF-8이며 최대 65,536바이트이다. 잘못된 후보는\n기존 의미 정보를 바꾸지 않는다. `std::nullopt`로 의미 정보를 제거하면 호스트의\n기존 역할이 복원된다. 기본 컨트롤의 의미 정보는 이 API로 덮어쓰지 않는다.\n"
+      "kind": "heading",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "### 숫자 범위와 값 변경\n",
+      "level": 3,
+      "title": "숫자 범위와 값 변경"
     },
     {
       "id": "b000006",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 20,
+      "raw": "유효한 숫자 범위를 가진 슬라이더와 진행 상태는 AT-SPI `Value`로 최솟값·최댓값·\n현재값을 제공한다. 실제 증분을 알 수 없는 경우 AT-SPI가 정한 미상 값 0을 반환한다.\n쓰기 요청은 유한하고 현재 범위 안에 있는 값에만 허용하며, 진행 상태와 설정\n핸들러가 없는 사용자 정의 표면은 거부한다. 사용자 정의 슬라이더는 교체 가능한\n값 설정 핸들러를 등록하고 자체 단계·콜백 규칙을 적용한다. 내장 슬라이더도\n같은 사용자 입력 의미로 값을 설정한다. 요청을 큐에 넣은 후 현재 창·콘텐츠 세대,\n범위·활성 상태와 핸들러를 다시 확인한다. 성공 응답은 접수이며 나중에 퇴역하거나\n비활성화된 대상에는 전달하지 않는다. 값이 바뀌면 Linux 접근성 투영을 갱신하고\n값 변경을 알린다. `Widget::set_accessibility_value_handler`로 사용자 정의 표면의\n설정 핸들러를 등록하거나 해제하며, 핸들러의 오류와 예외는 사용자 입력 경계에서\n처리한다. `MinimumIncrement`는 현재 범용 스냅샷에서 실제 단계를 알 수 없으므로\n0을 반환하고, 값의 설명 문자열이 없을 때 `Text`는 빈 문자열이다.\n새 값 설정 API는 헤더의 `IIGUI_ACCESSIBILITY_VALUE_HANDLER_API`로 확인한다.\n설정 함수는 라이브러리 심벌이므로 새 헤더와 이전 바이너리 조합도 구분된다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 21,
+      "end_line": 21,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "heading",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "### 텍스트 접근성\n",
+      "level": 3,
+      "title": "텍스트 접근성"
+    },
+    {
+      "id": "b000010",
       "kind": "blank",
       "start_line": 23,
       "end_line": 23,
       "raw": "\n"
     },
     {
-      "id": "b000007",
-      "kind": "paragraph",
-      "start_line": 24,
-      "end_line": 33,
-      "raw": "앱이 직접 구현하는 선택 컨트롤은 `ActionOptions::role`에 `check_box`,\n`radio_button`, `toggle_switch`, `tab`, `menu_item`을 지정하고 `Widget::set_checked`로 현재 값을\n전달할 수 있다. 역할을 지정해도 호스트가 선택 정책이나 그룹 규칙을 소유하지는\n않는다. `checkable`을 사용하지 않는 표면의 상태 전환은 앱이 수행한다. `set_checked`나\n전체 `ActionOptions`의 선택 값 변경은\n호스트 접근성 값 알림을 요청하며, 마운트가 종료된 이후에는 허용되지 않는다.\n탭과 메뉴 항목의 선택 상태는 스냅샷의 `selected`에도 전달한다. macOS는 탭 그룹과 그 직접\n자식 탭, 탭 버튼 하위 역할과 선택 값, 메뉴 항목 및 체크박스·라디오 역할을 전달한다. iOS는\n자식의 선택 특성과 스위치 값을 전달하고 탭 그룹 자체는 별도 포커스 대상으로 만들지 않는다.\niOS 스위치 문자열의 번역은 애플리케이션의 지역화 리소스가 담당한다.\n"
-    },
-    {
-      "id": "b000008",
-      "kind": "blank",
-      "start_line": 34,
-      "end_line": 34,
-      "raw": "\n"
-    },
-    {
-      "id": "b000009",
-      "kind": "paragraph",
-      "start_line": 35,
-      "end_line": 40,
-      "raw": "`WidgetSnapshot::accessibility_semantics`는 지정된 값을 노출하고, 호환 스냅샷의\n접근성 이름·설명·범위도 같은 값을 반영한다. 이름 또는 역할 변경과 숫자 변경은\n각각 호스트의 구조 변경 및 값 변경 알림에 연결한다. 변경은 다른 위젯 API처럼\n소유자 스레드에서 수행하며, 종료된 세대의 핸들은 닫힌 오류를 반환한다.\n범용 동작 표면의 설정은 접근성 알림을 보내기 전에 적용한다. 알림 수신자가 같은\n표면을 다시 설정해도 먼저 시작한 설정의 잔여 작업이 최신 활성화 상태를 덮어쓰지 않는다.\n"
-    },
-    {
-      "id": "b000010",
-      "kind": "blank",
-      "start_line": 41,
-      "end_line": 41,
-      "raw": "\n"
-    },
-    {
       "id": "b000011",
       "kind": "paragraph",
-      "start_line": 42,
-      "end_line": 47,
-      "raw": "macOS 소스는 image, progress, slider와 stepper 역할 및 숫자 값·범위를 네이티브 가상 접근성\n피어로 전달하고 사용자 정의 조절 표면의 증감 동작을 연결한다. iOS 소스는 image 특성,\n진행·슬라이더의 지역화된 백분율 및 슬라이더·스테퍼 조절 특성을 전달한다. 현재 Windows와\nLinux의 네이티브 접근성 계층은 이 의미 정보를 운영체제에 전달하지 않는다. 플랫폼\n소스 구현이나 헤드리스 스냅샷 검사를 실제 스크린 리더 또는 기기 실행 검증으로\n간주하지 않는다.\n"
+      "start_line": 24,
+      "end_line": 30,
+      "raw": "비밀번호가 아니고 유효한 텍스트 리비전이 있는 편집기에 `Text`와 읽기 전용이\n아닌 경우 `EditableText`의 일부를 제공한다. 글자 수와 커서 위치, 텍스트 범위·개별\n문자·선택 범위를 조회하고 커서 이동, 선택 범위 변경, 전체 내용 교체, 삽입과 삭제를\n접수한다. AT-SPI 문자 위치는 유니코드 스칼라 단위로 해석하고 iiGUI 편집기의 UTF-16\n범위와 변환한다. `InsertText`의 길이는 UTF-8 바이트 단위이며 문자 경계를 나누는\n요청은 거절한다. 이 계약은 [AT-SPI Text](https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/Text.xml)와\n[EditableText](https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/EditableText.xml)의 형식에 따른다.\n"
     },
     {
       "id": "b000012",
       "kind": "blank",
-      "start_line": 48,
-      "end_line": 48,
+      "start_line": 31,
+      "end_line": 31,
       "raw": "\n"
     },
     {
       "id": "b000013",
       "kind": "paragraph",
-      "start_line": 49,
-      "end_line": 50,
-      "raw": "`tests/accessibility_semantics.cpp`는 역할과 값 변경, 유효하지 않은 후보의 원자적\n거부, 초기화 해제, 기본 컨트롤 보호, 다른 스레드 및 종료된 세대의 거부를 확인한다.\n"
+      "start_line": 32,
+      "end_line": 37,
+      "raw": "사용자 정의 텍스트 공급자는 최대 65,536 UTF-16 단위씩 읽으며 읽기 전후의 대상과\n리비전이 바뀌면 결과를 버린다. 한 조회에서 읽는 전체 UTF-8 텍스트는 64 MiB 이하로\n제한한다. 조회마다 전체 텍스트를 다시 읽으므로 긴 문서에는 비용이 들 수 있다.\n선택·편집 요청은 소유자 실행기에 접수한 후 전달 직전에 대상 세대, 포커스, 활성·읽기\n전용 상태와 리비전을 다시 확인한다. 성공 응답은 요청의 접수를 뜻하며, 이후 상태가\n바뀌어 전달이 취소될 수 있다. 한 번의 삽입·교체는 65,536바이트 이하이다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 43,
+      "raw": "문자 단위의 `GetStringAtOffset`만 제공한다. 실제 레이아웃의 줄바꿈을 모르는 상황에서\n줄 경계를 추정하지 않으며 단어·문장·줄·문단 단위 조회, 텍스트 위치와 글꼴 속성,\n복사·잘라내기·붙여넣기는 제공하지 않는다. 변경 알림은 일반적인 화면 데이터 변경으로\n전달하고 아래 조건에서 텍스트 삽입·삭제와 커서·선택 변경을 별도로 알린다. 위젯\n자식의 선택을 다루는 `Selection`은 아직 제공하지 않는다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 44,
+      "end_line": 44,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "heading",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "### 텍스트 변경 알림\n",
+      "level": 3,
+      "title": "텍스트 변경 알림"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 53,
+      "raw": "같은 접근성 객체의 이전·현재 텍스트를 비교할 수 있으면 AT-SPI `TextChanged`로\n삭제 후 삽입을 알리고 유니코드 스칼라 기준 위치·길이와 해당 UTF-8 조각을 전달한다.\n여러 변경이 하나의 갱신으로 묶이면 공통 앞뒤를 제외한 구간을 한 번 교체한 것으로\n알린다. `TextCaretMoved`와 `TextSelectionChanged`는 커서와 선택을 독립적으로\n비교한다. 서로게이트 쌍이나 UTF-8 문자의 중간에서 변경 구간을 자르지 않는다.\n현재 입력의 원천을 구분할 수 없으므로 프로그램 변경을 별도의 `system` 상세로\n표시하지 않는다. 이벤트 형식은 [AT-SPI Event 명세](https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/Event.xml)를 따른다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 62,
+      "raw": "암호, 퇴역한 객체, 일관성이 깨진 텍스트 공급자의 내용은 저장하거나 알리지 않는다.\n공급자가 조회 중 트리를 바꾸면 그 결과는 버리고 다시 조정한다. 한 번에 네 차례\n연속으로 바뀌면 이전 게시 상태를 보존하고 다음 갱신 때 재시도한다. 연결이 끊기거나\n객체가 제거되면 보존한 텍스트를 폐기한다. 텍스트 스냅샷의 전체 보존 예산은 64 MiB이며\n포커스된 편집기를 우선한다. 상한이나 읽기 오류로 정확한 이전·현재 내용을 확보하지\n못하면 잘못된 텍스트·커서·선택 이벤트를 만들지 않고 일반 화면 데이터 변경 알림을\n유지한다. 읽기가 복구된 첫 스냅샷은 새 기준이며 누락된 변경을 추정하지 않는다.\n변경된 편집기는 텍스트 전체를 다시 읽으므로 큰 문서의 입력 비용은 문서 길이에 비례한다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 64,
+      "end_line": 68,
+      "raw": "X11과 Wayland 호스트는 하나의 앱 접근성 서비스와 창별 위젯 트리를 공유한다.\n서비스는 작업자에서 세션 버스의 `org.a11y.Bus.GetAddress`로 별도 접근성 버스\n주소를 얻고, 앱 루트를 등록한 뒤 `org.a11y.atspi.Socket.Embed`를 요청한다.\n연결·등록 실패는 창 표시를 막지 않으며 다시 연결을 시도한다. D-Bus 요청은\n소유자 이벤트 루프에서 제한된 양만 처리하고, 종료 시 진행 중인 연결을 취소한다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 70,
+      "end_line": 79,
+      "raw": "`Accessible`, `Application`, 기본 `Component`·`Action`과 `Cache.GetItems`를\n구현한다. 앱·창·위젯·가상 셀의 이름, 역할, 부모·자식, 상태와 좌표를 조회하고,\n구조·이름·상태 변경을 알린다. 캐시 추가는 부모부터, 제거는 자식부터 알린다.\n요소가 유지되는 동안 객체 경로는 유지하고 제거 후 재생성되거나 마운트가 교체되면\n새 경로를 사용한다. 동작 요청은 소유자 실행기에 접수한 뒤 전달 직전에 현재 세대와\n활성 상태를 다시 검사한다. 실패한 새 마운트는 현재 트리를 보존하며, 숨김·차단된\n요소와 암호 내용은 제외한다. X11은 배율이 1인 경우 확인 가능한 화면 원점을 사용하고,\nWayland와 그 밖의 알 수 없는 절대 화면 위치는 반환하지 않는다. 창 기준 좌표는\n위젯의 논리 좌표이다. `HostCapabilities::accessibility`는 컴파일된 기본 전달 경로를\n의미하며 실행 중 버스 연결 성공을 보증하지 않는다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 81,
+      "end_line": 91,
+      "raw": "다중 창, 마운트 교체·취소·퇴역, 가상 셀 재생성, 암호 보호, 지연 동작 거부와\n연결 취소를 헤드리스 검사했다. macOS의 연결된 D-Bus 피어로 실제 메시지 형식,\n일괄 캐시와 변경 알림을 검증했으며 Wayland 호스트는 모의 연결로 검사했다. X11·\nWayland 호스트와 전달 소스는 Linux aarch64 객체로 교차 컴파일하고 호스트별로\n결합했다. 텍스트 변경 알림 추가 후 접근성·Wayland 관련 검사 17건과 D-Bus·텍스트·\n조정 계층의 AddressSanitizer 및 UndefinedBehaviorSanitizer 검사 3건이 통과했다.\n별도 LVUI 검사는 모의 Wayland 연결에 부착한 실제 LVUI 입력 필드와 코드 편집기의\n선택·문자 교체가 D-Bus 이벤트에 도달함을 확인한다. 연결된 외부 SDK 라이브러리는\n계측하지 않았으며 누수 검사는 사용하지 않았다. 실제 Linux 세션\n버스·레지스트리 연결, compositor와 스크린 리더 실행, Linux 전체 SDK·앱 링크는\n검증하지 않았다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "heading",
+      "start_line": 93,
+      "end_line": 93,
+      "raw": "## Windows 접근성 전달\n",
+      "level": 2,
+      "title": "Windows 접근성 전달"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 94,
+      "end_line": 94,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 95,
+      "end_line": 101,
+      "raw": "Windows의 사용자 정의 위젯은 `WM_GETOBJECT`에 운영체제 접근성 객체를 반환한다.\n객체의 자식·역할·이름·상태·클리핑된 화면 위치·포커스와 허용된 기본 동작은\niiGUI 스냅샷과 입력 경계에서 얻으며 별도 OS 컨트롤을 만들지 않는다. 탭·메뉴·표와\n가상 셀은 의미 그룹에 속한다. 숨김·차단된 요소는 내보내지 않고, 폐기된 콘텐츠\n세대나 가상 셀의 이전 객체는 새 항목을 조작하지 못한다. 암호 필드의 텍스트는\n값이나 이름으로 노출하지 않는다. 중복 식별자와 순환 참조는 임의의 다른 요소에\n연결하지 않는다. 네이티브 객체가 위젯 트리보다 오래 살아도 닫힘을 반환한다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 102,
+      "end_line": 102,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "heading",
+      "start_line": 103,
+      "end_line": 103,
+      "raw": "### Windows 접근성 객체 수명\n",
+      "level": 3,
+      "title": "Windows 접근성 객체 수명"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 104,
+      "end_line": 104,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 105,
+      "end_line": 110,
+      "raw": "게시된 각 접근성 객체와 소유 스레드로 전달할 요청은 식별자 문자열뿐 아니라 해당\n게시 기간에 발급된 객체 번호도 함께 보존한다. 같은 문자열의 위젯이 제거된 후 다시\n게시되면 이전 객체의 조회·자식 탐색·동작 요청은 새 위젯에 연결되지 않는다.\n요청 접수 이후 제거·재생성이 발생한 경우에도 전달 직전에 객체 번호를 재확인하고,\nWindows 포커스 변경의 재진입 이후에도 같은 검사를 반복한다. 기존 객체가 계속\n유지되는 동안에는 번호와 접근성 동작을 유지한다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 111,
+      "end_line": 111,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "heading",
+      "start_line": 112,
+      "end_line": 112,
+      "raw": "### Windows 텍스트 값 설정 명세\n",
+      "level": 3,
+      "title": "Windows 텍스트 값 설정 명세"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 113,
+      "end_line": 113,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 114,
+      "end_line": 122,
+      "raw": "편집 가능한 텍스트의 `IAccessible::put_accValue`는 선택한 편집기의 전체 값을\n사용자 편집으로 교체한다. 현재 키보드 포커스는 이동하지 않으며 입력 검증,\n변경 콜백과 편집 기록은 일반 텍스트 입력과 같은 경로를 따른다. 암호·읽기 전용·\n비활성 편집기, 지원하지 않는 역할, 손상된 UTF-16과 허용 크기를 초과한 값은\n거절한다. 호출 당시의 객체 번호와 텍스트 리비전을 소유 스레드의 전달 직전에\n확인하여 제거·재생성 또는 내용 변경 이후에는 오래된 요청을 적용하지 않는다.\n성공은 편집이 끝난 경우에만 반환한다. 다른 스레드에서 전달을 기다리는 동안\n창이 닫히거나 5초 안에 실행을 시작하지 못한 요청은 취소하며 나중에 실행하지\n않는다. 실행이 이미 시작된 경우에는 편집 결과가 나올 때까지 호출을 기다린다.\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "paragraph",
+      "start_line": 124,
+      "end_line": 134,
+      "raw": "Windows 어댑터는 Microsoft Active Accessibility의 `IAccessible`을 반환한다.\n접근성 조회는 불변 스냅샷을 읽고, 포커스와 기본 동작은 최대 256개의 요청을\n소유자 스레드로 전달한 뒤 대상과 허용 상태를 다시 확인한다. 구조 알림과 별도로\n포커스·값 변경 알림은 현재 요소의 재사용하지 않는 양수 객체 ID를 사용한다.\n비밀번호가 아닌 텍스트 공급자는 최대 65,536 UTF-16 단위를 읽으며, 조회 전후의\n리비전이 다르면 읽은 값을 게시하지 않는다. Windows가 제공하는 MSAA-to-UI\nAutomation 호환 경로는 사용할 수 있으나, 별도의 네이티브 UI Automation 패턴은\n구현하지 않았다. MSAA의 텍스트 전체 값 설정은 위 명세에 따라 지원하며,\n다중 선택 열거, 텍스트 범위 조작, 숫자 값 설정, 슬라이더·스테퍼 증감과 실제\n스크린 리더 검증은 아직 남아 있다. 암호 필드의 값 조회는 `E_ACCESSDENIED`를\n반환한다.\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 135,
+      "end_line": 135,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 136,
+      "end_line": 148,
+      "raw": "macOS에서 동일 어댑터를 모의 Win32·COM 경계로 컴파일해 객체 반환, 역할·이름·\n값·화면 좌표, 비밀번호 보호, 스레드 간 요청, 가상 셀 교체, 포커스·값 알림과\n종료 중 재진입을 검사했다. 같은 검사는 AddressSanitizer와\nUndefinedBehaviorSanitizer도 통과했다. 같은 ID의 제거·재생성 후 이전 피어와\n대기 중인 클릭·포커스, 포커스 변경 중 재생성 및 새 피어의 정상 동작도 모의\nWindows·COM 검사로 확인한다. 텍스트 전체 값은 UTF-16과 길이 검증, 읽기 전용 및\n암호 보호, 다른 스레드에서의 결과 반환, 변경된 리비전과 시간 초과·종료 후 요청의\n폐기를 검사한다. LVUI 통합 검사는 생성된 버튼의 재마운트와 생성된 입력 필드의\n백엔드 갱신·Undo/Redo를 같은 모의 어댑터에 연결한다. Windows x64의 iiSDKCore·iiGUI 정적\n라이브러리와 iiGUI 설치 소비자를 교차 빌드·링크했다. 같은 패키지로 생성한\nLVUI `Application` 소비자도 연결했다. Vulkan 연결에는 Khronos의 공식 내보내기\n정의로 만든 임시 import 라이브러리를 사용했다. 이는 실제 Windows 실행이나\nGPU·스크린 리더 검증이 아니다.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 149,
+      "end_line": 149,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 150,
+      "end_line": 153,
+      "raw": "iiGUI의 범용 스택과 ActionSurface는 애플리케이션이 직접 그리는 컴포넌트를 담을 수\n있다. `Widget::set_accessibility_semantics`는 해당 컨테이너에 역할, 이름, 설명과\n선택적 숫자 범위를 전달한다. 이 접점은 컴포넌트의 상태나 그리기를 소유하지 않으며\n특정 상위 SDK의 타입을 참조하지 않는다.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 154,
+      "end_line": 154,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 155,
+      "end_line": 159,
+      "raw": "레이블의 문자열이 `set_text` 또는 `set_label_options`로 실제 변경되면 접근성\n트리의 변경을 통지한다. 같은 문자열의 재적용과 글꼴 크기 등 시각 속성만의\n변경은 이 통지를 발생시키지 않는다. 알림 중 다시 설정한 최신 문자열은 유지한다.\n이 계약은 macOS arm64의 헤드리스 위젯·재진입 검사로 확인했으며 플랫폼 보조\n기술의 실제 수신 여부를 확인한 결과는 아니다.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 160,
+      "end_line": 160,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 161,
+      "end_line": 175,
+      "raw": "현재 컨테이너 역할은 기본 `automatic`, `image`, `progress`, `slider`, `stepper`, `tab_group`, `menu`, `table`, `column_header_group`이다. 진행 역할의 숫자 범위는\n유한한 최솟값·최댓값·현재값을 사용하고 최솟값은 최댓값보다 작아야 한다. 숫자\n범위를 생략하면 미정 진행 상태이다. `slider`는 같은 유효 범위가 반드시 필요하며,\n증감 요청은 해당 표면의 입력 핸들러에 전달한다. 범위와 증감 정책은 앱이 소유하고\n비활성·숨김·차단된 표면에는 증감 요청을 전달하지 않는다. `image`와 `automatic`에는\n숫자 범위를 전달하지 않는다. `tab_group`과 `menu`도 숫자 범위를 받지 않으며\n탭 또는 메뉴 항목 역할을 묶는 의미 정보만 제공한다. 슬라이더에 초점이 있으면 상위 입력 핸들러에 방향키가\n위젯 탐색에 사용 중임을 알려 상위 컬렉션의 단축키가 조절 입력을 가로채지 않게 한다.\n`stepper`는 자체 숫자 범위 없이 증감 요청만 전달한다. `can_increment`와\n`can_decrement`는 허용 방향을 지정하며 적어도 하나는 가능해야 한다. 비활성\n상위 컨테이너 아래의 조절 입력도 전달하지 않는다. `Widget::step`은 사용자 정의\n스테퍼의 같은 입력 경로를 사용한다.\n이름과 설명은 각각 NUL이 없는 UTF-8이며 최대 65,536바이트이다. 잘못된 후보는\n기존 의미 정보를 바꾸지 않는다. `std::nullopt`로 의미 정보를 제거하면 호스트의\n기존 역할이 복원된다. 기본 컨트롤의 의미 정보는 이 API로 덮어쓰지 않는다.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 176,
+      "end_line": 176,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 177,
+      "end_line": 186,
+      "raw": "앱이 직접 구현하는 선택 컨트롤은 `ActionOptions::role`에 `check_box`,\n`radio_button`, `toggle_switch`, `tab`, `menu_item`을 지정하고 `Widget::set_checked`로 현재 값을\n전달할 수 있다. 역할을 지정해도 호스트가 선택 정책이나 그룹 규칙을 소유하지는\n않는다. `checkable`을 사용하지 않는 표면의 상태 전환은 앱이 수행한다. `set_checked`나\n전체 `ActionOptions`의 선택 값 변경은\n호스트 접근성 값 알림을 요청하며, 마운트가 종료된 이후에는 허용되지 않는다.\n탭과 메뉴 항목의 선택 상태는 스냅샷의 `selected`에도 전달한다. macOS는 탭 그룹과 그\n탭, 탭 버튼 하위 역할과 선택 값, 메뉴 항목 및 체크박스·라디오 역할을 전달한다. iOS는\n자식의 선택 특성과 스위치 값을 전달하고 탭 그룹 자체는 별도 포커스 대상으로 만들지 않는다.\niOS 스위치 문자열의 번역은 애플리케이션의 지역화 리소스가 담당한다.\n"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 187,
+      "end_line": 187,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 188,
+      "end_line": 192,
+      "raw": "macOS의 탭·메뉴 그룹은 직접 자식뿐 아니라 일반 스택이나 활성화 콘텐츠 호스트를\n사이에 둔 항목도 포함한다. 조건부 분기나 키 기반 반복에서 생성한 항목도 가장 가까운\n호환 그룹에 속한다. 다른 의미 그룹, 조작 가능한 표면 또는 팝오버는 경계이며, 숨겨지거나\n입력이 차단된 조상, 순환 또는 중복된 식별자를 통과하지 않는다. 의미 정보가 없는\n일반 컨테이너의 기존 네이티브 접근성 노출 정책은 바꾸지 않는다.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 193,
+      "end_line": 193,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "heading",
+      "start_line": 194,
+      "end_line": 194,
+      "raw": "## 가상 셀과 열 머리글\n",
+      "level": 2,
+      "title": "가상 셀과 열 머리글"
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 195,
+      "end_line": 195,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 196,
+      "end_line": 210,
+      "raw": "직접 그리는 표는 `Widget::set_virtual_accessibility`로 표면에\n`VirtualAccessibilityNode` 목록과 선택적 동작 콜백을 게시할 수 있다. 각 요소마다\n위젯이나 OS 컨트롤을 만들지 않으며 기존 4,096개 위젯 한도도 소비하지 않는다.\n각 셀의 키, 이름, 설명, 문자열 값, 소유자 기준 사각형, 활성·선택·포커스 상태는\n앱이 소유한다. 실제 표시 영역은 소유자의 변환된 사각형과 상위 클리핑에 맞추고,\n화면 밖 또는 숨겨지거나 차단된 요소에는 동작을 전달하지 않는다. 셀이 계속 게시된\n동안에는 키에 따른 접근성 식별자가 유지되며, 목록에서 제거된 뒤 같은 키가 다시\n나타나면 새 식별자를 부여해 이전 접근성 피어가 새 항목을 조작하지 못하게 한다.\n가상 요소의 역할은 기본 `cell` 또는 `column_header`이며 후자는 정렬 가능 여부와\n관계없이 열 머리글로 식별된다. `actionable=false`인 요소는 이름과 초점 정보를\n노출하지만 활성화 요청을 전달하지 않는다. 초점과 허용된 활성화 요청은 소유자\n스레드의 콜백으로 전달하며, 비활성 소유자나 요소는 무시한다. 키 중복, 지원하지 않는 역할,\n잘못된 UTF-8·좌표, 3,072개 초과, 텍스트 총량 16 MiB 초과는\n기존 게시 상태를 보존한 채 거절한다. 키는 최대 4,096바이트이고 이름·설명·값은\n각각 최대 65,536바이트다. 목록을 비우거나 소유 세대가 종료되면 셀은 퇴역한다.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 211,
+      "end_line": 211,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 212,
+      "end_line": 220,
+      "raw": "`table` 아래의 셀은 중간 스크롤 표면을 지나 해당 표에 묶이며, 열 머리글은 가장\n가까운 `table` 또는 `column_header_group`에 묶인다. 독립 머리글 그룹 자체는\n조작 대상으로 취급하지 않는다. macOS 어댑터 소스는 표의\n열 머리글 목록과 활성 버튼 또는 읽기 전용 텍스트 역할, 머리글 설명을 값으로\n제공한다. iOS 어댑터 소스는 머리글 특성, 활성 버튼 여부와 설명 값을 제공한다.\n각 셀의 이름·값·선택 및 활성화 특성도 노출하고 iOS는 퇴역한 피어를 캐시에서\n제거한다. 별도의 행·열 객체, 행·열 탐색 프로토콜과 플랫폼별 스크린 리더 동작의\n동등성은 아직 보장하지 않는다. Windows는 위의 MSAA 기본 경로를, Linux는 위의\nAT-SPI 기본 역할·동작과 캐시 경로를 제공한다.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 221,
+      "end_line": 221,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 222,
+      "end_line": 227,
+      "raw": "`WidgetSnapshot::accessibility_semantics`는 지정된 값을 노출하고, 호환 스냅샷의\n접근성 이름·설명·범위도 같은 값을 반영한다. 이름 또는 역할 변경과 숫자 변경은\n각각 호스트의 구조 변경 및 값 변경 알림에 연결한다. 변경은 다른 위젯 API처럼\n소유자 스레드에서 수행하며, 종료된 세대의 핸들은 닫힌 오류를 반환한다.\n범용 동작 표면의 설정은 접근성 알림을 보내기 전에 적용한다. 알림 수신자가 같은\n표면을 다시 설정해도 먼저 시작한 설정의 잔여 작업이 최신 활성화 상태를 덮어쓰지 않는다.\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 228,
+      "end_line": 228,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "paragraph",
+      "start_line": 229,
+      "end_line": 234,
+      "raw": "macOS 소스는 image, progress, slider와 stepper 역할 및 숫자 값·범위를 네이티브 가상 접근성\n피어로 전달하고 사용자 정의 조절 표면의 증감 동작을 연결한다. iOS 소스는 image 특성,\n진행·슬라이더의 지역화된 백분율 및 슬라이더·스테퍼 조절 특성을 전달한다. Windows는\n위에 기록한 MSAA 경로로 기본 의미를 전달하며 Linux는 기본 AT-SPI 경로를 사용한다. 플랫폼\n소스 구현이나 헤드리스 스냅샷 검사를 실제 스크린 리더 또는 기기 실행 검증으로\n간주하지 않는다.\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 235,
+      "end_line": 235,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 236,
+      "end_line": 243,
+      "raw": "`tests/accessibility_semantics.cpp`는 역할과 값 변경, 유효하지 않은 후보의 원자적\n거부, 초기화 해제, 기본 컨트롤 보호, 다른 스레드 및 종료된 세대의 거부를 확인한다.\n`tests/accessibility_grouping.cpp`는 중첩 그룹의 경계와 깊은 트리, 조건부 세대의\n교체·퇴역을 창 없는 위젯 트리와 스냅샷으로 확인한다.\n`tests/virtual_accessibility.cpp`는 가상 셀과 머리글의 역할·위치·클리핑, 식별자 유지와 퇴역,\n비활성 및 재진입 동작, 잘못된 후보의 원자적 거부, 3,072개 한도를 헤드리스로 검사한다.\n`tests/windows_accessibility_projection.cpp`와 `tests/windows_accessibility_adapter.cpp`는\nWindows 트리 투영과 모의 네이티브 객체·요청·퇴역 경계를 검사한다.\n"
     }
   ],
   "outline": [
@@ -124,69 +504,267 @@
       "title": "사용자 정의 컨테이너의 접근성 의미 정보",
       "anchor": "사용자-정의-컨테이너의-접근성-의미-정보",
       "start_line": 1
+    },
+    {
+      "block_id": "b000003",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Linux AT-SPI 기본 전달",
+      "anchor": "linux-at-spi-기본-전달",
+      "start_line": 3
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000003",
+      "level": 3,
+      "title": "숫자 범위와 값 변경",
+      "anchor": "숫자-범위와-값-변경",
+      "start_line": 5
+    },
+    {
+      "block_id": "b000009",
+      "parent_id": "b000003",
+      "level": 3,
+      "title": "텍스트 접근성",
+      "anchor": "텍스트-접근성",
+      "start_line": 22
+    },
+    {
+      "block_id": "b000017",
+      "parent_id": "b000003",
+      "level": 3,
+      "title": "텍스트 변경 알림",
+      "anchor": "텍스트-변경-알림",
+      "start_line": 45
+    },
+    {
+      "block_id": "b000029",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Windows 접근성 전달",
+      "anchor": "windows-접근성-전달",
+      "start_line": 93
+    },
+    {
+      "block_id": "b000033",
+      "parent_id": "b000029",
+      "level": 3,
+      "title": "Windows 접근성 객체 수명",
+      "anchor": "windows-접근성-객체-수명",
+      "start_line": 103
+    },
+    {
+      "block_id": "b000037",
+      "parent_id": "b000029",
+      "level": 3,
+      "title": "Windows 텍스트 값 설정 명세",
+      "anchor": "windows-텍스트-값-설정-명세",
+      "start_line": 112
+    },
+    {
+      "block_id": "b000055",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "가상 셀과 열 머리글",
+      "anchor": "가상-셀과-열-머리글",
+      "start_line": 194
     }
   ],
   "indexes": {
     "directive_candidates": [
       {
-        "block_id": "b000003",
-        "line": 6,
+        "block_id": "b000007",
+        "line": 14,
+        "text": "비활성화된 대상에는 전달하지 않는다. 값이 바뀌면 Linux 접근성 투영을 갱신하고",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 41,
+        "text": "복사·잘라내기·붙여넣기는 제공하지 않는다. 변경 알림은 일반적인 화면 데이터 변경으로",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 43,
+        "text": "자식의 선택을 다루는 `Selection`은 아직 제공하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 53,
+        "text": "표시하지 않는다. 이벤트 형식은 [AT-SPI Event 명세](https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/Event.xml)를 따른다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 61,
+        "text": "유지한다. 읽기가 복구된 첫 스냅샷은 새 기준이며 누락된 변경을 추정하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 77,
+        "text": "Wayland와 그 밖의 알 수 없는 절대 화면 위치는 반환하지 않는다. 창 기준 좌표는",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 79,
+        "text": "의미하며 실행 중 버스 연결 성공을 보증하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 100,
+        "text": "값이나 이름으로 노출하지 않는다. 중복 식별자와 순환 참조는 임의의 다른 요소에",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000031",
+        "line": 101,
+        "text": "연결하지 않는다. 네이티브 객체가 위젯 트리보다 오래 살아도 닫힘을 반환한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000039",
+        "line": 119,
+        "text": "확인하여 제거·재생성 또는 내용 변경 이후에는 오래된 요청을 적용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000041",
+        "line": 129,
+        "text": "리비전이 다르면 읽은 값을 게시하지 않는다. Windows가 제공하는 MSAA-to-UI",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000045",
+        "line": 153,
         "text": "특정 상위 SDK의 타입을 참조하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000005",
-        "line": 10,
+        "block_id": "b000049",
+        "line": 163,
         "text": "범위를 생략하면 미정 진행 상태이다. `slider`는 같은 유효 범위가 반드시 필요하며,",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000005",
-        "line": 12,
+        "block_id": "b000049",
+        "line": 165,
         "text": "비활성·숨김·차단된 표면에는 증감 요청을 전달하지 않는다. `image`와 `automatic`에는",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000005",
-        "line": 13,
-        "text": "숫자 범위를 전달하지 않는다. `tab_group`과 `menu`도 숫자 범위를 받지 않으며 직접",
+        "block_id": "b000049",
+        "line": 166,
+        "text": "숫자 범위를 전달하지 않는다. `tab_group`과 `menu`도 숫자 범위를 받지 않으며",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000005",
-        "line": 17,
+        "block_id": "b000049",
+        "line": 170,
         "text": "`can_decrement`는 허용 방향을 지정하며 적어도 하나는 가능해야 한다. 비활성",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000005",
-        "line": 18,
+        "block_id": "b000049",
+        "line": 171,
         "text": "상위 컨테이너 아래의 조절 입력도 전달하지 않는다. `Widget::step`은 사용자 정의",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000011",
-        "line": 45,
-        "text": "Linux의 네이티브 접근성 계층은 이 의미 정보를 운영체제에 전달하지 않는다. 플랫폼",
+        "block_id": "b000053",
+        "line": 191,
+        "text": "입력이 차단된 조상, 순환 또는 중복된 식별자를 통과하지 않는다. 의미 정보가 없는",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000011",
-        "line": 47,
+        "block_id": "b000057",
+        "line": 198,
+        "text": "위젯이나 OS 컨트롤을 만들지 않으며 기존 4,096개 위젯 한도도 소비하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000057",
+        "line": 201,
+        "text": "화면 밖 또는 숨겨지거나 차단된 요소에는 동작을 전달하지 않는다. 셀이 계속 게시된",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000057",
+        "line": 206,
+        "text": "노출하지만 활성화 요청을 전달하지 않는다. 초점과 허용된 활성화 요청은 소유자",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000059",
+        "line": 214,
+        "text": "조작 대상으로 취급하지 않는다. macOS 어댑터 소스는 표의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000059",
+        "line": 219,
+        "text": "동등성은 아직 보장하지 않는다. Windows는 위의 MSAA 기본 경로를, Linux는 위의",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000063",
+        "line": 234,
         "text": "간주하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       }
     ],
     "commands": [],
-    "links": [],
+    "links": [
+      {
+        "block_id": "b000011",
+        "label": "AT-SPI Text",
+        "target": "https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/Text.xml",
+        "kind": "external",
+        "line": 29
+      },
+      {
+        "block_id": "b000011",
+        "label": "EditableText",
+        "target": "https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/EditableText.xml",
+        "kind": "external",
+        "line": 30
+      },
+      {
+        "block_id": "b000019",
+        "label": "AT-SPI Event 명세",
+        "target": "https://raw.githubusercontent.com/GNOME/at-spi2-core/main/xml/Event.xml",
+        "kind": "external",
+        "line": 53
+      }
+    ],
     "tables": []
   },
   "provenance": {

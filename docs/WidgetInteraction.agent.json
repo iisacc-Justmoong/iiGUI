@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/WidgetInteraction.md",
-    "sha256": "9e71c2f52162c5733d553496e08d48d9089ae45814360cdabfe3c7fcabb5f290",
-    "bytes": 3554,
-    "line_count": 19,
+    "sha256": "61fceb3bf41a772d5d67b436ab3f2b9ffdda53dc7bccc7a4ccdbac4bce2f93a4",
+    "bytes": 9730,
+    "line_count": 91,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -54,10 +54,12 @@
     },
     {
       "id": "b000005",
-      "kind": "paragraph",
+      "kind": "heading",
       "start_line": 5,
       "end_line": 5,
-      "raw": "observe_interaction(shared_ptr<const WidgetInteractionPort>)는 기존 입력·포커스·배치 핸들러를 교체하지 않는 약한 Core QueryPort 구독이다. 입력과 배치가 정리된 뒤 변경된 메타데이터만 전달한다. 같은 포트·같은 대상의 중복 등록은 한 번만 유지한다. 조회나 repaint만 반복되어 값이 같으면 통지를 반복하지 않는다. 별도의 폴링 타이머·스레드·프레임 슬롯을 만들지 않는다. 한 세대의 구독 상한은 1,024개이다.\n"
+      "raw": "## 누름 입력 출처 계약\n",
+      "level": 2,
+      "title": "누름 입력 출처 계약"
     },
     {
       "id": "b000006",
@@ -70,94 +72,236 @@
       "id": "b000007",
       "kind": "paragraph",
       "start_line": 7,
-      "end_line": 7,
-      "raw": "콜백은 소유 스레드에서 읽기와 위젯 변경을 할 수 있다. 변경이 추가되면 최대 여덟 차례까지 정리하며 계속 상태를 뒤집는 수신자는 busy 오류가 된다. 수신자 하나가 실패해도 다른 살아 있는 수신자에게 반영된 상태를 전달한 후 failed를 반환한다. 이미 반영된 입력을 무조건 재시도하지 않는다. 구독을 놓으면 전달 대상에서 제외되며, 세대 종료 시 마지막 alive=false를 전달한다. 닫힌 핸들은 새로운 세대를 가리키지 않는다.\n"
+      "end_line": 12,
+      "raw": "`Widget::press_origin()`은 같은 위젯 세대에서 해당 위젯 또는 그 하위의 현재 누름이 없는지, 포인터인지,\n키보드인지를 조회한다. 포인터를 누른 채 영역 밖으로 이동해도 포인터로 남고,\n놓기·취소·포커스 상실 뒤에는 `none`이다. 키보드 누름은 포인터의 호버 위치와\n무관하게 키보드로 보고한다. 기존 `WidgetInteraction`의 크기와 관찰 계약을 바꾸지\n않으며, 소유 스레드와 위젯 세대의 수명 규칙을 따른다. 이 조회만으로 입력을\n소비하거나 상태를 변경하지 않는다. 실제 플랫폼 입력 장치 실행은 별도 검증이다.\n"
     },
     {
       "id": "b000008",
       "kind": "blank",
-      "start_line": 8,
-      "end_line": 8,
+      "start_line": 13,
+      "end_line": 13,
       "raw": "\n"
     },
     {
       "id": "b000009",
       "kind": "paragraph",
-      "start_line": 9,
-      "end_line": 9,
-      "raw": "Widget::measure(available_width)는 실제 네이티브 글꼴 서비스와 기존 배치 엔진으로 폭 제약에 따른 선호 크기를 계산·캐시한다. 폭은 (0,8192]이며 문서 변경이나 자식 위젯 재생성을 수행하지 않는다. WidgetPlacement::domain은 불투명하고 약한 포함 도메인 식별자이다. 다른 콘텐츠 세대라도 같은 포함 도메인인지 확인할 수 있으며 구현 객체를 노출하지 않는다. is_null은 비어 있는 기본 핸들과 이미 폐기된 핸들을 구분한다.\n"
+      "start_line": 14,
+      "end_line": 18,
+      "raw": "`WidgetInputKind::key_cancel`은 일치하는 키의 진행 중인 눌림을 활성화 없이 취소한다.\n포인터 캡처와 키보드 포커스는 유지한다. 사용자 입력 핸들러에도 이벤트를 통지하며,\n핸들러가 처리했다고 반환해도 기본 위젯의 키 눌림 정리는 중단하지 않는다. 중첩된\n콘텐츠 호스트와 팝업에도 전달된다. 지원 헤더는 `IIGUI_KEY_CANCEL_API`를 정의한다.\n기존 눌림을 먼저 정리하므로 취소 콜백에서 같은 키를 다시 누르면 새 눌림은 유지된다.\n"
     },
     {
       "id": "b000010",
       "kind": "blank",
-      "start_line": 10,
-      "end_line": 10,
+      "start_line": 19,
+      "end_line": 19,
       "raw": "\n"
     },
     {
       "id": "b000011",
-      "kind": "heading",
-      "start_line": 11,
-      "end_line": 11,
-      "raw": "## 명시적 팝업과 통과 영역\n",
-      "level": 2,
-      "title": "명시적 팝업과 통과 영역"
+      "kind": "paragraph",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "observe_interaction(shared_ptr<const WidgetInteractionPort>)는 기존 입력·포커스·배치 핸들러를 교체하지 않는 약한 Core QueryPort 구독이다. 입력과 배치가 정리된 뒤 변경된 메타데이터만 전달한다. 같은 포트·같은 대상의 중복 등록은 한 번만 유지한다. 조회나 repaint만 반복되어 값이 같으면 통지를 반복하지 않는다. 별도의 폴링 타이머·스레드·프레임 슬롯을 만들지 않는다. 한 세대의 구독 상한은 1,024개이다.\n"
     },
     {
       "id": "b000012",
       "kind": "blank",
-      "start_line": 12,
-      "end_line": 12,
+      "start_line": 21,
+      "end_line": 21,
       "raw": "\n"
     },
     {
       "id": "b000013",
       "kind": "paragraph",
-      "start_line": 13,
-      "end_line": 13,
-      "raw": "PopoverOptions.bounds는 콘텐츠 표면 절대 좌표의 팝업 프레임이다. input_bounds는 팝업 로컬 좌표의 입력 사각형이며, 프레임 안의 그림이라도 이 영역 밖이면 아래 컨트롤로 입력이 통과한다. 툴팁의 꼬리·장식에 사용할 수 있다. 입력 영역은 자식의 입력과 바깥 클릭 판정에도 적용한다. 프레임의 한 변 상한은 8,192이며 유효하지 않은 사각형과 Sheet 조합은 거절한다.\n"
+      "start_line": 22,
+      "end_line": 28,
+      "raw": "`Widget::set_interaction_handler`는 컨트롤 구현이 자기 위젯의 상태를 받기 위한\n별도 슬롯이다. 위젯당 하나이며 다시 설정하면 교체하고 빈 핸들러는 해제한다.\n외부 QueryPort 구독이나 입력 핸들러를 교체하지 않고 외부 구독 한도도 소비하지\n않는다. 상태가 확정된 후 최초 값과 변경된 값만 전달한다. 교체가 콜백 안에서\n일어나면 새 핸들러에도 현재 상태를 전달한다. 세대 종료 시 마지막 `alive=false`를\n받으며 콜백은 소유 스레드에서 실행된다. 콜백 실패 시 외부 관찰자에게도 반영된\n상태를 전달한 뒤 오류를 반환한다. 핸들러가 소유한 참조는 종료 알림까지 유효해야 한다.\n"
     },
     {
       "id": "b000014",
       "kind": "blank",
-      "start_line": 14,
-      "end_line": 14,
+      "start_line": 29,
+      "end_line": 29,
       "raw": "\n"
     },
     {
       "id": "b000015",
       "kind": "paragraph",
-      "start_line": 15,
-      "end_line": 15,
-      "raw": "preserve_input=true는 비모달·focus_on_open=false 팝업에만 허용한다. 팝업을 열고 닫을 때 기원 컨트롤의 press·hover·포인터 캡처를 보존한다. 팝업 자신에게 속한 캡처는 닫을 때 정리한다. Escape 닫힘과 기존 컨트롤의 클릭 경로를 유지한다. PopoverTransition.origin은 정규화한 축척 중심이며 기본값은 기존 팝업과 같은 중앙이다.\n"
+      "start_line": 30,
+      "end_line": 35,
+      "raw": "프로그램에서 `Widget::focus()`를 호출한 경우에도 포커스 변경이 확정된 뒤 반환하기\n전에 소유 핸들러와 외부 관찰자에게 변경을 전달한다. 동일한 대상을 다시 지정하면\n값이 같으므로 중복 통지하지 않는다. 콜백이 포커스를 다시 변경하면 기존의 최대\n여덟 차례 정리 규칙을 따르며, 전달 오류가 발생해도 이미 확정된 포커스를 되돌리지\n않는다. 콘텐츠 세대를 구성 중이거나 다른 상호작용 콜백을 전달 중인 경우에는 기존\n정리 단계에서 해당 변경을 전달한다.\n"
     },
     {
       "id": "b000016",
       "kind": "blank",
-      "start_line": 16,
-      "end_line": 16,
+      "start_line": 36,
+      "end_line": 36,
       "raw": "\n"
     },
     {
       "id": "b000017",
       "kind": "paragraph",
-      "start_line": 17,
-      "end_line": 17,
-      "raw": "수동 말풍선이 모달 위에 열리더라도 기존 모달의 배경 입력 차단은 유지한다. 포함 콘텐츠 세대는 상위의 배치·가시성 변경을 함께 정리하며, 내부 대상 좌표는 전역 표면으로 변환한다.\n"
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "콜백은 소유 스레드에서 읽기와 위젯 변경을 할 수 있다. 변경이 추가되면 최대 여덟 차례까지 정리하며 계속 상태를 뒤집는 수신자는 busy 오류가 된다. 수신자 하나가 실패해도 다른 살아 있는 수신자에게 반영된 상태를 전달한 후 failed를 반환한다. 이미 반영된 입력을 무조건 재시도하지 않는다. 구독을 놓으면 전달 대상에서 제외되며, 세대 종료 시 마지막 alive=false를 전달한다. 닫힌 핸들은 새로운 세대를 가리키지 않는다.\n"
     },
     {
       "id": "b000018",
       "kind": "blank",
-      "start_line": 18,
-      "end_line": 18,
+      "start_line": 38,
+      "end_line": 38,
       "raw": "\n"
     },
     {
       "id": "b000019",
       "kind": "paragraph",
-      "start_line": 19,
-      "end_line": 19,
-      "raw": "관련 검사는 tests/widget_interaction.cpp에 있다. 이 단계에서는 컴파일·설치·정적 검사만 수행하며 실제 앱·테스트 실행은 전체 LVRS 이식 마지막의 일괄 단계까지 보류한다. 다른 플랫폼의 입력 어댑터와 실제 IME·접근성·픽셀 결과는 별도 실행 확인 사항이다.\n"
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "Widget::measure(available_width)는 실제 네이티브 글꼴 서비스와 기존 배치 엔진으로 폭 제약에 따른 선호 크기를 계산·캐시한다. 폭은 (0,8192]이며 문서 변경이나 자식 위젯 재생성을 수행하지 않는다. WidgetPlacement::domain은 불투명하고 약한 포함 도메인 식별자이다. 다른 콘텐츠 세대라도 같은 포함 도메인인지 확인할 수 있으며 구현 객체를 노출하지 않는다. is_null은 비어 있는 기본 핸들과 이미 폐기된 핸들을 구분한다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 49,
+      "raw": "포인터 누름의 `WidgetInput::native_click_count`는 플랫폼이 제공한 클릭 연속 횟수다.\n0은 정보가 없음을 뜻하며, 컨트롤이 자체 시간·거리 규칙을 적용할 수 있다.\nmacOS 마우스 이벤트는 AppKit의 클릭 횟수를 전달하고 Windows 창은 운영체제의\n더블 클릭 메시지를 누름과 횟수 2로 전달한다. iPadOS의 UIKit 터치 누름은\n`UITouch.tapCount`를 전달한다. Windows에서 정상적인 마우스 놓기\n때문에 캡처가 해제되는 경우에는 포커스 상실을 보내지 않는다. Linux와 그 밖의\n입력 소스는 현재 0을 전달하므로 플랫폼 설정의 자동 적용을 보장하지 않는다.\n중첩 위젯의 입력 전달과 UIKit 터치 값 변환은 헤드리스 검사로 확인한다. 실제\nmacOS 입력, Windows 운영체제 메시지 전달 및 iPad 터치 실행은 이 검사에 포함되지 않는다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 50,
+      "end_line": 50,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "heading",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "## 콘텐츠 호스트의 포인터 통과\n",
+      "level": 2,
+      "title": "콘텐츠 호스트의 포인터 통과"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 52,
+      "end_line": 52,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 53,
+      "end_line": 63,
+      "raw": "콘텐츠 호스트는 기본적으로 자기 영역의 포인터 입력을 포함된 세대로 전달한다.\n`Widget::set_content_input_passthrough(true)`를 설정하면 그 위치의 포함 콘텐츠에\n입력 대상이 없을 때 상위 행이나 버튼으로 포인터를 전달할 수 있다. 포함된 버튼,\n입력 핸들러, 모달과 진행 중인 포인터 캡처는 계속 우선한다. 히트 대상이 있는\n핸들러가 이벤트를 처리하지 않더라도 사후적으로 상위에 다시 보내지는 않는다.\n이 설정은 콘텐츠 호스트에서만 유효하며 키보드 포커스와 그리기를 바꾸지 않는다.\n상위 입력 핸들러의 포인터 이벤트에는 해당 위치가 통과 설정된 콘텐츠의 컨트롤을\n가리키는 경우 `native_content_control_active=true`를 전달한다. 상위 드래그\n핸들러는 이 값을 확인해 내부 버튼이나 편집기가 먼저 입력을 받도록 할 수 있다.\n`iiGUI.ancestor_input.passthrough`는 위치가 이동된 행의 기본 차단, 표시 전용\n콘텐츠 통과, 상위 핸들러의 대상 판별, 하위 버튼 우선과 캡처 해제를 실제 창 없이 검사한다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "heading",
+      "start_line": 65,
+      "end_line": 65,
+      "raw": "## 명시적 팝업과 통과 영역\n",
+      "level": 2,
+      "title": "명시적 팝업과 통과 영역"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 66,
+      "end_line": 66,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 67,
+      "end_line": 67,
+      "raw": "PopoverOptions.bounds는 콘텐츠 표면 절대 좌표의 팝업 프레임이다. input_bounds는 팝업 로컬 좌표의 입력 사각형이며, 프레임 안의 그림이라도 이 영역 밖이면 아래 컨트롤로 입력이 통과한다. 툴팁의 꼬리·장식에 사용할 수 있다. 입력 영역은 자식의 입력과 바깥 클릭 판정에도 적용한다. 프레임의 한 변 상한은 8,192이며 유효하지 않은 사각형과 Sheet 조합은 거절한다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "preserve_input=true는 비모달·focus_on_open=false 팝업에만 허용한다. 팝업을 열고 닫을 때 기원 컨트롤의 press·hover·포인터 캡처를 보존한다. 팝업 자신에게 속한 캡처는 닫을 때 정리한다. Escape 닫힘과 기존 컨트롤의 클릭 경로를 유지한다. PopoverTransition.origin은 정규화한 축척 중심이며 기본값은 기존 팝업과 같은 중앙이다.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 70,
+      "end_line": 70,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 71,
+      "end_line": 75,
+      "raw": "열린 팝업의 hover 관찰은 입력 가능한 자식이 없는 본문도 포함한다. 마지막 마우스·펜\n좌표가 팝업의 입력 영역에 있고 그 위치를 가리는 상위 팝업이 없으면 hover로 보고한다.\n팝업의 입력 영역 밖, 포인터 이탈·포커스 상실과 터치 입력에서는 이 위치 기반 hover를\n유지하지 않는다. 별도의 포커스 가능한 위젯이나 접근성 대상을 만들지 않는다.\n휠 이동으로 콘텐츠가 바뀔 때는 새 배치에서 포인터 아래의 위젯을 다시 찾는다.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 77,
+      "end_line": 77,
+      "raw": "수동 말풍선이 모달 위에 열리더라도 기존 모달의 배경 입력 차단은 유지한다. 포함 콘텐츠 세대는 상위의 배치·가시성 변경을 함께 정리하며, 내부 대상 좌표는 전역 표면으로 변환한다.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 78,
+      "end_line": 78,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "paragraph",
+      "start_line": 79,
+      "end_line": 83,
+      "raw": "보유 그리기의 픽셀 내용만 바뀌고 이미 그리기가 존재하는 경우에는 화면 갱신을\n요청하되 상호작용 관찰자를 다시 순회하지 않는다. 그리기가 처음 설정되거나\n제거되어 입력 영역의 클립이 달라질 때는 관찰자를 갱신한다. 이 구분은 포함된\n콘텐츠에서 상위 세대로 전달할 때도 유지하며, 실제 배치·가시성·포커스·모달\n변경에 따른 알림은 생략하지 않는다.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 85,
+      "end_line": 91,
+      "raw": "관련 검사는 `tests/widget_interaction.cpp`와 창을 열지 않는\n`tests/interaction_handler.cpp`에 있다. 후자는 일반 입력·재진입·실패 전파·폐기,\n프로그램 지정 포커스, 소유 스레드 및 1,100개 위젯과 외부 구독 1,024개의 독립\n한도를 확인한다. 2026-11-03 macOS arm64의 iiGUI 전체 빌드와 관련 헤드리스 회귀\n50건이 통과했다. Qt·LVRS의 주요 소스와 라이브러리 경로 읽기는 빌드 및 검사에서\n차단했으며, 기존 SDK 빌드 구성을 재사용했다.\n다른 플랫폼의 입력 어댑터와 실제 IME·접근성·픽셀 결과는 별도 실행 확인 사항이다.\n"
     }
   ],
   "outline": [
@@ -170,12 +314,28 @@
       "start_line": 1
     },
     {
-      "block_id": "b000011",
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "누름 입력 출처 계약",
+      "anchor": "누름-입력-출처-계약",
+      "start_line": 5
+    },
+    {
+      "block_id": "b000023",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "콘텐츠 호스트의 포인터 통과",
+      "anchor": "콘텐츠-호스트의-포인터-통과",
+      "start_line": 51
+    },
+    {
+      "block_id": "b000027",
       "parent_id": "b000001",
       "level": 2,
       "title": "명시적 팝업과 통과 영역",
       "anchor": "명시적-팝업과-통과-영역",
-      "start_line": 11
+      "start_line": 65
     }
   ],
   "indexes": {
@@ -188,23 +348,79 @@
         "context": "paragraph"
       },
       {
-        "block_id": "b000005",
-        "line": 5,
-        "text": "observe_interaction(shared_ptr<const WidgetInteractionPort>)는 기존 입력·포커스·배치 핸들러를 교체하지 않는 약한 Core QueryPort 구독이다. 입력과 배치가 정리된 뒤 변경된 메타데이터만 전달한다. 같은 포트·같은 대상의 중복 등록은 한 번만 유지한다. 조회나 repaint만 반복되어 값이 같으면 통지를 반복하지 않는다. 별도의 폴링 타이머·스레드·프레임 슬롯을 만들지 않는다. 한 세대의 구독 상한은 1,024개이다.",
-        "basis": "lexical_match",
-        "context": "paragraph"
-      },
-      {
         "block_id": "b000007",
-        "line": 7,
-        "text": "콜백은 소유 스레드에서 읽기와 위젯 변경을 할 수 있다. 변경이 추가되면 최대 여덟 차례까지 정리하며 계속 상태를 뒤집는 수신자는 busy 오류가 된다. 수신자 하나가 실패해도 다른 살아 있는 수신자에게 반영된 상태를 전달한 후 failed를 반환한다. 이미 반영된 입력을 무조건 재시도하지 않는다. 구독을 놓으면 전달 대상에서 제외되며, 세대 종료 시 마지막 alive=false를 전달한다. 닫힌 핸들은 새로운 세대를 가리키지 않는다.",
+        "line": 12,
+        "text": "소비하거나 상태를 변경하지 않는다. 실제 플랫폼 입력 장치 실행은 별도 검증이다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000009",
-        "line": 9,
+        "line": 16,
+        "text": "핸들러가 처리했다고 반환해도 기본 위젯의 키 눌림 정리는 중단하지 않는다. 중첩된",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 20,
+        "text": "observe_interaction(shared_ptr<const WidgetInteractionPort>)는 기존 입력·포커스·배치 핸들러를 교체하지 않는 약한 Core QueryPort 구독이다. 입력과 배치가 정리된 뒤 변경된 메타데이터만 전달한다. 같은 포트·같은 대상의 중복 등록은 한 번만 유지한다. 조회나 repaint만 반복되어 값이 같으면 통지를 반복하지 않는다. 별도의 폴링 타이머·스레드·프레임 슬롯을 만들지 않는다. 한 세대의 구독 상한은 1,024개이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000013",
+        "line": 28,
+        "text": "상태를 전달한 뒤 오류를 반환한다. 핸들러가 소유한 참조는 종료 알림까지 유효해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 32,
+        "text": "값이 같으므로 중복 통지하지 않는다. 콜백이 포커스를 다시 변경하면 기존의 최대",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000017",
+        "line": 37,
+        "text": "콜백은 소유 스레드에서 읽기와 위젯 변경을 할 수 있다. 변경이 추가되면 최대 여덟 차례까지 정리하며 계속 상태를 뒤집는 수신자는 busy 오류가 된다. 수신자 하나가 실패해도 다른 살아 있는 수신자에게 반영된 상태를 전달한 후 failed를 반환한다. 이미 반영된 입력을 무조건 재시도하지 않는다. 구독을 놓으면 전달 대상에서 제외되며, 세대 종료 시 마지막 alive=false를 전달한다. 닫힌 핸들은 새로운 세대를 가리키지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 39,
         "text": "Widget::measure(available_width)는 실제 네이티브 글꼴 서비스와 기존 배치 엔진으로 폭 제약에 따른 선호 크기를 계산·캐시한다. 폭은 (0,8192]이며 문서 변경이나 자식 위젯 재생성을 수행하지 않는다. WidgetPlacement::domain은 불투명하고 약한 포함 도메인 식별자이다. 다른 콘텐츠 세대라도 같은 포함 도메인인지 확인할 수 있으며 구현 객체를 노출하지 않는다. is_null은 비어 있는 기본 핸들과 이미 폐기된 핸들을 구분한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 47,
+        "text": "입력 소스는 현재 0을 전달하므로 플랫폼 설정의 자동 적용을 보장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000033",
+        "line": 74,
+        "text": "유지하지 않는다. 별도의 포커스 가능한 위젯이나 접근성 대상을 만들지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 80,
+        "text": "요청하되 상호작용 관찰자를 다시 순회하지 않는다. 그리기가 처음 설정되거나",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000037",
+        "line": 83,
+        "text": "변경에 따른 알림은 생략하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       }

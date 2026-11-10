@@ -18,6 +18,8 @@ struct State final {
 }
 ii::core::Result<void> ii::runtime::configure_application(Application& app){
     auto state=std::make_shared<State>();for(const auto& argument:app.arguments())if(argument=="--self-test")state->self_test=true;
+    if(auto workers=app.workers().resize_workers(2);!workers)
+        return core::fail(core::ErrorCode::failed,"HelloHosts cannot allocate its background workers",workers.error().cause);
     auto options=lvui_generated::HelloHosts::options();options.frame_loop=&app.frame_loop();
     auto host=gui::attach_application(app,options,{
         .opened=[state,&app]{

@@ -33,12 +33,12 @@ template<class View> struct Mounted final {
 using View=lvui_generated::NativeLayoutRuntime;
 void values() {
     using namespace lvui::native;using A=gui::StackAlignment;
-    auto value=stack_layout({.spacing=-1,.default_spacing=6,.padding=4,.left_padding=2,.width=200,.height=80,.flex=2});
+    auto value=stack_layout<gui::StackLayoutOptions>({.spacing=-1,.default_spacing=6,.padding=4,.left_padding=2,.width=200,.height=80,.flex=2});
     check(value.stack.spacing==6 && value.stack.insets==gui::Insets{2,4,4,4} && value.extent==gui::Size{200,80} && value.flex==2,
           "Native layout values lost fallback spacing, insets, extent or flex");
     auto axes=stack_alignment(std::string("BOTTOMTRAILING"),StackAxis::overlay);
     check(axes==LayoutAlignmentAxes{LayoutAlignment::trailing,LayoutAlignment::trailing},"Named alignment lost an axis");
-    auto fallback=stack_layout({.alignment={LayoutAlignment::leading,LayoutAlignment::leading},.alignment_name="unrecognized",.axis=StackAxis::horizontal});
+    auto fallback=stack_layout<gui::StackLayoutOptions>({.alignment={LayoutAlignment::leading,LayoutAlignment::leading},.alignment_name="unrecognized",.axis=StackAxis::horizontal});
     check(gui::vertical_alignment(fallback.stack)==A::leading,"An unrecognized alignmentName did not preserve its base alignment");
     bool refused=false;try{const char* missing=nullptr;(void)stack_alignment(missing,StackAxis::vertical);}catch(const std::invalid_argument&){refused=true;}
     check(refused,"A null native alignment String was accepted");
@@ -96,11 +96,16 @@ void updates() {
 }
 void preservation() {
     Mounted<View> f;auto draft=f.widget("draft"),panel=f.widget("panel");good(draft.focus());good(draft.set_text("User edit"));
-    const auto before=take(draft.snapshot());const auto count=take(f.state->snapshots()).size();
+    const auto before=take(draft.snapshot());const auto before_text=take(draft.text_content({0,before.text_length})).text;
+    check(before_text=="User edit","Editing the retained input field failed before layout changes");
+    const auto count=take(f.state->snapshots()).size();
     f.scope->backend_0.gap.set(20);f.scope->backend_0.width.set(280);f.scope->backend_0.alignment.set("trailing");
-    const auto after=take(draft.snapshot());
-    check(after.id==before.id && after.text=="User edit" && after.focused && take(f.state->snapshots()).size()==count && NativeLayoutModel::live==1,
-          "Geometry changes rebuilt widgets, input state or backend objects");
+    const auto after=take(draft.snapshot());const auto after_text=take(draft.text_content({0,after.text_length})).text;
+    const auto after_count=take(f.state->snapshots()).size();
+    if(after.id!=before.id || after_text!=before_text || !after.focused || after_count!=count || NativeLayoutModel::live!=1)
+        throw std::runtime_error("Geometry state: same_id="+std::to_string(after.id==before.id)+" text="+after_text+
+            " focused="+std::to_string(after.focused)+" nodes="+std::to_string(count)+"/"+std::to_string(after_count)+
+            " models="+std::to_string(NativeLayoutModel::live));
     check(take(panel.snapshot()).bounds.width==280,"Retained geometry did not reach layout");
 }
 void alignment() {

@@ -1,12 +1,17 @@
 # 네이티브 머티리얼 입력
 
 BackdropMaterial은 선택적 불변 alpha mask와 흐림 전 underlay, 그 위치,
-기본 색상 및 capture 여부를 받는다. capture=false는 현재 프레임을 읽지 않고
-base와 underlay만 선형 premultiplied 공간에서 합성한 뒤 흐린다. 마스크는 bounds에
+기본 색상 및 capture 여부를 받는다. capture=false는 현재 프레임을 읽지 않는다.
+base, 선택한 기존 프레임, 선택한 배경·콘텐츠 장면, underlay를 이 순서로 선형
+premultiplied 공간에서 합성한 뒤 흐린다. 마스크는 bounds에
 매핑한 이미지 alpha이며, 임의 경로의 border는 전경 벡터/이미지로 그려야 한다.
 따라서 mask와 양의 border_width를 함께 지정하면 검증에서 거절한다.
 inner_highlight는 현재 커버리지에서 아래로 이동한 커버리지를 빼서 구한다.
 BoxShadow도 불변 alpha mask를 같은 경계에 매핑해 그림자 모양을 정의한다.
+
+선택한 위젯의 배경 없는 그리기 명령은 [하위 트리 스냅샷](SubtreeScenes.md)으로
+분리할 수 있다. Metal, Vulkan, Direct3D 11과 WebGL2는 이를 투명 오프스크린
+표면에 그려 재질 입력으로 합성한다. LVUI는 위젯 참조를 장면 입력에 연결한다.
 
 일반 WidgetDrawing과 순수 paint provider가 backdrop·shadow를 반환할 수 있다.
 메타데이터는 위젯의 로컬 좌표이며 임베딩·이동·콘텐츠 변환 시 같이 변환된다.
@@ -14,12 +19,15 @@ WidgetPaintState.backing_scale은 마스크를 실제 화면 배율에 맞춰 �
 그리기 중 UI 조회/변경은 계속 금지하며 provider가 불변 데이터를 캐시한다.
 
 Metal은 입력을 잘라낸 선형 합성 텍스처로 준비하고 MPS Gaussian blur를 사용한다.
-Vulkan·Direct3D는 같은 선형 합성·마스크·가우시안 계약을 fragment 경로에서 수행한다.
+Vulkan·Direct3D·WebGL은 선형 합성·마스크·가우시안 계약을 fragment 경로에서
+수행하며 배경 및 콘텐츠 장면 텍스처를 추가한다.
 Vulkan push constant는 최소 보장 크기인 128바이트 안에 둔다. 이미지 텍스처는
 포인터 정체성으로 재사용하고 그림자와 머티리얼이 같은 원본을 공유한다.
 효과 예산은 물리 뷰포트 픽셀당 32바이트를 기준으로 최소 64 MiB, 최대 256 MiB이다.
 작은 팝업과 4K 창 표면을 같은 고정 한도로 취급하지 않는다. Metal은 다른 효과 작업
-공간까지 이 예산에 포함하며 Vulkan·D3D는 공유 입력 이미지에 적용한다.
+공간까지 이 예산에 포함한다. Vulkan·D3D는 장면 그래프에 대해 장면 대상, 공유
+프레임 스냅샷과 효과 이미지를 포함하며 일반 프레임은 기존 이미지 예산을 유지한다.
+WebGL은 일반 재질 프레임의 스냅샷에도 같은 예산을 적용한다.
 effect_texture_budget_bytes로 현재 한도를 보고한다. 드라이버 실제 할당량과 실행 성능은 별도 검증 대상이다.
 
 RGBA·SVG 출력은 최대 축 8192 및 16 Mi 픽셀로 제한한다. PNG 디코더의 기존 입력·축
@@ -34,8 +42,9 @@ RGBA·SVG 출력은 최대 축 8192 및 16 Mi 픽셀로 제한한다. PNG 디코
 기본 비활성이고 request_frames로 재시작한다. 콜백의 false 반환은 해당 위젯 요청을
 멈추며, 콜백 안의 재요청/교체는 revision으로 보호한다. 제거된 세대의 콜백은 실행하지
 않는다. 호스트 기본 Motion은 WidgetBuilder.motion_preferences로 공유한다. underlay_tint는
-RGB 전환 중 alpha 원본을 재사용하며 색상 네 채널은 최대 1/1024 미만 오차의 half로
-압축해 128바이트 push-constant 한도를 유지한다.
+RGB 전환 중 alpha 원본을 재사용한다. Vulkan·Direct3D 공통 매개변수는 색상 네
+채널을 최대 1/1024 미만 오차의 half로 압축해 128바이트 한도를 유지한다. WebGL은
+별도의 전체 정밀도 uniform으로 tint를 전달한다.
 
 공유 프레임 슬롯은 최초 활성 요청 시 지연 생성한다. 매 프레임에는 활성 위젯 목록만
 순회하고 비활성 머티리얼 전체를 스캔하지 않는다. previous_layers 캡처는 현재 레이어의

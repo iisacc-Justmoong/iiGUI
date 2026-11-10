@@ -1,9 +1,11 @@
 #pragma once
 #include <iiGUI/Graphics.h>
-#include <iiGUI/Host.h>
+#include <iiGUI/WindowGeometry.h>
 #include <iiSDKCore/Runtime/Query.h>
+#include <functional>
 
 namespace ii::gui {
+enum class WidgetPressOrigin { none, pointer, keyboard };
 // Small owner-thread metadata in absolute native-surface coordinates. No text,
 // document, paint provider or native control is copied to observe interaction.
 struct IIGUI_EXPORT WidgetInteraction final {
@@ -15,4 +17,6 @@ struct IIGUI_EXPORT WidgetInteraction final {
     friend bool operator==(const WidgetInteraction&,const WidgetInteraction&)=default;
 };
 using WidgetInteractionPort=runtime::QueryPort<WidgetInteraction>;
+// One control-owned receiver per widget; independent of external QueryPort subscriptions.
+using WidgetInteractionHandler=std::function<void(const WidgetInteraction&)>;
 } // namespace ii::gui
