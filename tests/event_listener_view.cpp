@@ -183,6 +183,28 @@ void host_reentrant_release(){
             "A nested release left the listener capturing later pointer motion");
     tree->close();
 }
+void host_drag_handoff_cancellation(){
+    using K=ii::gui::WidgetInputKind;
+    auto tree=std::make_shared<ii::gui::detail::WidgetState>([](ii::runtime::Task task){task();});
+    auto outer=take(tree->content_host({},"outer",{640,480}));
+    std::optional<ii::gui::NativeEventListener> listener;
+    std::vector<K> events;
+    good(outer.set_content([&](auto& builder)->ii::core::Result<void>{
+        auto created=ii::gui::NativeEventListener::create(builder,{},"titlebar-drag",{320,40},
+            {.input=[&](const ii::gui::WidgetInput& event)->ii::core::Result<bool>{
+                events.push_back(event.kind);
+                if(event.kind==K::pointer_down) good(tree->input({.kind=K::pointer_cancel}));
+                return true;
+            }});
+        if(!created)return std::unexpected(created.error());listener=*created;return {};
+    }));
+    const auto bounds=take(listener->root().snapshot()).bounds;
+    good(tree->input({.kind=K::pointer_down,.x=bounds.x+5,.y=bounds.y+5,.buttons=1}));
+    good(tree->input({.kind=K::pointer_move,.x=bounds.x+bounds.width+20,.y=bounds.y+bounds.height+20}));
+    require(events.size()==2 && events[0]==K::pointer_down && events[1]==K::pointer_cancel,
+            "Window drag handoff left the titlebar capturing later input");
+    tree->close();
+}
 void host_input_retirement_and_bounds(){
     using K=ii::gui::WidgetInputKind;
     auto tree=std::make_shared<ii::gui::detail::WidgetState>([](ii::runtime::Task task){task();});
@@ -262,4 +284,4 @@ int main(){events();
 #if defined(IIGUI_KEY_CANCEL_API)
 keyboard_cancellation();
 #endif
-reentrant_updates();host_reentrant_input();host_reentrant_release();host_input_retirement_and_bounds();content_sizing();}
+reentrant_updates();host_reentrant_input();host_reentrant_release();host_drag_handoff_cancellation();host_input_retirement_and_bounds();content_sizing();}

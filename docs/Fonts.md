@@ -27,10 +27,10 @@ iiGUI가 그 컴포넌트의 스타일이나 상태를 소유하지는 않는다
 무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때
 이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.
 `default_text_tokens()`와 `default_widget_appearance()`는 기존 iiGUI 사용자를 위한
-기본값이다. 기존 `lvrs_text_tokens()`와 `lvrs_appearance()`도 같은 값을 반환하는
-호환 API로 유지하되 별도 객체 파일에 두어 정적 링크의 일반 호스트가 이를 끌어오지
-않는다. 기본값에는 과거 LVRS 디자인 스냅샷이 남으며 외부 LVRS나 Qt는 필요하지
-않다.
+기본값이다. `lvrs_text_tokens()`는 같은 텍스트 규칙을 반환하고, `lvrs_appearance()`는
+이전 창 강조색 혼합을 보존한 호환 스냅샷이다. 일반 기본 외형의 창은 중립색이며,
+LVUI는 `Panel/window` 토큰을 전달한다. 호환 API는 별도 객체 파일에 두어 정적 링크의
+일반 호스트가 이를 끌어오지 않는다. 외부 LVRS나 Qt는 필요하지 않다.
 
 iiGUI 0.5.0의 이 변경은 값으로 전달되는 공개 C++ `WidgetAppearance`의 크기를
 바꾼다. 공유 라이브러리의 ABI 식별 버전은 1로 변경하고 Windows 공유 라이브러리

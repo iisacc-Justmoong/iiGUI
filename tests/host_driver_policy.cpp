@@ -1,5 +1,6 @@
 #include "../src/Platform/HostDriverPolicy.h"
 #include "../src/Platform/HostCapabilitiesPolicy.h"
+#include "../src/Platform/WindowChromeGeometry.h"
 #include <iiGUI/Host.h>
 #include <cstdio>
 #include <stdexcept>
@@ -18,6 +19,28 @@ int main() {
     check(ii::gui::detail::deliver_opened_before_visible(true), "The hidden application driver could not start");
     const auto capability = ii::gui::host_capabilities();
     using ii::gui::HostBackend;
+    for (auto backend : {HostBackend::win32, HostBackend::x11, HostBackend::wayland}) {
+        const auto chrome=ii::gui::window_chrome_presentation(backend);
+        check(chrome.titlebar && chrome.client_controls && !chrome.native_controls,
+              "Desktop custom chrome must expose three client controls");
+    }
+    const auto mac_chrome=ii::gui::window_chrome_presentation(HostBackend::cocoa);
+    check(mac_chrome.titlebar && mac_chrome.native_controls && !mac_chrome.client_controls,
+          "macOS must retain its native window controls");
+    for (auto backend : {HostBackend::uikit,HostBackend::android}) {
+        const auto chrome=ii::gui::window_chrome_presentation(backend);
+        check(chrome.titlebar && !chrome.native_controls && !chrome.client_controls,
+              "Tablet chrome must show a titlebar without window controls");
+    }
+    using ii::gui::detail::WindowResizeEdge;
+    using ii::gui::detail::window_resize_edge;
+    check(window_resize_edge(1,1,800,600,6,6)==WindowResizeEdge::top_left &&
+          window_resize_edge(799,599,800,600,6,6)==WindowResizeEdge::bottom_right &&
+          window_resize_edge(400,2,800,600,6,6)==WindowResizeEdge::top &&
+          window_resize_edge(2,300,800,600,6,6)==WindowResizeEdge::left &&
+          window_resize_edge(400,300,800,600,6,6)==WindowResizeEdge::none &&
+          window_resize_edge(-1,20,800,600,6,6)==WindowResizeEdge::none,
+          "Custom chrome resize hit testing did not preserve edges and content");
     for (const auto backend : {HostBackend::cocoa, HostBackend::win32, HostBackend::x11,
                                HostBackend::wayland, HostBackend::uikit})
         check(ii::gui::detail::has_application_driver(backend), "A supported independent driver was not advertised");

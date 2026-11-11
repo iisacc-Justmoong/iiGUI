@@ -6,6 +6,7 @@
 #include "WaylandPoll.h"
 #include "WaylandConnectionRegistry.h"
 #include "WaylandTouch.h"
+#include "WindowChromeGeometry.h"
 #include "xdg-shell-client-protocol.h"
 #include "text-input-unstable-v3-client-protocol.h"
 #include "fractional-scale-v1-client-protocol.h"
@@ -33,6 +34,20 @@ namespace {
 thread_local WaylandConnectionRegistry<WaylandConnection> connections;
 WidgetKey key(xkb_keysym_t value){switch(value){case XKB_KEY_Tab:case XKB_KEY_ISO_Left_Tab:return WidgetKey::tab;case XKB_KEY_Return:case XKB_KEY_KP_Enter:return WidgetKey::enter;case XKB_KEY_Escape:return WidgetKey::escape;case XKB_KEY_space:return WidgetKey::space;case XKB_KEY_Left:return WidgetKey::left;case XKB_KEY_Right:return WidgetKey::right;case XKB_KEY_Up:return WidgetKey::up;case XKB_KEY_Down:return WidgetKey::down;case XKB_KEY_Home:return WidgetKey::home;case XKB_KEY_End:return WidgetKey::end;case XKB_KEY_BackSpace:return WidgetKey::backspace;case XKB_KEY_Delete:return WidgetKey::delete_forward;case XKB_KEY_Page_Up:return WidgetKey::page_up;case XKB_KEY_Page_Down:return WidgetKey::page_down;default:return WidgetKey::character;}}
 void nonblocking(int fd){const auto flags=fcntl(fd,F_GETFL);if(flags<0||fcntl(fd,F_SETFL,flags|O_NONBLOCK)<0)throw std::runtime_error("Cannot make Wayland transfer nonblocking");}
+std::uint32_t resize_edge(WindowResizeEdge edge){
+    switch(edge){
+    case WindowResizeEdge::top_left:return XDG_TOPLEVEL_RESIZE_EDGE_TOP_LEFT;
+    case WindowResizeEdge::top:return XDG_TOPLEVEL_RESIZE_EDGE_TOP;
+    case WindowResizeEdge::top_right:return XDG_TOPLEVEL_RESIZE_EDGE_TOP_RIGHT;
+    case WindowResizeEdge::right:return XDG_TOPLEVEL_RESIZE_EDGE_RIGHT;
+    case WindowResizeEdge::bottom_right:return XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT;
+    case WindowResizeEdge::bottom:return XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM;
+    case WindowResizeEdge::bottom_left:return XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_LEFT;
+    case WindowResizeEdge::left:return XDG_TOPLEVEL_RESIZE_EDGE_LEFT;
+    case WindowResizeEdge::none:return XDG_TOPLEVEL_RESIZE_EDGE_NONE;
+    }
+    return XDG_TOPLEVEL_RESIZE_EDGE_NONE;
+}
 }
 struct WaylandConnection::Impl final : WaylandWaitSource {
     WaylandConnection* connection=nullptr;
@@ -64,7 +79,7 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
     struct Send {int fd;std::shared_ptr<const std::string> bytes;std::size_t offset=0;runtime::Clock::time_point expires=runtime::Clock::now()+std::chrono::seconds(2);};
     std::vector<Send> sends;
     WaylandCallbacks callbacks;Size extent{640,420};double scale=1;std::uint32_t serial=0;
-    double x=0,y=0;unsigned buttons=0;bool configured=false,fullscreen=false,active=false,commit_pending=false;std::optional<std::string> failure;
+    double x=0,y=0;unsigned buttons=0;bool configured=false,fullscreen=false,maximized=false,custom_chrome=false,active=false,commit_pending=false;std::optional<bool> requested_maximize;std::optional<std::string> failure;
     int repeat_rate=0,repeat_delay=0;std::optional<std::uint32_t> repeat_key;runtime::Clock::time_point repeat_at;
     const std::thread::id owner=std::this_thread::get_id();
     void require()const{if(owner!=std::this_thread::get_id())throw std::logic_error("Wayland access requires its owner thread");}
@@ -169,7 +184,7 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
         if(text_epoch==std::numeric_limits<std::uint64_t>::max())throw std::overflow_error("Wayland text focus generation exhausted");++text_epoch;
     }
     void open(const HostOptions& options,WaylandCallbacks value){
-        require();if(options.title.size()>8192)throw std::invalid_argument("Wayland title exceeds protocol budget");callbacks=std::move(value);extent=wayland_surface_size(options.size);display=wl_display_connect(nullptr);if(!display)throw std::runtime_error("Cannot connect to WAYLAND_DISPLAY");
+        require();if(options.title.size()>8192)throw std::invalid_argument("Wayland title exceeds protocol budget");callbacks=std::move(value);custom_chrome=options.chrome==WindowChrome::custom;extent=wayland_surface_size(options.size);display=wl_display_connect(nullptr);if(!display)throw std::runtime_error("Cannot connect to WAYLAND_DISPLAY");
         xkb=xkb_context_new(XKB_CONTEXT_NO_FLAGS);if(!xkb)throw std::runtime_error("Cannot create xkbcommon context");registry=wl_display_get_registry(display);
         static const wl_registry_listener globals{+[](void* raw,wl_registry* registry,std::uint32_t id,const char* interface,std::uint32_t version){auto& self=*static_cast<Impl*>(raw);self.guard([&]{
             if(!std::strcmp(interface,wl_compositor_interface.name)&&version>=3)self.compositor=static_cast<wl_compositor*>(wl_registry_bind(registry,id,&wl_compositor_interface,std::min(version,4u)));
@@ -197,7 +212,7 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
         surface=wl_compositor_create_surface(compositor);static const wl_surface_listener surface_listener{.enter=+[](void* raw,wl_surface*,wl_output* output){auto& self=*static_cast<Impl*>(raw);self.entered.insert(output);self.guard([&]{self.update_scale();});},.leave=+[](void* raw,wl_surface*,wl_output* output){auto& self=*static_cast<Impl*>(raw);self.entered.erase(output);self.guard([&]{self.update_scale();});}};
         wl_surface_add_listener(surface,&surface_listener,this);setup_fractional();role=xdg_wm_base_get_xdg_surface(shell,surface);top=xdg_surface_get_toplevel(role);
         static const xdg_surface_listener configure{+[](void* raw,xdg_surface* role,std::uint32_t serial){auto& self=*static_cast<Impl*>(raw);xdg_surface_ack_configure(role,serial);self.configured=true;self.guard([&]{self.viewport_size();if(self.active)(void)connections.select(self.connection);if(self.callbacks.activity)self.callbacks.activity(self.active);const bool scheduled=self.callbacks.configure&&self.callbacks.configure(self.extent,self.scale);self.commit_pending=!scheduled;});}};xdg_surface_add_listener(role,&configure,this);
-        static const xdg_toplevel_listener top_listener{.configure=+[](void* raw,xdg_toplevel*,int width,int height,wl_array* states){auto& self=*static_cast<Impl*>(raw);self.guard([&]{self.extent=wayland_configure_size(self.extent,width,height);self.fullscreen=false;self.active=false;if(states->size%sizeof(std::uint32_t)||states->size>4096)throw std::runtime_error("Invalid xdg toplevel state list");const auto* values=static_cast<const std::uint32_t*>(states->data);for(std::size_t i=0;i<states->size/sizeof(std::uint32_t);++i){if(values[i]==XDG_TOPLEVEL_STATE_FULLSCREEN)self.fullscreen=true;if(values[i]==XDG_TOPLEVEL_STATE_ACTIVATED)self.active=true;}});},.close=+[](void* raw,xdg_toplevel*){auto& self=*static_cast<Impl*>(raw);self.guard([&]{if(self.callbacks.close)self.callbacks.close();});},.configure_bounds=+[](void*,xdg_toplevel*,int,int){},.wm_capabilities=+[](void*,xdg_toplevel*,wl_array*){}};
+        static const xdg_toplevel_listener top_listener{.configure=+[](void* raw,xdg_toplevel*,int width,int height,wl_array* states){auto& self=*static_cast<Impl*>(raw);self.guard([&]{self.extent=wayland_configure_size(self.extent,width,height);self.fullscreen=false;self.maximized=false;self.active=false;if(states->size%sizeof(std::uint32_t)||states->size>4096)throw std::runtime_error("Invalid xdg toplevel state list");const auto* values=static_cast<const std::uint32_t*>(states->data);for(std::size_t i=0;i<states->size/sizeof(std::uint32_t);++i){if(values[i]==XDG_TOPLEVEL_STATE_FULLSCREEN)self.fullscreen=true;if(values[i]==XDG_TOPLEVEL_STATE_MAXIMIZED)self.maximized=true;if(values[i]==XDG_TOPLEVEL_STATE_ACTIVATED)self.active=true;}if(self.requested_maximize&&*self.requested_maximize==self.maximized)self.requested_maximize.reset();});},.close=+[](void* raw,xdg_toplevel*){auto& self=*static_cast<Impl*>(raw);self.guard([&]{if(self.callbacks.close)self.callbacks.close();});},.configure_bounds=+[](void*,xdg_toplevel*,int,int){},.wm_capabilities=+[](void*,xdg_toplevel*,wl_array*){}};
         xdg_toplevel_add_listener(top,&top_listener,this);xdg_toplevel_set_title(top,options.title.c_str());xdg_toplevel_set_app_id(top,"com.iisacc.iiGUI");xdg_toplevel_set_min_size(top,int(options.minimum_size.width),int(options.minimum_size.height));wl_surface_commit(surface);dispatch();
     }
     void expire_transfers(){const auto now=runtime::Clock::now();
@@ -265,7 +280,25 @@ const wl_pointer_listener WaylandConnection::Impl::pointer_listener{
     .enter=+[](void* raw,wl_pointer*,std::uint32_t serial,wl_surface*,wl_fixed_t x,wl_fixed_t y){auto& self=*static_cast<Impl*>(raw);self.serial=serial;self.pointer_serial=serial;self.x=wl_fixed_to_double(x);self.y=wl_fixed_to_double(y);(void)connections.select(self.connection);self.guard([&]{self.cursor();});},
     .leave=+[](void* raw,wl_pointer*,std::uint32_t,wl_surface*){auto& self=*static_cast<Impl*>(raw);self.pointer_serial=0;self.guard([&]{self.emit(self.input(WidgetInputKind::pointer_leave));});},
     .motion=+[](void* raw,wl_pointer*,std::uint32_t time,wl_fixed_t x,wl_fixed_t y){auto& self=*static_cast<Impl*>(raw);self.x=wl_fixed_to_double(x);self.y=wl_fixed_to_double(y);self.guard([&]{self.emit(self.input(WidgetInputKind::pointer_move,time));});},
-    .button=+[](void* raw,wl_pointer*,std::uint32_t serial,std::uint32_t time,std::uint32_t button,std::uint32_t state){auto& self=*static_cast<Impl*>(raw);self.serial=serial;const auto mask=button==BTN_LEFT?1u:button==BTN_RIGHT?2u:button==BTN_MIDDLE?4u:0u;if(state)self.buttons|=mask;else self.buttons&=~mask;self.guard([&]{self.emit(self.input(state?WidgetInputKind::pointer_down:WidgetInputKind::pointer_up,time));});},
+    .button=+[](void* raw,wl_pointer*,std::uint32_t serial,std::uint32_t time,std::uint32_t button,std::uint32_t state){
+        auto& self=*static_cast<Impl*>(raw);self.serial=serial;
+        const auto mask=button==BTN_LEFT?1u:button==BTN_RIGHT?2u:button==BTN_MIDDLE?4u:0u;
+        self.guard([&]{
+            if(state && button==BTN_LEFT && self.custom_chrome && !self.fullscreen &&
+               !self.maximized && !self.requested_maximize.value_or(false) && self.seat && self.top){
+                const auto edge=window_resize_edge(self.x,self.y,self.extent.width,self.extent.height,6,6);
+                if(edge!=WindowResizeEdge::none){
+                    self.buttons&=~mask;xdg_toplevel_resize(self.top,self.seat,serial,resize_edge(edge));
+                    wl_display_flush(self.display);return;
+                }
+            }
+            if(state)self.buttons|=mask;else self.buttons&=~mask;
+            auto value=self.input(state?WidgetInputKind::pointer_down:WidgetInputKind::pointer_up,time);
+            if(state && button==BTN_LEFT && self.callbacks.pointer_press)
+                self.callbacks.pointer_press(std::move(value),serial);
+            else self.emit(std::move(value));
+        });
+    },
     .axis=+[](void* raw,wl_pointer*,std::uint32_t time,std::uint32_t axis,wl_fixed_t value){auto& self=*static_cast<Impl*>(raw);self.guard([&]{auto input=self.input(WidgetInputKind::scroll,time);if(axis==WL_POINTER_AXIS_VERTICAL_SCROLL)input.scroll_y=-wl_fixed_to_double(value);else input.scroll_x=-wl_fixed_to_double(value);self.emit(std::move(input));});},
     .frame=+[](void*,wl_pointer*){},.axis_source=+[](void*,wl_pointer*,std::uint32_t){},.axis_stop=+[](void*,wl_pointer*,std::uint32_t,std::uint32_t){},.axis_discrete=+[](void*,wl_pointer*,std::uint32_t,std::int32_t){}
 };
@@ -307,7 +340,25 @@ void WaylandConnection::dispatch(){impl_->dispatch();}
 void WaylandConnection::title(std::string_view value){impl_->require();std::string text(value);xdg_toplevel_set_title(impl_->top,text.c_str());}
 void WaylandConnection::minimum(Size size){impl_->require();xdg_toplevel_set_min_size(impl_->top,int(std::ceil(size.width)),int(std::ceil(size.height)));}
 void WaylandConnection::resize(Size size){impl_->require();impl_->extent=wayland_surface_size(size);impl_->viewport_size();xdg_surface_set_window_geometry(impl_->role,0,0,int(impl_->extent.width),int(impl_->extent.height));if(impl_->callbacks.configure)impl_->callbacks.configure(impl_->extent,impl_->scale);}
-void WaylandConnection::action(WindowAction action){impl_->require();switch(action){case WindowAction::minimize:xdg_toplevel_set_minimized(impl_->top);break;case WindowAction::maximize:xdg_toplevel_set_maximized(impl_->top);break;case WindowAction::restore:xdg_toplevel_unset_maximized(impl_->top);xdg_toplevel_unset_fullscreen(impl_->top);break;case WindowAction::toggle_fullscreen:if(impl_->fullscreen)xdg_toplevel_unset_fullscreen(impl_->top);else xdg_toplevel_set_fullscreen(impl_->top,nullptr);break;case WindowAction::raise:throw std::invalid_argument("Wayland activation requires a user activation token");default:throw std::invalid_argument("Unknown window action");}wl_display_flush(impl_->display);}
+void WaylandConnection::action(WindowAction action){
+    impl_->require();
+    const auto maximize=[&](bool value){impl_->requested_maximize=value;if(value)xdg_toplevel_set_maximized(impl_->top);else xdg_toplevel_unset_maximized(impl_->top);};
+    switch(action){
+    case WindowAction::minimize:xdg_toplevel_set_minimized(impl_->top);break;
+    case WindowAction::maximize:maximize(true);break;
+    case WindowAction::restore:maximize(false);xdg_toplevel_unset_fullscreen(impl_->top);break;
+    case WindowAction::toggle_maximize:maximize(!impl_->requested_maximize.value_or(impl_->maximized));break;
+    case WindowAction::toggle_fullscreen:if(impl_->fullscreen)xdg_toplevel_unset_fullscreen(impl_->top);else xdg_toplevel_set_fullscreen(impl_->top,nullptr);break;
+    case WindowAction::raise:throw std::invalid_argument("Wayland activation requires a user activation token");
+    default:throw std::invalid_argument("Unknown window action");
+    }
+    wl_display_flush(impl_->display);
+}
+void WaylandConnection::begin_move(std::uint32_t serial){
+    impl_->require();
+    if(!impl_->top||!impl_->seat)throw std::logic_error("Wayland pointer seat is unavailable");
+    xdg_toplevel_move(impl_->top,impl_->seat,serial);wl_display_flush(impl_->display);
+}
 void WaylandConnection::request_frame(){impl_->request_frame();}
 void WaylandConnection::cancel_frame(){impl_->cancel_frame();}
 std::uint64_t WaylandConnection::claim_text_input(){

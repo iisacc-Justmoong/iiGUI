@@ -37,6 +37,17 @@ void ordered_queue(){
     auto a=queue.pop(),b=queue.pop(),c=queue.pop();
     check(a&&b&&c&&std::get<WidgetInput>(*a).x==2&&std::get<WaylandImeEvent>(*b).epoch==7&&
           std::get<WidgetInput>(*c).x==3&&queue.empty(),"Wayland IME and pointer ordering was not preserved");
+    check(queue.push(WidgetInput{.kind=WidgetInputKind::pointer_down,.buttons=1},42),
+          "Cannot queue a Wayland window gesture");
+    auto press=queue.pop();
+    check(press && std::get<WaylandPointerEvent>(*press).serial==42 &&
+          std::get<WaylandPointerEvent>(*press).input.kind==WidgetInputKind::pointer_down,
+          "Wayland must retain the exact initiating input serial");
+    check(queue.push(WidgetInput{.kind=WidgetInputKind::pointer_down,.buttons=1},0),
+          "The compositor may provide a zero input serial");
+    auto zero=queue.pop();
+    check(zero && std::get<WaylandPointerEvent>(*zero).serial==0,
+          "A zero Wayland serial was confused with an absent serial");
 }
 void wire_batch(){
     WaylandImeCapture capture;good(capture.preedit("ㅎ",3,3));good(capture.preedit("한",3,3));

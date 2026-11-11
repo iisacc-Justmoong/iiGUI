@@ -77,7 +77,7 @@
       "document_id": "urn:iisacc:document:7a64ea5fa9d6b92a5fe7b5d92d2d9c080e907c49bf3df4734c111e40cc5adcb8",
       "source": "docs/BackdropMaterials.md",
       "agent_json": "docs/BackdropMaterials.agent.json",
-      "source_sha256": "3d0064b9e2940607be9f46f8e6f7b331d6ee8b634dabd3d3c6ff61c24c387e3f",
+      "source_sha256": "530e4c62c6c271a1c82b9ea89436ec3c64e44f781b3fa101e2e2d902da9adf95",
       "role": "guide"
     },
     {
@@ -147,7 +147,14 @@
       "document_id": "urn:iisacc:document:029b7b756ced0a514fee582554b297e351068c680c116d7ea66a1236e4825317",
       "source": "docs/CoreApplication.md",
       "agent_json": "docs/CoreApplication.agent.json",
-      "source_sha256": "415116bbe2bd6b19a8f52109254ec90d6d7f9578ad990578a8b1110b00b17bf0",
+      "source_sha256": "1cc7eee6628d8377688515d59571ad8a667a422841ed27024c7e576e8e380e5b",
+      "role": "guide"
+    },
+    {
+      "document_id": "urn:iisacc:document:c34cb08ad03d560532fbebb5bcda9d9c9fa5493dd2ab85fee94201ae665fe917",
+      "source": "docs/CustomWindowChrome.md",
+      "agent_json": "docs/CustomWindowChrome.agent.json",
+      "source_sha256": "a218232b0208c6e70460ed5bd56b514aab342404d586d2c0bd8027e2c6b1e25f",
       "role": "guide"
     },
     {
@@ -203,7 +210,7 @@
       "document_id": "urn:iisacc:document:a9b897d265071e0012f707cf10507af24520453bd2fae295c830d833dbcfc97c",
       "source": "docs/Fonts.md",
       "agent_json": "docs/Fonts.agent.json",
-      "source_sha256": "e08d5f8579d88e08e2a03b535cb43ef112e7de634dfcc6226d7332d83cf7aa50",
+      "source_sha256": "bd0dc397059b30a42e5baa4bd03339cb281bbcc7e1a11228aab4841285f68dfb",
       "role": "guide"
     },
     {

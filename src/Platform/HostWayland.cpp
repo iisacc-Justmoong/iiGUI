@@ -46,7 +46,7 @@ struct Host::Impl final {
     std::shared_ptr<detail::AtSpiHost> accessibility;std::optional<std::uint64_t> accessible_window;
     std::unique_ptr<runtime::FrameLoop> motion_frames;
     std::shared_ptr<MotionPreferences> preferences=std::make_shared<MotionPreferences>();
-    detail::WaylandInputQueue inputs;bool opened=false,draining=false,mounting=false,close_pending=false,configure_pending=false,resized_pending=false,frame_pending=false,native_close_pending=false;
+    detail::WaylandInputQueue inputs;std::optional<std::uint32_t> current_pointer_serial;bool opened=false,draining=false,mounting=false,close_pending=false,configure_pending=false,resized_pending=false,frame_pending=false,native_close_pending=false;
     bool application_driver=false,owns_wake=true,focused=false,accessibility_layout_pending=false;std::size_t motion_clients=0;
     explicit Impl(HostOptions value):options(detail::validate_options(std::move(value))),dispatch(std::make_shared<detail::DispatchState>(options.task_capacity,options.event_loop)){state.title=options.title;state.size=options.size;}
     bool on_owner()const{return owner==std::this_thread::get_id();}
@@ -117,7 +117,11 @@ struct Host::Impl final {
             if(!opened||close_pending)return;
             if(!parent)activity.deliver();if(close_pending||phase!=Phase::running)return;
             while(!inputs.empty()&&!close_pending){auto input=*inputs.pop();if(widgets){auto owner=widgets;
-                if(auto* widget=std::get_if<WidgetInput>(&input)){const detail::WaylandSurfaceEvent event{detail::WaylandEventKind::input,widget};(void)owner->native_event(&event);}
+                if(auto* pointer=std::get_if<detail::WaylandPointerEvent>(&input)){
+                    struct SerialScope{std::optional<std::uint32_t>& current;~SerialScope(){current.reset();}} scope{current_pointer_serial};
+                    current_pointer_serial=pointer->serial;
+                    const detail::WaylandSurfaceEvent event{detail::WaylandEventKind::input,&pointer->input};(void)owner->native_event(&event);
+                } else if(auto* widget=std::get_if<WidgetInput>(&input)){const detail::WaylandSurfaceEvent event{detail::WaylandEventKind::input,widget};(void)owner->native_event(&event);}
                 else if(auto* ime=std::get_if<detail::WaylandImeEvent>(&input)){const detail::WaylandSurfaceEvent event{detail::WaylandEventKind::ime,nullptr,ime};(void)owner->native_event(&event);}}}
             if(close_pending)return;++statistics.dispatches;if(!parent)dispatch->loop.poll(options.budget);
             if(!parent&&dispatch->loop.state()==runtime::LoopState::stopped){defer_close();return;}
@@ -131,7 +135,7 @@ struct Host::Impl final {
         resized_pending=resized_pending||changed;state.size=size;state.backing_scale=scale;state.visible=true;
         if(accessibility&&!accessible_window)accessible_window=accessibility->open(state.title,state.size);else if(changed)accessibility_geometry();
         accessibility_layout_pending=true;configure_pending=true;wake->signal();return true;}
-    void push(WidgetInput input)noexcept{try{if(!close_pending&&!inputs.push(std::move(input)))throw std::runtime_error("Wayland input queue is full");}catch(...){if(!failure)failure=core::Error{core::ErrorCode::full,"Wayland input admission failed",std::current_exception()};defer_close();}wake->signal();}
+    void push(WidgetInput input,std::optional<std::uint32_t> serial={})noexcept{try{if(!close_pending&&!inputs.push(std::move(input),serial))throw std::runtime_error("Wayland input queue is full");}catch(...){if(!failure)failure=core::Error{core::ErrorCode::full,"Wayland input admission failed",std::current_exception()};defer_close();}wake->signal();}
     void push(detail::WaylandImeEvent input)noexcept{try{if(!close_pending&&!inputs.push(std::move(input)))throw std::runtime_error("Wayland input queue is full");}catch(...){if(!failure)failure=core::Error{core::ErrorCode::full,"Wayland input admission failed",std::current_exception()};defer_close();}wake->signal();}
     void open_native(){
         native=std::make_unique<detail::WaylandConnection>();
@@ -141,7 +145,8 @@ struct Host::Impl final {
             .frame=[this]{++statistics.display_callbacks;statistics.display_synced=true;frame_pending=true;wake->signal();},
             .input=[this](WidgetInput value){push(std::move(value));},
             .ime=[this](detail::WaylandImeEvent value){push(std::move(value));},
-            .activity=[this](bool value){observe_activity(value);}});
+            .activity=[this](bool value){observe_activity(value);},
+            .pointer_press=[this](WidgetInput value,std::uint32_t serial){push(std::move(value),serial);}});
     }
 
 };
@@ -217,6 +222,15 @@ core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
 }
 core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogCompletion completion){if(auto r=impl_->ready();!r)return r;if(impl_->dialog)return core::fail(core::ErrorCode::busy,"File dialog already open");auto weak=std::weak_ptr<detail::DispatchState>(impl_->dispatch);auto opened=detail::portal_file_dialog("",std::move(options),executor(),[host=impl_.get(),weak,completion=std::move(completion)](auto result)mutable{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;host->dialog.reset();if(completion)completion(std::move(result));});if(!opened)return std::unexpected(opened.error());impl_->dialog=std::move(*opened);return {};}
 core::Result<void> Host::window_action(WindowAction action){if(auto r=impl_->surface_ready();!r)return r;try{impl_->native->action(action);return {};}catch(const std::invalid_argument& e){return core::fail(core::ErrorCode::unsupported,e.what());}}
+core::Result<void> Host::begin_window_drag(){
+    if(auto r=impl_->surface_ready();!r)return r;
+    if(impl_->options.chrome!=WindowChrome::custom)return core::fail(core::ErrorCode::unsupported,"Window drag requires custom chrome");
+    const auto serial=impl_->current_pointer_serial;
+    if(!serial)return core::fail(core::ErrorCode::invalid_argument,"Window drag requires the initiating Wayland pointer press");
+    if(auto widgets=impl_->widgets)if(auto canceled=widgets->input({.kind=WidgetInputKind::pointer_cancel});!canceled)return canceled;
+    try{impl_->native->begin_move(*serial);return {};}
+    catch(...){return core::fail(core::ErrorCode::failed,"Cannot start the Wayland window drag",std::current_exception());}
+}
 core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> menu){if(!detail::valid_menu(menu))return core::fail(core::ErrorCode::invalid_argument,"Invalid menu");return core::fail(core::ErrorCode::unsupported,"Wayland has no standard global menu protocol; use an iiGUI menu");}
 core::Result<void> Host::set_title(std::string_view title){if(auto r=impl_->surface_ready();!r)return r;if(!detail::valid_title(title)||title.size()>8192)return core::fail(core::ErrorCode::invalid_argument,"Invalid Wayland title");impl_->state.title=title;impl_->native->title(title);impl_->accessibility_geometry();return {};}
 core::Result<void> Host::set_text(std::string_view text){if(auto r=impl_->surface_ready();!r)return r;if(!detail::valid_title(text))return core::fail(core::ErrorCode::invalid_argument,"Invalid text");auto mounted=mount_widgets([text=std::string(text)](WidgetBuilder& widgets)->core::Result<void>{auto r=widgets.label({},"host-text",{.text=text});if(!r)return std::unexpected(r.error());return {};});if(!mounted)return std::unexpected(mounted.error());impl_->state.text=text;return {};}

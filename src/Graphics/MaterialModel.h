@@ -142,13 +142,18 @@ public:
         const bool window=c.kind==MaterialKind::window;
         const auto density=c.density.value_or(window?MaterialDensity::dense75:MaterialDensity::glass25);
         const bool dense=density==MaterialDensity::dense75;
+        constexpr bool neutral_window_policy=[] {
+            if constexpr(requires { Policy::neutral_window; }) return bool(Policy::neutral_window);
+            return false;
+        }();
+        const bool neutral_window=window&&neutral_window_policy;
         auto tint=c.color.value_or(Policy::default_tint());
-        tint.alpha*=c.tint_opacity.value_or(window?.5:(dense?.75:.25));
-        return {density,c.backdrop,c.primary_color.value_or(Policy::default_primary()),tint,
+        tint.alpha*=c.tint_opacity.value_or(dense?.75:.25);
+        return {density,c.backdrop,neutral_window?Policy::default_tint():c.primary_color.value_or(Policy::default_primary()),tint,
             c.border_color.value_or(StyleColor{1,1,1,dense?.12:.22}),c.backdrop_base_color.value_or(StyleColor{0,0,0,0}),
             c.blur_enabled?c.blur_radius.value_or(dense?64:16):0,c.radius.value_or(window?16:12),
             c.inner_highlight_opacity.value_or(dense?.06:.14),c.inner_highlight_offset_y.value_or(1),c.border_width.value_or(1),
-            c.intense_opacity.value_or(.40),c.faint_opacity.value_or(.11),c.shadow_radius.value_or(window?48:24),
+            neutral_window?0:c.intense_opacity.value_or(.40),neutral_window?0:c.faint_opacity.value_or(.11),c.shadow_radius.value_or(window?48:24),
             c.shadow_offset_y.value_or(window?16:8),c.shadow_opacity.value_or(window?.30:.22),
             c.width.value_or(window?500:(c.kind==MaterialKind::panel?380:0)),
             c.height.value_or(window?272:(c.kind==MaterialKind::panel?204:0))};

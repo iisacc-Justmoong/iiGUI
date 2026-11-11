@@ -347,6 +347,15 @@ struct Host::Impl {
             static_cast<unsigned int>(pixels(options.size.height)), 0,
             BlackPixel(display, screen), WhitePixel(display, screen));
         if (!window) throw std::runtime_error("Cannot create native X11 window");
+        if(options.chrome==WindowChrome::custom){
+            // Keep the window manager's resize border while omitting its title,
+            // menu, and controls. The application supplies the titlebar.
+            constexpr unsigned long decorations_hint=1u<<1,border=1u<<1,resize_handles=1u<<2;
+            const unsigned long hints[]{decorations_hint,0,border|resize_handles,0,0};
+            const auto motif=XInternAtom(display,"_MOTIF_WM_HINTS",False);
+            XChangeProperty(display,window,motif,motif,32,PropModeReplace,
+                reinterpret_cast<const unsigned char*>(hints),5);
+        }
         XSelectInput(display, window, ExposureMask | StructureNotifyMask);
         protocols = XInternAtom(display, "WM_PROTOCOLS", False);
         delete_window = XInternAtom(display, "WM_DELETE_WINDOW", False);
@@ -674,6 +683,23 @@ core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogComplet
 }
 
 namespace ii::gui {
-core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::raise))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto* display=impl_->display;const auto window=impl_->window;const auto state=[&](long mode,const char* first,const char* second=nullptr){XEvent event{};event.xclient.type=ClientMessage;event.xclient.window=window;event.xclient.message_type=XInternAtom(display,"_NET_WM_STATE",False);event.xclient.format=32;event.xclient.data.l[0]=mode;event.xclient.data.l[1]=XInternAtom(display,first,False);event.xclient.data.l[2]=second?XInternAtom(display,second,False):0;event.xclient.data.l[3]=1;XSendEvent(display,RootWindow(display,impl_->screen),False,SubstructureRedirectMask|SubstructureNotifyMask,&event);};switch(action){case WindowAction::restore:XMapRaised(display,window);state(0,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");state(0,"_NET_WM_STATE_FULLSCREEN");break;case WindowAction::minimize:XIconifyWindow(display,window,impl_->screen);break;case WindowAction::maximize:state(1,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");break;case WindowAction::toggle_fullscreen:state(2,"_NET_WM_STATE_FULLSCREEN");break;case WindowAction::raise:XMapRaised(display,window);XRaiseWindow(display,window);break;}XFlush(display);return {};}
+core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::toggle_maximize))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto* display=impl_->display;const auto window=impl_->window;const auto state=[&](long mode,const char* first,const char* second=nullptr){XEvent event{};event.xclient.type=ClientMessage;event.xclient.window=window;event.xclient.message_type=XInternAtom(display,"_NET_WM_STATE",False);event.xclient.format=32;event.xclient.data.l[0]=mode;event.xclient.data.l[1]=XInternAtom(display,first,False);event.xclient.data.l[2]=second?XInternAtom(display,second,False):0;event.xclient.data.l[3]=1;XSendEvent(display,RootWindow(display,impl_->screen),False,SubstructureRedirectMask|SubstructureNotifyMask,&event);};switch(action){case WindowAction::restore:XMapRaised(display,window);state(0,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");state(0,"_NET_WM_STATE_FULLSCREEN");break;case WindowAction::minimize:XIconifyWindow(display,window,impl_->screen);break;case WindowAction::maximize:state(1,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");break;case WindowAction::toggle_maximize:state(2,"_NET_WM_STATE_MAXIMIZED_VERT","_NET_WM_STATE_MAXIMIZED_HORZ");break;case WindowAction::toggle_fullscreen:state(2,"_NET_WM_STATE_FULLSCREEN");break;case WindowAction::raise:XMapRaised(display,window);XRaiseWindow(display,window);break;}XFlush(display);return {};}
+core::Result<void> Host::begin_window_drag(){
+    if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->options.chrome!=WindowChrome::custom)return core::fail(core::ErrorCode::unsupported,"Window drag requires custom chrome");
+    auto* display=impl_->display;const auto window=impl_->window;::Window root=0,child=0;
+    int root_x=0,root_y=0,local_x=0,local_y=0;unsigned mask=0;
+    if(!XQueryPointer(display,window,&root,&child,&root_x,&root_y,&local_x,&local_y,&mask) || !(mask&Button1Mask))
+        return core::fail(core::ErrorCode::invalid_argument,"Window drag requires a primary mouse press");
+    if(auto widgets=impl_->widgets)if(auto canceled=widgets->input({.kind=WidgetInputKind::pointer_cancel});!canceled)return canceled;
+    XUngrabPointer(display,CurrentTime);
+    XEvent event{};event.xclient.type=ClientMessage;event.xclient.display=display;event.xclient.window=window;
+    event.xclient.message_type=XInternAtom(display,"_NET_WM_MOVERESIZE",False);event.xclient.format=32;
+    event.xclient.data.l[0]=root_x;event.xclient.data.l[1]=root_y;event.xclient.data.l[2]=8;
+    event.xclient.data.l[3]=1;event.xclient.data.l[4]=1;
+    if(!XSendEvent(display,root,False,SubstructureRedirectMask|SubstructureNotifyMask,&event))
+        return core::fail(core::ErrorCode::failed,"Cannot request an X11 window drag");
+    XFlush(display);return {};
+}
 core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){if(auto ready=impl_->ready();!ready)return ready;auto created=detail::native_app_menu(impl_->display,impl_->window,std::move(items),executor());if(!created)return std::unexpected(created.error());impl_->app_menu=std::move(*created);return {};}
 }

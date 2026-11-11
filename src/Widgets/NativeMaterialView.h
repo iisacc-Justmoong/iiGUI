@@ -87,15 +87,21 @@ class BasicNativeMaterial final {
             const auto color=linear(tint);drawing->panels.push_back({bounds,color,color,0});
             return std::shared_ptr<const ii::gui::WidgetDrawing>(std::move(drawing));
         }
-        auto gradient=state->gradient;if(!gradient)return ii::core::fail(ii::core::ErrorCode::closed,"Material has retired");
-        const auto [padding_x,padding_y]=NativeMaterialGradient::blur_padding(width,height,s.blur_radius);
-        auto underlay=gradient->render_colored(state->view,width,height,input.backing_scale,padding_x,padding_y);if(!underlay)return std::unexpected(underlay.error());
+        std::shared_ptr<const ii::gui::RasterImage> underlay;
+        ii::gui::Rect underlay_bounds{};
+        if(s.intense_opacity>0||s.faint_opacity>0){
+            auto gradient=state->gradient;if(!gradient)return ii::core::fail(ii::core::ErrorCode::closed,"Material has retired");
+            const auto [padding_x,padding_y]=NativeMaterialGradient::blur_padding(width,height,s.blur_radius);
+            auto image=gradient->render_colored(state->view,width,height,input.backing_scale,padding_x,padding_y);if(!image)return std::unexpected(image.error());
+            underlay=*image;
+            underlay_bounds={float(-padding_x),float(-padding_y),float(width+2*padding_x),float(height+2*padding_y)};
+        }
         const auto border_width=(std::min)({s.border_width,width/2,height/2});
         auto shape=outline(state,width,height,input.backing_scale,border_width);if(!shape)return std::unexpected(shape.error());
         drawing->backdrop=ii::gui::BackdropMaterial{.bounds=bounds,.radius=float(radius),.blur_radius=float(s.blur_radius),
             .tint=linear(state->view.displayed_tint()),.border=linear(s.border),.border_width=float(shape->mask?0:border_width),
             .source=s.backdrop==MaterialBackdrop::previous_layers?ii::gui::BackdropSource::previous_layers:ii::gui::BackdropSource::content,
-            .mask=shape->mask,.underlay=*underlay,.underlay_bounds={float(-padding_x),float(-padding_y),float(width+2*padding_x),float(height+2*padding_y)},
+            .mask=shape->mask,.underlay=std::move(underlay),.underlay_bounds=underlay_bounds,
             .base=linear(s.base),.capture=s.backdrop!=MaterialBackdrop::none,
             .inner_highlight_opacity=float(s.inner_highlight_opacity),.inner_highlight_offset_y=float(s.inner_highlight_offset_y)};
         if(s.shadow_opacity>0)drawing->shadow=ii::gui::BoxShadow{.bounds={0,float(s.shadow_offset_y),float(width),float(height)},

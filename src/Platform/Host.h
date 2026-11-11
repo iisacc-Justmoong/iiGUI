@@ -35,6 +35,9 @@ struct DisplayPixels final {
     int width = 0, height = 0;
     friend bool operator==(const DisplayPixels&, const DisplayPixels&) = default;
 };
+// Custom chrome extends the application content into the native titlebar.
+// Platforms that cannot do so retain their system chrome.
+enum class WindowChrome { system, custom };
 struct HostOptions final {
     std::string title = "iiGUI";
     Size size{640, 420};
@@ -47,6 +50,7 @@ struct HostOptions final {
     // macOS 14+ uses the window's CADisplayLink, never a nominal 16 ms timer.
     runtime::FrameLoop* frame_loop = nullptr;
     Renderer renderer=Renderer::automatic;
+    WindowChrome chrome=WindowChrome::system;
 };
 struct HostCallbacks final {
     runtime::Task opened;
@@ -66,6 +70,20 @@ struct WindowSnapshot final {
 // Reports the compiled host contract; OS permissions/session services may still
 // deny an individual request. Core targets without a window system have no GUI host.
 enum class HostBackend { cocoa, win32, x11, wayland, android, uikit, web, none };
+struct WindowChromePresentation final {
+    bool titlebar=false, native_controls=false, client_controls=false;
+};
+// Presentation when an application requests custom chrome. UIKit/Android
+// expose application content but do not own desktop window controls.
+[[nodiscard]] constexpr WindowChromePresentation window_chrome_presentation(HostBackend backend) noexcept {
+    switch(backend) {
+    case HostBackend::cocoa:return {true,true,false};
+    case HostBackend::win32:case HostBackend::x11:case HostBackend::wayland:return {true,false,true};
+    case HostBackend::uikit:case HostBackend::android:return {true,false,false};
+    case HostBackend::web:case HostBackend::none:return {};
+    }
+    return {};
+}
 struct HostCapabilities final {
     HostBackend backend=HostBackend::none;
     bool clipboard_text=false,external_urls=false,file_dialogs=false;
@@ -76,6 +94,7 @@ struct HostCapabilities final {
 [[nodiscard]] IIGUI_EXPORT bool supports_application_driver() noexcept;
 // Whether the compiled host has a distinct application foreground signal.
 [[nodiscard]] IIGUI_EXPORT bool supports_application_foreground() noexcept;
+[[nodiscard]] IIGUI_EXPORT bool supports_custom_window_chrome() noexcept;
 
 struct HostStats final {
     std::uint64_t dispatches = 0;
@@ -152,6 +171,8 @@ public:
     [[nodiscard]] core::Result<void> show(Host& parent,HostCallbacks callbacks = {});
     [[nodiscard]] core::Result<void> choose_file(FileDialogOptions,FileDialogCompletion);
     [[nodiscard]] core::Result<void> window_action(WindowAction);
+    // Call synchronously from a primary-button press in a custom drag region.
+    [[nodiscard]] core::Result<void> begin_window_drag();
     [[nodiscard]] core::Result<void> set_app_menu(std::vector<AppMenuItem>);
     [[nodiscard]] core::Result<void> set_title(std::string_view title);
     [[nodiscard]] core::Result<void> set_text(std::string_view text);

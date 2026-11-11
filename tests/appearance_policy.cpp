@@ -40,11 +40,14 @@ int main() {
     using namespace ii;
     gui::require_text_weight_rules_abi_v1();
     const auto generic = gui::default_widget_appearance();
-    check(generic == gui::lvrs_appearance(), "Compatibility appearance changed");
-    const auto defaults = gui::default_text_tokens(), legacy = gui::lvrs_text_tokens();
-    check(defaults.size() == legacy.size(), "Compatibility text token count changed");
+    const auto legacy = gui::lvrs_appearance();
+    check(generic.window.red==generic.window.green&&generic.window.green==generic.window.blue,
+          "Generic window must not incorporate the default accent");
+    check(generic.primary==legacy.primary,"Neutral window changed the compatibility accent");
+    const auto defaults = gui::default_text_tokens(), legacy_text = gui::lvrs_text_tokens();
+    check(defaults.size() == legacy_text.size(), "Compatibility text token count changed");
     for (std::size_t i = 0; i < defaults.size(); ++i)
-        check(defaults[i].pixels == legacy[i].pixels && defaults[i].weight == legacy[i].weight && defaults[i].style == legacy[i].style,
+        check(defaults[i].pixels == legacy_text[i].pixels && defaults[i].weight == legacy_text[i].weight && defaults[i].style == legacy_text[i].style,
               "Compatibility text token changed");
 
     int geometry_updates = 0;

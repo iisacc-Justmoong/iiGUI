@@ -32,7 +32,7 @@ struct FileDialogOptions final {
 };
 struct FileDialogSelection final {bool canceled=false;std::vector<std::string> paths;};
 using FileDialogCompletion=std::function<void(core::Result<FileDialogSelection>)>;
-enum class WindowAction { restore,minimize,maximize,toggle_fullscreen,raise };
+enum class WindowAction { restore,minimize,maximize,toggle_fullscreen,raise,toggle_maximize };
 struct AppShortcut final {std::string key;bool control=false,alt=false,shift=false,meta=true;};
 struct AppMenuItem final {
     std::string id,title;

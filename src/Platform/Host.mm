@@ -508,12 +508,18 @@ struct Host::Impl {
                 if(owner->native.backing_changed)owner->native.backing_changed();
             });
         } else {
+        const auto style=NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                         NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable |
+                         (options.chrome==WindowChrome::custom ? NSWindowStyleMaskFullSizeContentView : 0);
         window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, options.size.width, options.size.height)
-            styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
-                      NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
+            styleMask:style
             backing:NSBackingStoreBuffered defer:NO];
         window.releasedWhenClosed = NO;
         window.title = native_text(state.title);
+        if(options.chrome==WindowChrome::custom) {
+            window.titleVisibility=NSWindowTitleHidden;
+            window.titlebarAppearsTransparent=YES;
+        }
         window.contentMinSize = NSMakeSize(options.minimum_size.width, options.minimum_size.height);
         window.delegate = delegate;
         [window center];
@@ -745,9 +751,26 @@ core::Result<void> Host::window_action(WindowAction action){
     case WindowAction::restore:[impl_->window deminiaturize:nil];if(impl_->window.zoomed)[impl_->window zoom:nil];[impl_->window makeKeyAndOrderFront:nil];break;
     case WindowAction::minimize:[impl_->window miniaturize:nil];break;
     case WindowAction::maximize:if(!impl_->window.zoomed)[impl_->window zoom:nil];break;
+    case WindowAction::toggle_maximize:[impl_->window zoom:nil];break;
     case WindowAction::toggle_fullscreen:[impl_->window toggleFullScreen:nil];break;
     case WindowAction::raise:[impl_->window makeKeyAndOrderFront:nil];break;
     default:return core::fail(core::ErrorCode::invalid_argument,"Invalid window action");}
+    return {};
+}
+core::Result<void> Host::begin_window_drag(){
+    if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->embedded || impl_->options.chrome!=WindowChrome::custom)
+        return core::fail(core::ErrorCode::unsupported,"Window drag requires owned custom chrome");
+    NSEvent* event=impl_->application.currentEvent;
+    if(!event || event.type!=NSEventTypeLeftMouseDown || event.window!=impl_->window)
+        return core::fail(core::ErrorCode::invalid_argument,"Window drag requires the current primary mouse-down event");
+    [impl_->window performWindowDragWithEvent:event];
+    // AppKit hands this gesture to the window server and may never send the
+    // surface a mouse-up. Release the widget capture before the next click.
+    if(auto widgets=impl_->widgets) {
+        if(auto cancelled=widgets->input({.kind=WidgetInputKind::pointer_cancel});!cancelled)
+            return cancelled;
+    }
     return {};
 }
 core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){

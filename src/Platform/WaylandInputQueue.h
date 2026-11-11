@@ -7,13 +7,15 @@
 #include <vector>
 
 namespace ii::gui::detail {
-using WaylandQueuedInput=std::variant<WidgetInput,WaylandImeEvent>;
+struct WaylandPointerEvent final { WidgetInput input; std::uint32_t serial=0; };
+using WaylandQueuedInput=std::variant<WidgetInput,WaylandImeEvent,WaylandPointerEvent>;
 class WaylandInputQueue final {
     std::vector<std::optional<WaylandQueuedInput>> slots_;
     std::size_t head_=0,count_=0;
 public:
     explicit WaylandInputQueue(std::size_t capacity=512):slots_(capacity){if(!capacity)throw std::invalid_argument("Wayland input queue capacity is zero");}
-    bool push(WidgetInput value){
+    bool push(WidgetInput value,std::optional<std::uint32_t> serial={}){
+        if(serial) return append(WaylandPointerEvent{std::move(value),*serial});
         if(count_&&value.kind==WidgetInputKind::pointer_move){
             auto* prior=std::get_if<WidgetInput>(&*slots_[(head_+count_-1)%slots_.size()]);
             if(prior&&prior->kind==value.kind&&prior->device==value.device&&prior->device_id==value.device_id){*prior=std::move(value);return true;}

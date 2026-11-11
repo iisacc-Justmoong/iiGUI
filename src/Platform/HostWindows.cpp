@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <windowsx.h>
 #include <iiGUI/Host.h>
 #include "DisplayPixelsPolicy.h"
 #include <iiGUI/DispatchState.h>
@@ -11,6 +12,7 @@
 #include "FrameDemand.h"
 #include "WindowForeground.h"
 #include "Win32Foreground.h"
+#include "WindowChromeGeometry.h"
 #include <iiGUI/CanvasState.h>
 #include <iiGUI/WidgetState.h>
 #include <iiGUI/WidgetSurfaceNative.h>
@@ -139,6 +141,7 @@ struct Host::Impl {
     int pixels(double value) const { return static_cast<int>(std::lround(value*dpi/96.0)); }
     RECT frame(Size size) const {
         RECT rectangle{0, 0, pixels(size.width), pixels(size.height)};
+        if(options.chrome==WindowChrome::custom)return rectangle;
         if (!AdjustWindowRectExForDpi(&rectangle, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi))
             throw native_error("Cannot calculate window frame");
         return rectangle;
@@ -302,6 +305,34 @@ struct Host::Impl {
         LRESULT result = 0;
         self->guard([&] {
             switch (message) {
+            case WM_NCCALCSIZE:
+                if(self->options.chrome==WindowChrome::custom && wparam){
+                    if(IsZoomed(handle)){
+                        MONITORINFO monitor{sizeof(monitor)};
+                        if(GetMonitorInfoW(MonitorFromWindow(handle,MONITOR_DEFAULTTONEAREST),&monitor)){
+                            auto& content=reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam)->rgrc[0];
+                            content.left=std::max(content.left,monitor.rcWork.left);content.top=std::max(content.top,monitor.rcWork.top);
+                            content.right=std::min(content.right,monitor.rcWork.right);content.bottom=std::min(content.bottom,monitor.rcWork.bottom);
+                        }
+                    }
+                    result=0;break;
+                }
+                handled=false;break;
+            case WM_NCHITTEST:
+                if(self->options.chrome==WindowChrome::custom){
+                    if(IsZoomed(handle)){result=HTCLIENT;break;}
+                    RECT rect{};if(!GetWindowRect(handle,&rect)){handled=false;break;}
+                    const auto border_x=GetSystemMetricsForDpi(SM_CXSIZEFRAME,self->dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,self->dpi);
+                    const auto border_y=GetSystemMetricsForDpi(SM_CYSIZEFRAME,self->dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,self->dpi);
+                    using E=detail::WindowResizeEdge;
+                    const auto edge=detail::window_resize_edge(GET_X_LPARAM(lparam)-rect.left,GET_Y_LPARAM(lparam)-rect.top,
+                        rect.right-rect.left,rect.bottom-rect.top,border_x,border_y);
+                    switch(edge){case E::top_left:result=HTTOPLEFT;break;case E::top:result=HTTOP;break;case E::top_right:result=HTTOPRIGHT;break;
+                    case E::right:result=HTRIGHT;break;case E::bottom_right:result=HTBOTTOMRIGHT;break;case E::bottom:result=HTBOTTOM;break;
+                    case E::bottom_left:result=HTBOTTOMLEFT;break;case E::left:result=HTLEFT;break;case E::none:result=HTCLIENT;break;}
+                    break;
+                }
+                handled=false;break;
             case wake_message: self->gate->consumed(); self->drain(); break;
             case WM_TIMER:
                 if (wparam != deadline_timer) { handled = false; break; }
@@ -384,7 +415,7 @@ struct Host::Impl {
         if (!dpi) dpi = 96;
         const auto actual_frame = frame(options.size);
         if (!SetWindowPos(window, nullptr, 0, 0, actual_frame.right-actual_frame.left,
-            actual_frame.bottom-actual_frame.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE))
+            actual_frame.bottom-actual_frame.top, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED))
             throw native_error("Cannot size native GUI window");
         gate->attach(window);
         if(!parent)dispatch->connect([wake=gate]() noexcept { wake->signal(); });
@@ -669,6 +700,16 @@ core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogComplet
 }
 
 namespace ii::gui {
-core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::raise))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto window=impl_->window;switch(action){case WindowAction::restore:ShowWindow(window,SW_RESTORE);break;case WindowAction::minimize:ShowWindow(window,SW_MINIMIZE);break;case WindowAction::maximize:ShowWindow(window,SW_MAXIMIZE);break;case WindowAction::raise:ShowWindow(window,SW_SHOWNORMAL);SetForegroundWindow(window);break;case WindowAction::toggle_fullscreen:if(!impl_->fullscreen){impl_->saved_style=GetWindowLongPtrW(window,GWL_STYLE);GetWindowRect(window,&impl_->saved_bounds);MONITORINFO monitor{sizeof(monitor)};if(!GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))return core::fail(core::ErrorCode::failed,"Cannot read fullscreen monitor");SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style&~WS_OVERLAPPEDWINDOW);SetWindowPos(window,HWND_TOP,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_FRAMECHANGED);}else{SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style);auto r=impl_->saved_bounds;SetWindowPos(window,nullptr,r.left,r.top,r.right-r.left,r.bottom-r.top,SWP_FRAMECHANGED|SWP_NOZORDER);}impl_->fullscreen=!impl_->fullscreen;break;}impl_->update_snapshot();return {};}
+core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::toggle_maximize))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto window=impl_->window;switch(action){case WindowAction::restore:ShowWindow(window,SW_RESTORE);break;case WindowAction::minimize:ShowWindow(window,SW_MINIMIZE);break;case WindowAction::maximize:ShowWindow(window,SW_MAXIMIZE);break;case WindowAction::toggle_maximize:ShowWindow(window,IsZoomed(window)?SW_RESTORE:SW_MAXIMIZE);break;case WindowAction::raise:ShowWindow(window,SW_SHOWNORMAL);SetForegroundWindow(window);break;case WindowAction::toggle_fullscreen:if(!impl_->fullscreen){impl_->saved_style=GetWindowLongPtrW(window,GWL_STYLE);GetWindowRect(window,&impl_->saved_bounds);MONITORINFO monitor{sizeof(monitor)};if(!GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))return core::fail(core::ErrorCode::failed,"Cannot read fullscreen monitor");SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style&~WS_OVERLAPPEDWINDOW);SetWindowPos(window,HWND_TOP,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_FRAMECHANGED);}else{SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style);auto r=impl_->saved_bounds;SetWindowPos(window,nullptr,r.left,r.top,r.right-r.left,r.bottom-r.top,SWP_FRAMECHANGED|SWP_NOZORDER);}impl_->fullscreen=!impl_->fullscreen;break;}impl_->update_snapshot();return {};}
+core::Result<void> Host::begin_window_drag(){
+    if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->options.chrome!=WindowChrome::custom)return core::fail(core::ErrorCode::unsupported,"Window drag requires custom chrome");
+    if(!(GetKeyState(VK_LBUTTON)&0x8000))return core::fail(core::ErrorCode::invalid_argument,"Window drag requires a primary mouse press");
+    POINT point{};if(!GetCursorPos(&point))return core::fail(core::ErrorCode::failed,"Cannot locate window drag");
+    if(auto widgets=impl_->widgets)if(auto canceled=widgets->input({.kind=WidgetInputKind::pointer_cancel});!canceled)return canceled;
+    auto handle=impl_->window;ReleaseCapture();
+    SendMessageW(handle,WM_NCLBUTTONDOWN,HTCAPTION,MAKELPARAM(point.x,point.y));
+    return {};
+}
 core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){if(auto ready=impl_->ready();!ready)return ready;if(!detail::valid_menu(items))return core::fail(core::ErrorCode::invalid_argument,"Invalid native application menu");HMENU replacement=CreateMenu();if(!replacement)return core::fail(core::ErrorCode::failed,"Cannot allocate native menu");try{std::map<UINT,runtime::Task> actions;std::vector<ACCEL> keys;UINT next=0x4000;const auto build=[&](auto&& self,HMENU menu,const std::vector<AppMenuItem>& source)->void{for(const auto& item:source){if(item.separator){AppendMenuW(menu,MF_SEPARATOR,0,nullptr);continue;}const auto title=native_text(item.title);if(!item.children.empty()){auto popup=CreatePopupMenu();if(!popup)throw native_error("Cannot create native submenu");self(self,popup,item.children);if(!AppendMenuW(menu,MF_POPUP|MF_STRING,reinterpret_cast<UINT_PTR>(popup),title.c_str())){DestroyMenu(popup);throw native_error("Cannot append native submenu");}}else{const auto id=next++;UINT flags=MF_STRING|(item.enabled?MF_ENABLED:MF_GRAYED)|(item.checked?MF_CHECKED:MF_UNCHECKED);if(!AppendMenuW(menu,flags,id,title.c_str()))throw native_error("Cannot append native menu action");actions.emplace(id,item.triggered);if(item.shortcut&&item.enabled){auto key=native_text(item.shortcut->key);if(key.size()!=1)throw std::invalid_argument("Native shortcut must name one character");const auto virtual_key=VkKeyScanW(key[0]);if(virtual_key==-1)throw std::invalid_argument("Shortcut is unavailable in the current keyboard layout");BYTE modifiers=FVIRTKEY;if(item.shortcut->control||item.shortcut->meta)modifiers|=FCONTROL;if(item.shortcut->alt)modifiers|=FALT;if(item.shortcut->shift||(HIBYTE(virtual_key)&1))modifiers|=FSHIFT;keys.push_back({modifiers,WORD(LOBYTE(virtual_key)),WORD(id)});}}}};build(build,replacement,items);HACCEL accelerator=keys.empty()?nullptr:CreateAcceleratorTableW(keys.data(),int(keys.size()));if(!keys.empty()&&!accelerator)throw native_error("Cannot create native keyboard shortcuts");if(!SetMenu(impl_->window,replacement)){if(accelerator)DestroyAcceleratorTable(accelerator);throw native_error("Cannot attach native menu");}if(impl_->app_menu)DestroyMenu(impl_->app_menu);if(impl_->shortcuts)DestroyAcceleratorTable(impl_->shortcuts);impl_->app_menu=replacement;impl_->shortcuts=accelerator;impl_->menu_actions=std::move(actions);DrawMenuBar(impl_->window);return {};}catch(...){DestroyMenu(replacement);return core::fail(core::ErrorCode::failed,"Cannot build the native application menu",std::current_exception());}}
 }

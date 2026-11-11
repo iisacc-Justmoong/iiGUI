@@ -29,6 +29,7 @@ struct MockTextState final {
 std::map<const ii::gui::detail::WaylandConnection*,MockTextState> text_states;
 std::map<const ii::gui::detail::WaylandConnection*,ii::gui::detail::WaylandCallbacks> callback_states;
 std::map<const ii::gui::detail::WaylandConnection*,double> display_scales;
+std::optional<std::uint32_t> move_serial;
 }
 void fake_wayland_set_scale(double scale){
     for(auto* connection:connections){display_scales[connection]=scale;auto& callbacks=callback_states.at(connection);
@@ -44,6 +45,14 @@ void fake_wayland_emit_ordered_input(){
         if(callbacks.ime)callbacks.ime({.kind=WaylandImeEventKind::done,.epoch=1,.serial=1});
     }
 }
+void fake_wayland_emit_pointer_press(std::uint32_t serial){
+    using namespace ii::gui;
+    for(auto* connection:connections){auto& callbacks=callback_states.at(connection);
+        if(callbacks.pointer_press)callbacks.pointer_press({.kind=WidgetInputKind::pointer_down,.buttons=1},serial);
+        if(callbacks.input)callbacks.input({.kind=WidgetInputKind::pointer_up});
+    }
+}
+std::optional<std::uint32_t> fake_wayland_move_serial(){return move_serial;}
 void fake_wayland_text_enter(ii::gui::detail::WaylandConnection& connection){auto& state=text_states.at(&connection);state.focused=true;state.enabled=false;++state.epoch;}
 std::uint32_t fake_wayland_text_serial(const ii::gui::detail::WaylandConnection& connection){return text_states.at(&connection).serial;}
 std::uint64_t fake_wayland_text_epoch(const ii::gui::detail::WaylandConnection& connection){return text_states.at(&connection).epoch;}
@@ -62,7 +71,7 @@ extern "C" ssize_t fake_wayland_write(int fd,const void* data,size_t size){
 void fake_wayland_clear_wakes(){std::lock_guard lock(wake_mutex);for(auto [reader,writer]:wake_writers){(void)reader;::close(writer);}wake_writers.clear();}
 void fake_wayland_reject_next_open(){reject_open=true;}
 void fake_wayland_reject_next_dispatch(){reject_dispatch=true;}
-void fake_wayland_reset_waits(){wait_count=0;close_epoch=0;next_wait_action={};}
+void fake_wayland_reset_waits(){wait_count=0;close_epoch=0;next_wait_action={};move_serial.reset();}
 void fake_wayland_on_next_wait(std::function<void()> action){next_wait_action=std::move(action);}
 void fake_wayland_request_all_close(){++close_epoch;}
 void fake_wayland_complete_dialog(){auto completion=std::move(pending_dialog);if(completion)completion(ii::gui::FileDialogSelection{.canceled=true});}
@@ -94,6 +103,7 @@ void WaylandConnection::title(std::string_view){}
 void WaylandConnection::minimum(Size){}
 void WaylandConnection::resize(Size){}
 void WaylandConnection::action(WindowAction){}
+void WaylandConnection::begin_move(std::uint32_t serial){move_serial=serial;}
 void WaylandConnection::request_frame(){}
 void WaylandConnection::cancel_frame(){}
 wl_display* WaylandConnection::display()const{return nullptr;}

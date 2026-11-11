@@ -23,6 +23,7 @@ inline bool valid_title(std::string_view title) {
 }
 inline HostOptions validate_options(HostOptions options) {
     if(unsigned(options.renderer)>unsigned(Renderer::vulkan))throw std::invalid_argument("Invalid widget renderer selection");
+    if(unsigned(options.chrome)>unsigned(WindowChrome::custom))throw std::invalid_argument("Invalid window chrome selection");
     if(options.frame_loop && options.event_loop!=&options.frame_loop->events())
         throw std::invalid_argument("Display frame loop must borrow the Host's event loop");
 #if !defined(__APPLE__)

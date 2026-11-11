@@ -39,6 +39,13 @@ void contracts() {
         catch (const std::invalid_argument&) { return true; }
     };
     gui::HostOptions options;
+    check(options.chrome == gui::WindowChrome::system, "native window chrome is the default");
+    options.chrome = static_cast<gui::WindowChrome>(999);
+    check(invalid(options), "reject unknown native window chrome");
+    options = {};
+    options.chrome = gui::WindowChrome::custom;
+    check(!invalid(options), "custom window chrome is a valid host option");
+    options = {};
     options.size.width = std::numeric_limits<double>::quiet_NaN();
     check(invalid(options), "reject NaN size");
     options = {}; options.size.width = 1e30;
@@ -65,6 +72,7 @@ void contracts() {
     check(owned_constructor && !wrong_constructor, "native host belongs to its construction thread");
 #endif
     gui::Host host;
+    check(!host.begin_window_drag(), "window drag requires an open window");
     check(!host.set_text("before open"), "window does not exist before run");
     good(host.executor().post([] {}), "pre-run submission is admitted");
     check(host.executor().every(0ms, [] {}).error == runtime::SubmitError::invalid,

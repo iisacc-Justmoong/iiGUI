@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/CoreApplication.md",
-    "sha256": "415116bbe2bd6b19a8f52109254ec90d6d7f9578ad990578a8b1110b00b17bf0",
-    "bytes": 3823,
+    "sha256": "1cc7eee6628d8377688515d59571ad8a667a422841ed27024c7e576e8e380e5b",
+    "bytes": 3837,
     "line_count": 66,
     "encoding": "utf-8",
     "language": "en"
@@ -85,9 +85,9 @@
       "kind": "heading",
       "start_line": 26,
       "end_line": 26,
-      "raw": "## LVRS appearance with native semantics\n",
+      "raw": "## Historical LVRS appearance compatibility\n",
       "level": 2,
-      "title": "LVRS appearance with native semantics"
+      "title": "Historical LVRS appearance compatibility"
     },
     {
       "id": "b000010",
@@ -101,7 +101,7 @@
       "kind": "paragraph",
       "start_line": 28,
       "end_line": 33,
-      "raw": "`Appearance.h` defines encoded sRGB visual values independent of Qt. The checked-in\n`lvrs_appearance()` snapshot applies the current 2% accent window fill, text roles,\nbutton state colors, 22-point button height, 8-point padding/radius, and stack\nalignment/spacing. Native buttons remain NSButton instances with AppKit input,\nfocus, accessibility and target/action; only visual drawing uses the LVRS values.\nLabels remain NSTextField and layout remains NSStackView/Auto Layout.\n"
+      "raw": "`Appearance.h` defines encoded sRGB visual values independent of Qt. The checked-in\n`lvrs_appearance()` compatibility snapshot preserves the historical 2% accent window fill, text roles,\nbutton state colors, 22-point button height, 8-point padding/radius, and stack\nalignment/spacing. The general default window appearance is neutral. LVUI supplies\nits `Panel/window` token and does not use this historical snapshot for application\nwindows; see [Backdrop materials](BackdropMaterials.md).\n"
     },
     {
       "id": "b000012",
@@ -206,8 +206,8 @@
       "block_id": "b000009",
       "parent_id": "b000001",
       "level": 2,
-      "title": "LVRS appearance with native semantics",
-      "anchor": "lvrs-appearance-with-native-semantics",
+      "title": "Historical LVRS appearance compatibility",
+      "anchor": "historical-lvrs-appearance-compatibility",
       "start_line": 26
     },
     {
@@ -243,6 +243,13 @@
         "target": "SelfRenderedWidgets.md",
         "kind": "relative",
         "line": 5
+      },
+      {
+        "block_id": "b000011",
+        "label": "Backdrop materials",
+        "target": "BackdropMaterials.md",
+        "kind": "relative",
+        "line": 33
       }
     ],
     "tables": []

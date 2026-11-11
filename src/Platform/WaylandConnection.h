@@ -15,6 +15,8 @@ struct WaylandCallbacks final {
     std::function<void(WidgetInput)> input;
     std::function<void(WaylandImeEvent)> ime;
     std::function<void(bool)> activity;
+    // Preserve the initiating press serial through the deferred input queue.
+    std::function<void(WidgetInput,std::uint32_t)> pointer_press;
 };
 // One owner-thread connection. Workers only signal Host's eventfd. Protocol
 // objects, clipboard offers and pending transfers retire with the connection.
@@ -31,6 +33,7 @@ public:
     void minimum(Size);
     void resize(Size);
     void action(WindowAction);
+    void begin_move(std::uint32_t serial);
     void request_frame();
     void cancel_frame();
     wl_display* display()const;

@@ -32,4 +32,13 @@ bool supports_application_driver() noexcept {
 bool supports_application_foreground() noexcept {
     return detail::has_application_foreground(host_capabilities().backend);
 }
+bool supports_custom_window_chrome() noexcept {
+    const auto presentation=window_chrome_presentation(host_capabilities().backend);
+    return presentation.native_controls||presentation.client_controls;
+}
+#if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+core::Result<void> Host::begin_window_drag() {
+    return core::fail(core::ErrorCode::unsupported,"Custom window chrome is unavailable on this host");
+}
+#endif
 }

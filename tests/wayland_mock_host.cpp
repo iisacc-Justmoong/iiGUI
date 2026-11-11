@@ -18,6 +18,9 @@ void fake_wayland_on_next_wait(std::function<void()>);
 void fake_wayland_complete_dialog();
 void fake_wayland_request_all_close();
 void fake_wayland_emit_ordered_input();
+void fake_wayland_emit_pointer_press(std::uint32_t);
+std::optional<std::uint32_t> fake_wayland_move_serial();
+void fake_wayland_input_hook(std::function<void(const ii::gui::WidgetInput&)>);
 void fake_wayland_clear_input_log();
 std::vector<int> fake_wayland_input_log();
 namespace {
@@ -172,6 +175,30 @@ void input_and_ime_keep_native_order(){
     check(ii::gui::detail::AtSpiHost::created==1&&ii::gui::detail::AtSpiHost::opened==1&&ii::gui::detail::AtSpiHost::published==1&&ii::gui::detail::AtSpiHost::closed==1,
           "A committed Wayland mount was not published and retired with its window");
 }
+void window_drag_uses_the_initiating_pointer_serial(){
+    Cleanup cleanup;fake_wayland_reset_waits();
+    struct ResetHook final {~ResetHook(){fake_wayland_input_hook({});}} reset_hook;
+    Host host({.chrome=ii::gui::WindowChrome::custom});
+    ii::gui::HostCallbacks callbacks;
+    callbacks.opened=[&]{
+        auto mounted=host.mount_widgets([](ii::gui::WidgetBuilder& builder)->ii::core::Result<void>{
+            auto field=builder.input_field({},"field");if(!field)return std::unexpected(field.error());return {};
+        });
+        check(bool(mounted),"Wayland mock could not mount the drag fixture");
+        auto outside_press=host.begin_window_drag();
+        check(!outside_press&&outside_press.error().code==ii::core::ErrorCode::invalid_argument,
+              "Wayland accepted a drag without a pointer press");
+        fake_wayland_input_hook([&](const ii::gui::WidgetInput& event){
+            if(event.kind==ii::gui::WidgetInputKind::pointer_down)good(host.begin_window_drag());
+        });
+        fake_wayland_emit_pointer_press(0);
+        auto submitted=host.executor().post([&]{good(host.request_close());});
+        check(bool(submitted),"Cannot queue host close after drag");
+    };
+    good(host.run(std::move(callbacks)));
+    check(fake_wayland_move_serial()==std::optional<std::uint32_t>{0},
+          "Wayland drag did not retain the initiating pointer serial");
+}
 void accessibility_mount_is_transactional(){
     Cleanup cleanup;fake_wayland_reset_waits();ii::gui::detail::AtSpiHost::reset();Host host;
     ii::gui::HostCallbacks callbacks;callbacks.opened=[&]{
@@ -220,6 +247,6 @@ void accessibility_value_refresh_is_deferred(){
 }
 } // namespace
 int main(){
-    try{independent_windows_and_application_lifecycle();failed_or_unconfigured_child_does_not_stop_driver();standalone_window_still_runs();closing_the_driver_stops_later_window_publication();child_failure_is_reported_without_hiding_the_cause();dialog_result_after_child_close_is_not_delivered();simultaneous_native_and_programmatic_close_are_coalesced();input_and_ime_keep_native_order();accessibility_mount_is_transactional();accessibility_value_refresh_is_deferred();display_scale_changes_are_event_driven();}
+    try{independent_windows_and_application_lifecycle();failed_or_unconfigured_child_does_not_stop_driver();standalone_window_still_runs();closing_the_driver_stops_later_window_publication();child_failure_is_reported_without_hiding_the_cause();dialog_result_after_child_close_is_not_delivered();simultaneous_native_and_programmatic_close_are_coalesced();input_and_ime_keep_native_order();window_drag_uses_the_initiating_pointer_serial();accessibility_mount_is_transactional();accessibility_value_refresh_is_deferred();display_scale_changes_are_event_driven();}
     catch(const std::exception& error){std::fprintf(stderr,"%s\n",error.what());return 1;}
 }

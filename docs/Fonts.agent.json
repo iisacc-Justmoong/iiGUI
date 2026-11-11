@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/Fonts.md",
-    "sha256": "e08d5f8579d88e08e2a03b535cb43ef112e7de634dfcc6226d7332d83cf7aa50",
-    "bytes": 8121,
+    "sha256": "bd0dc397059b30a42e5baa4bd03339cb281bbcc7e1a11228aab4841285f68dfb",
+    "bytes": 8214,
     "line_count": 71,
     "encoding": "utf-8",
     "language": "ko"
@@ -143,7 +143,7 @@
       "kind": "paragraph",
       "start_line": 26,
       "end_line": 33,
-      "raw": "창의 규칙을 변경하면 유지된 콘텐츠와 팝업에 전달하고 텍스트 측정·배치 캐시를\n무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때\n이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.\n`default_text_tokens()`와 `default_widget_appearance()`는 기존 iiGUI 사용자를 위한\n기본값이다. 기존 `lvrs_text_tokens()`와 `lvrs_appearance()`도 같은 값을 반환하는\n호환 API로 유지하되 별도 객체 파일에 두어 정적 링크의 일반 호스트가 이를 끌어오지\n않는다. 기본값에는 과거 LVRS 디자인 스냅샷이 남으며 외부 LVRS나 Qt는 필요하지\n않다.\n"
+      "raw": "창의 규칙을 변경하면 유지된 콘텐츠와 팝업에 전달하고 텍스트 측정·배치 캐시를\n무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때\n이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.\n`default_text_tokens()`와 `default_widget_appearance()`는 기존 iiGUI 사용자를 위한\n기본값이다. `lvrs_text_tokens()`는 같은 텍스트 규칙을 반환하고, `lvrs_appearance()`는\n이전 창 강조색 혼합을 보존한 호환 스냅샷이다. 일반 기본 외형의 창은 중립색이며,\nLVUI는 `Panel/window` 토큰을 전달한다. 호환 API는 별도 객체 파일에 두어 정적 링크의\n일반 호스트가 이를 끌어오지 않는다. 외부 LVRS나 Qt는 필요하지 않다.\n"
     },
     {
       "id": "b000018",

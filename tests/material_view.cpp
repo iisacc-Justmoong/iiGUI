@@ -27,5 +27,20 @@ int main(){
      for(const auto& layer:frame.overlays)if(layer.backdrop&&layer.backdrop->underlay)weak=layer.backdrop->underlay;
      require(!weak.expired(),"Material did not produce a retained gradient");}
     good(host.clear_content());require(weak.expired(),"Retired material retained its gradient through a public handle");
-    require(!surface->set_options({}),"Retired material accepted input");tree->close();
+    require(!surface->set_options({}),"Retired material accepted input");
+    ii::gui::MaterialConfiguration neutral;neutral.kind=ii::gui::MaterialKind::window;
+    neutral.width=100;neutral.height=50;neutral.intense_opacity=0;neutral.faint_opacity=0;neutral.motion_enabled=false;
+    good(host.set_content([&](auto& builder)->Result<void>{
+        auto created=Surface::create(builder,{},"neutral-window",neutral);if(!created)return std::unexpected(created.error());surface=*created;return {};
+    }));
+    const auto check_neutral=[&](double opacity,double blur){
+        auto frame=take(tree->drawing_snapshot({200,100}));bool found=false;
+        for(const auto& layer:frame.overlays)if(layer.backdrop){
+            require(!layer.backdrop->underlay&&layer.backdrop->tint.alpha==opacity&&layer.backdrop->blur_radius==blur,
+                    "Neutral window material created an accent underlay or lost its density");found=true;
+        }
+        require(found,"Neutral window material was not drawn");
+    };
+    check_neutral(.75,64);neutral.density=ii::gui::MaterialDensity::glass25;good(surface->set_options(neutral));
+    check_neutral(.25,16);tree->close();
 }

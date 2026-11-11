@@ -23,14 +23,14 @@ window revokes native handles; generated C++ widget instances retain imported
 backends until Core detaches them. Unowned external jobs require their own lifetime
 coordination. Native Host construction/run/destruction still require the UI thread.
 
-## LVRS appearance with native semantics
+## Historical LVRS appearance compatibility
 
 `Appearance.h` defines encoded sRGB visual values independent of Qt. The checked-in
-`lvrs_appearance()` snapshot applies the current 2% accent window fill, text roles,
+`lvrs_appearance()` compatibility snapshot preserves the historical 2% accent window fill, text roles,
 button state colors, 22-point button height, 8-point padding/radius, and stack
-alignment/spacing. Native buttons remain NSButton instances with AppKit input,
-focus, accessibility and target/action; only visual drawing uses the LVRS values.
-Labels remain NSTextField and layout remains NSStackView/Auto Layout.
+alignment/spacing. The general default window appearance is neutral. LVUI supplies
+its `Panel/window` token and does not use this historical snapshot for application
+windows; see [Backdrop materials](BackdropMaterials.md).
 
 The four unmodified Pretendard font faces and their upstream SIL OFL notice are
 in `resources/native/`. `iiGUI_NATIVE_RESOURCES` exposes installed resource files

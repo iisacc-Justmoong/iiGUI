@@ -19,4 +19,11 @@ int main(){
     bad=before;bad.outline_path="M0 0 X1 2";require(!material.set_configuration(bad,start),"Unsafe outline accepted");
     bad=before;bad.tint_opacity=std::numeric_limits<double>::quiet_NaN();require(!material.set_configuration(bad,start),"NaN accepted");
     require(material.gradient_alpha(48,32,380,204)>=0&&material.gradient_alpha(48,32,380,204)<=1,"Gradient coverage invalid");
+    ii::gui::MaterialConfiguration window;window.kind=ii::gui::MaterialKind::window;
+    const auto dense=ii::gui::MaterialModel::resolve(window);
+    require(dense.density==ii::gui::MaterialDensity::dense75&&dense.tint.alpha==.75&&dense.blur_radius==64,
+            "Dense window material must use its density opacity and blur");
+    window.density=ii::gui::MaterialDensity::glass25;
+    const auto glass=ii::gui::MaterialModel::resolve(window);
+    require(glass.tint.alpha==.25&&glass.blur_radius==16,"Glass window material must retain its density opacity and blur");
 }
