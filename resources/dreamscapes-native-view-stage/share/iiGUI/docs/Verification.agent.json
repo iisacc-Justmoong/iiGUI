@@ -1,0 +1,1582 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7cf83d6606ef70259551b288f08336d3068b3face0081484f295756c4a32acce",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Verification.md",
+    "sha256": "9f10e860f6b9495689d86856162c45d3a7d295a05581f566e2138de56d975408",
+    "bytes": 22226,
+    "line_count": 339,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Verification",
+    "role": "evidence",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Verification\n",
+      "level": 1,
+      "title": "Verification"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 9,
+      "raw": "The current scope covers Windows/Win32, macOS/AppKit and Linux/X11 backends.\nWindows/Linux execution was explicitly deferred by the user on 2026-10-16.\nTheir evidence is cross compilation, native-image inspection, host-side source\nchecks and relocated installed-consumer compilation. It is not real target\nGUI execution. macOS runs the shared lifecycle suite, HelloGUI and installed\nconsumer on the actual host. Native tests require an interactive desktop;\ncross compilation or header inspection alone is not GUI evidence.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "## Automated checks\n",
+      "level": 2,
+      "title": "Automated checks"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "table",
+      "start_line": 13,
+      "end_line": 33,
+      "raw": "| Test | Actual behavior checked |\n|---|---|\n| contracts | UTF-8/NUL/native-size/budget/capacity validation; main-thread construction on AppKit, owner-thread construction elsewhere; inactive/empty endpoint errors |\n| lifecycle | Visible native window; Core timer; Runtime result on UI thread; 820×520 resize; closed snapshot; reentrancy rejection |\n| wakeup | A worker wakes an idle native loop without a frame timer or user input |\n| earlier_deadline | A worker posts an earlier timer while a long native timer is armed |\n| close_veto | Native close veto and later acceptance; cancelled timer does not run |\n| failure | Callback exception becomes a returned error and releases the window |\n| close_failure | A throwing close-veto callback returns an error and still releases the window |\n| shutdown_race | Late weak endpoint rejects after the host has been destroyed |\n| producer_race | Two producers race close; bounded admission and no UI delivery after the close barrier |\n| full_queue | A full one-slot queue does not prevent native startup or lose accepted pre-run work |\n| wrong_thread | Foreign run, inspect, resize, retitle and close operations return wrong_executor |\n| graphics_contracts | Pure geometry/color/radius/panel-count/policy validation and inactive GPU endpoint errors |\n| graphics | Actual native device and sRGB pixel readback, linear blend/gradient/rounded AA, 100-to-1 update coalescing, identical-scene reuse, resize, strict policy and teardown |\n| core_io | A real pipe fixture acknowledges startup and waits for release after I/O admission; readiness wakes the native host, delivers on UI and joins its waiter before teardown |\n| core_operation | Tracked completion owns a temporary weak UI endpoint; scoped timed UI submission runs; removal cancels an earlier scope's timer |\n| core_frame | Borrowed Core loop rejects foreign/blocking drivers; update then prepare_present reaches actual GPU capture for three frames |\n| core_stop | Direct Core submission and terminal request_stop close the native host through normal cleanup |\n| boundary | Public C++/Core boundary; no Qt/SDL package or include; no direct native file creation |\n| tooling | Verifier output stays under build/, foreign execution requires explicit omission, all kits share sources, cross pkg-config cannot inherit host package paths |\n",
+      "columns": [
+        "Test",
+        "Actual behavior checked"
+      ],
+      "rows": [
+        [
+          "contracts",
+          "UTF-8/NUL/native-size/budget/capacity validation; main-thread construction on AppKit, owner-thread construction elsewhere; inactive/empty endpoint errors"
+        ],
+        [
+          "lifecycle",
+          "Visible native window; Core timer; Runtime result on UI thread; 820×520 resize; closed snapshot; reentrancy rejection"
+        ],
+        [
+          "wakeup",
+          "A worker wakes an idle native loop without a frame timer or user input"
+        ],
+        [
+          "earlier_deadline",
+          "A worker posts an earlier timer while a long native timer is armed"
+        ],
+        [
+          "close_veto",
+          "Native close veto and later acceptance; cancelled timer does not run"
+        ],
+        [
+          "failure",
+          "Callback exception becomes a returned error and releases the window"
+        ],
+        [
+          "close_failure",
+          "A throwing close-veto callback returns an error and still releases the window"
+        ],
+        [
+          "shutdown_race",
+          "Late weak endpoint rejects after the host has been destroyed"
+        ],
+        [
+          "producer_race",
+          "Two producers race close; bounded admission and no UI delivery after the close barrier"
+        ],
+        [
+          "full_queue",
+          "A full one-slot queue does not prevent native startup or lose accepted pre-run work"
+        ],
+        [
+          "wrong_thread",
+          "Foreign run, inspect, resize, retitle and close operations return wrong_executor"
+        ],
+        [
+          "graphics_contracts",
+          "Pure geometry/color/radius/panel-count/policy validation and inactive GPU endpoint errors"
+        ],
+        [
+          "graphics",
+          "Actual native device and sRGB pixel readback, linear blend/gradient/rounded AA, 100-to-1 update coalescing, identical-scene reuse, resize, strict policy and teardown"
+        ],
+        [
+          "core_io",
+          "A real pipe fixture acknowledges startup and waits for release after I/O admission; readiness wakes the native host, delivers on UI and joins its waiter before teardown"
+        ],
+        [
+          "core_operation",
+          "Tracked completion owns a temporary weak UI endpoint; scoped timed UI submission runs; removal cancels an earlier scope's timer"
+        ],
+        [
+          "core_frame",
+          "Borrowed Core loop rejects foreign/blocking drivers; update then prepare_present reaches actual GPU capture for three frames"
+        ],
+        [
+          "core_stop",
+          "Direct Core submission and terminal request_stop close the native host through normal cleanup"
+        ],
+        [
+          "boundary",
+          "Public C++/Core boundary; no Qt/SDL package or include; no direct native file creation"
+        ],
+        [
+          "tooling",
+          "Verifier output stays under build/, foreign execution requires explicit omission, all kits share sources, cross pkg-config cannot inherit host package paths"
+        ]
+      ]
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 39,
+      "raw": "HelloGUI's separate self-test checks a 250 ms Core timer, a tracked worker\nresult of 42 through then_on, an 840×540 logical-unit resize owned by TaskScope,\nCore FrameLoop preparation, native GPU capture and a normal return after close.\nThe copied installed consumer checks the same categories through installed\nheaders/targets, with its own application source.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 45,
+      "raw": "The initial red run intentionally failed contracts and lifecycle against the\nunimplemented host. Its XML remains in `build/red-tests.xml`. Subsequent build,\ntest, package and binary evidence is written below `build/`. Sanitizer runs\ninstrument the new GUI implementation and its tests; they do not imply that\nApple's system frameworks are instrumented.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "heading",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "## Reproduction\n",
+      "level": 2,
+      "title": "Reproduction"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 48,
+      "end_line": 48,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 49,
+      "end_line": 55,
+      "raw": "Use tools/verify_desktop.py from README.md on each native desktop. It runs\nBuilder, the 19 host checks (17 native cases and two source/tooling checks),\nHelloGUI and the relocated consumer. Each run gets\nnew logs and a report under build/verify-desktop/<platform>/runs/. The\n--compile-only option marks executable tests not_run and still compiles both\nthe native test binary and relocated consumer. A missing desktop is an error\nwhen native execution is requested; it is never silently converted to a pass.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 56,
+      "end_line": 56,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 57,
+      "end_line": 61,
+      "raw": "Follow README.md for source/Builder builds and the relocated consumer. To test\nthe new host under ASan/UBSan, configure another build under `build/` with\n`-DIIGUI_SANITIZE=ON`, build, and run the lifecycle, wakeup, failure and shutdown\ntests there. Qt package discovery remains disabled. Native window observation,\nmanual resizing/closing, and loaded-library inspection supplement these tests.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 62,
+      "end_line": 62,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "heading",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "## Limits\n",
+      "level": 2,
+      "title": "Limits"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 64,
+      "end_line": 64,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 65,
+      "end_line": 68,
+      "raw": "This release does not establish a complete widget toolkit, editable Unicode\ntext/IME, custom-control accessibility, a general 2D/3D renderer, mobile lifecycle support,\nstore deployment, code-signing identity or long-running production stability.\nGlobal installed SDK packages and existing running product apps are preserved.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "heading",
+      "start_line": 70,
+      "end_line": 70,
+      "raw": "## Historical macOS 0.1 result (2026-10-16)\n",
+      "level": 2,
+      "title": "Historical macOS 0.1 result (2026-10-16)"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 71,
+      "end_line": 71,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 72,
+      "end_line": 75,
+      "raw": "Environment: macOS 27.0.1, arm64, Apple Clang 21, C++23 and private Objective-C++23.\niiSDKBuilder 0.1.1 built iiSDKCore 0.15.0, iiGUI 0.1.0 and HelloGUI successfully.\nAll eight configure/build/install steps in the selected macOS kit succeeded;\nBuilder verified the application's arm64 Mach-O executable.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 76,
+      "end_line": 76,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "table",
+      "start_line": 77,
+      "end_line": 83,
+      "raw": "| Configuration / consumer | Passed | Failed | Evidence below build/ |\n|---|---:|---:|---|\n| Debug host regression | 10 | 0 | host-tests.xml |\n| Builder Release host regression | 10 | 0 | release-tests.xml |\n| ASan + UBSan host regression | 10 | 0 | sanitizer-tests.xml |\n| HelloGUI native self-test | 1 | 0 | hello-gui-tests.xml |\n| Relocated installed-package consumer | 1 | 0 | installed-consumer/tests.xml |\n",
+      "columns": [
+        "Configuration / consumer",
+        "Passed",
+        "Failed",
+        "Evidence below build/"
+      ],
+      "rows": [
+        [
+          "Debug host regression",
+          "10",
+          "0",
+          "host-tests.xml"
+        ],
+        [
+          "Builder Release host regression",
+          "10",
+          "0",
+          "release-tests.xml"
+        ],
+        [
+          "ASan + UBSan host regression",
+          "10",
+          "0",
+          "sanitizer-tests.xml"
+        ],
+        [
+          "HelloGUI native self-test",
+          "1",
+          "0",
+          "hello-gui-tests.xml"
+        ],
+        [
+          "Relocated installed-package consumer",
+          "1",
+          "0",
+          "installed-consumer/tests.xml"
+        ]
+      ]
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 85,
+      "end_line": 87,
+      "raw": "These are 32 passing CTest entries, including repetition of the same ten host\nchecks in three configurations. The source boundary check is included in those\nten; the count is not a number of independent GUI features.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 89,
+      "end_line": 94,
+      "raw": "The app was installed at `build/HelloGUI.app` and run again with loader tracing.\nIt returned 0 after three timer ticks, a background result of 42 delivered on\nthe UI thread, an 840×540 resize and normal close. Six direct dependencies are\nApple AppKit/CoreFoundation/Foundation, libc++, libSystem and libobjc. The\nloaded-image trace contained no Qt or SDL library. Core and iiGUI are static\nin this app; its execution does not need the source tree or a Qt SDK.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 95,
+      "end_line": 95,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 96,
+      "end_line": 101,
+      "raw": "Native computer-use observation also showed the actual HelloGUI window:\nthe display changed from `working…` to `42`, the timer advanced, and macOS\nzoom/restore changed content size from 680×440 to 2560×1378 and back. The\ndisplay recorded 42 native resize callbacks after restoration. Command-Q\nterminated the app, confirmed by both process inspection and app inventory.\nThe app is reopened for the final handoff after validation.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 102,
+      "end_line": 102,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 103,
+      "end_line": 105,
+      "raw": "Machine-readable aggregation is `build/verification.json`; Builder's report is\n`build/hello-gui/report.json`. No global SDK install was replaced. Installation\nevidence refers to the isolated, relocated prefix under build/.\n"
+    },
+    {
+      "id": "b000036",
+      "kind": "blank",
+      "start_line": 106,
+      "end_line": 106,
+      "raw": "\n"
+    },
+    {
+      "id": "b000037",
+      "kind": "heading",
+      "start_line": 107,
+      "end_line": 107,
+      "raw": "## Desktop backends 0.2 result (2026-10-16)\n",
+      "level": 2,
+      "title": "Desktop backends 0.2 result (2026-10-16)"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 108,
+      "end_line": 108,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 109,
+      "end_line": 112,
+      "raw": "The Windows and Linux native backends were implemented against the unchanged\nC++23 Host/UiExecutor API. The same HelloGUI main.cpp was compiled for all\nthree platforms. Windows/Linux desktop execution was omitted at the user's\nexplicit request, not silently skipped by the test suite.\n"
+    },
+    {
+      "id": "b000040",
+      "kind": "blank",
+      "start_line": 113,
+      "end_line": 113,
+      "raw": "\n"
+    },
+    {
+      "id": "b000041",
+      "kind": "table",
+      "start_line": 114,
+      "end_line": 118,
+      "raw": "| Target | Compiler / image | Builder | Host executable tests | Relocated consumer |\n|---|---|---|---|---|\n| Windows x64 | LLVM-MinGW Clang 23.1.2; PE32+ x64 | Core → iiGUI → HelloGUI, all 8 steps passed | Test binary compiled; 2 build-host checks passed; native execution not run | Installed/moved, configured and linked; execution not run |\n| Linux ARM64 | Clang 21 with GCC 14/libstdc++ and Debian 13 sysroot; ELF AArch64 | All 8 steps passed | Test binary compiled; 2 build-host checks passed; native execution not run | Installed/moved, configured and linked; execution not run |\n| macOS ARM64 | Apple Clang 21; Mach-O arm64 | All 8 steps passed | 13 checks passed; HelloGUI self-test passed | Installed/moved, configured, linked and executed successfully |\n",
+      "columns": [
+        "Target",
+        "Compiler / image",
+        "Builder",
+        "Host executable tests",
+        "Relocated consumer"
+      ],
+      "rows": [
+        [
+          "Windows x64",
+          "LLVM-MinGW Clang 23.1.2; PE32+ x64",
+          "Core → iiGUI → HelloGUI, all 8 steps passed",
+          "Test binary compiled; 2 build-host checks passed; native execution not run",
+          "Installed/moved, configured and linked; execution not run"
+        ],
+        [
+          "Linux ARM64",
+          "Clang 21 with GCC 14/libstdc++ and Debian 13 sysroot; ELF AArch64",
+          "All 8 steps passed",
+          "Test binary compiled; 2 build-host checks passed; native execution not run",
+          "Installed/moved, configured and linked; execution not run"
+        ],
+        [
+          "macOS ARM64",
+          "Apple Clang 21; Mach-O arm64",
+          "All 8 steps passed",
+          "13 checks passed; HelloGUI self-test passed",
+          "Installed/moved, configured, linked and executed successfully"
+        ]
+      ]
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 119,
+      "end_line": 119,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "paragraph",
+      "start_line": 120,
+      "end_line": 123,
+      "raw": "The macOS ASan/UBSan configuration also passed all 13 checks with no reported\nsanitizer errors. Instrumentation covers iiGUI and its test executable, not\nthe prebuilt Core archive or system frameworks. Counts repeat the same suite\nacross configurations and do not represent distinct features.\n"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 124,
+      "end_line": 124,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 125,
+      "end_line": 130,
+      "raw": "Each current run report is under build/verify-desktop/<platform>/runs/.\nWindows/Linux report status is built_execution_deferred and targetTests,\nhelloGUI and installedConsumerExecution remain not_run. Their two passing\nhost checks are the Python boundary/tooling checks running on macOS, not\nWindows/Linux GUI tests. Existing consumers still request iiGUI 0.1 to verify\nthe package compatibility of the unchanged API.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 131,
+      "end_line": 131,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 132,
+      "end_line": 138,
+      "raw": "Installed-consumer configure/build processes clear inherited compiler search\npaths and resolve both packages inside their relocated prefix. Native system\nlibraries still come from the target toolchain/sysroot. The Linux test image\nuses Debian 13's ABI; it is not claimed as a portable prebuilt binary for every\nLinux distribution. The Windows image uses the MinGW native ABI; MSVC and\nother CPU variants remain unverified. HelloGUI and the installed consumer use\nthe Windows GUI subsystem while retaining the same ordinary C++ main source.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 139,
+      "end_line": 139,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "paragraph",
+      "start_line": 140,
+      "end_line": 144,
+      "raw": "The aggregate current evidence is build/desktop-verification.json. Original\n0.1 reports above are retained separately. No global SDK install or existing\nrunning product application was replaced. Run tools/verify_desktop.py on a\nWindows/Linux desktop without --compile-only to perform the deferred native\ntest and installed-consumer execution.\n"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 145,
+      "end_line": 145,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "heading",
+      "start_line": 146,
+      "end_line": 146,
+      "raw": "## Graphics and native text 0.3 result (2026-10-16)\n",
+      "level": 2,
+      "title": "Graphics and native text 0.3 result (2026-10-16)"
+    },
+    {
+      "id": "b000052",
+      "kind": "blank",
+      "start_line": 147,
+      "end_line": 147,
+      "raw": "\n"
+    },
+    {
+      "id": "b000053",
+      "kind": "paragraph",
+      "start_line": 148,
+      "end_line": 150,
+      "raw": "The same C++23 Graphics/Host API and HelloGUI scene now build through Builder\nfor all three desktop targets. The 0.3 reports are isolated from the 0.1/0.2\nartifacts under build/modern-verification/.\n"
+    },
+    {
+      "id": "b000054",
+      "kind": "blank",
+      "start_line": 151,
+      "end_line": 151,
+      "raw": "\n"
+    },
+    {
+      "id": "b000055",
+      "kind": "table",
+      "start_line": 152,
+      "end_line": 156,
+      "raw": "| Target | Builder configure/build/install steps | Target execution | Relocated installed consumer |\n|---|---|---|---|\n| macOS ARM64, Apple Clang 21 | All 8 passed | 15 host checks and HelloGUI self-test passed | Compiled, linked and executed, including native GPU capture |\n| Windows x64, LLVM-MinGW Clang 23.1.2 | All 8 passed | Explicitly not run; 2 build-host source/tooling checks passed | Installed/moved, compiled and linked; execution not run |\n| Linux ARM64, Clang 21 + GCC 14 / Debian 13 sysroot | All 8 passed | Explicitly not run; 2 build-host source/tooling checks passed | Installed/moved, compiled and linked; execution not run |\n",
+      "columns": [
+        "Target",
+        "Builder configure/build/install steps",
+        "Target execution",
+        "Relocated installed consumer"
+      ],
+      "rows": [
+        [
+          "macOS ARM64, Apple Clang 21",
+          "All 8 passed",
+          "15 host checks and HelloGUI self-test passed",
+          "Compiled, linked and executed, including native GPU capture"
+        ],
+        [
+          "Windows x64, LLVM-MinGW Clang 23.1.2",
+          "All 8 passed",
+          "Explicitly not run; 2 build-host source/tooling checks passed",
+          "Installed/moved, compiled and linked; execution not run"
+        ],
+        [
+          "Linux ARM64, Clang 21 + GCC 14 / Debian 13 sysroot",
+          "All 8 passed",
+          "Explicitly not run; 2 build-host source/tooling checks passed",
+          "Installed/moved, compiled and linked; execution not run"
+        ]
+      ]
+    },
+    {
+      "id": "b000056",
+      "kind": "blank",
+      "start_line": 157,
+      "end_line": 157,
+      "raw": "\n"
+    },
+    {
+      "id": "b000057",
+      "kind": "paragraph",
+      "start_line": 158,
+      "end_line": 161,
+      "raw": "The macOS ASan/UBSan build also passed all 15 checks with no reported sanitizer\nerrors. It instruments iiGUI and the tests, not the prebuilt Core archive,\nApple drivers or system libraries. These counts repeat the same checks across\nconfigurations and do not count unique features.\n"
+    },
+    {
+      "id": "b000058",
+      "kind": "blank",
+      "start_line": 162,
+      "end_line": 162,
+      "raw": "\n"
+    },
+    {
+      "id": "b000059",
+      "kind": "paragraph",
+      "start_line": 163,
+      "end_line": 169,
+      "raw": "Actual Apple M1 Max Metal readback recorded hardware=1, a 384x256 device-pixel\ncanvas at 2x scale, sRGB midpoint 188, 71 partially covered corner pixels,\nand scene_renders=1 after 100 admitted requests. Identical scene updates did\nnot increase that count; resize and strict-hardware/teardown checks passed.\nHelloGUI also reported Apple M1 Max hardware=true, four scene renders and\n4,039,168 bytes in its retained color attachment at the measured self-test\npoint. That byte count excludes swapchain/driver/capture storage.\n"
+    },
+    {
+      "id": "b000060",
+      "kind": "blank",
+      "start_line": 170,
+      "end_line": 170,
+      "raw": "\n"
+    },
+    {
+      "id": "b000061",
+      "kind": "paragraph",
+      "start_line": 171,
+      "end_line": 176,
+      "raw": "Native computer-use observation separately showed the real Metal gradient\npanels and shaped Korean/Arabic/Devanagari/emoji text, a running timer and the\nbackground result of 42. Zoom expanded content from 760x540 to 2560x1313 at\n2x, with 21 resize callbacks; restoring returned it to 760x540 with 40 callbacks.\nThe GPU scene filled its resized viewport. This is observed macOS behavior,\nnot Windows/Linux visual evidence or a general text-conformance test.\n"
+    },
+    {
+      "id": "b000062",
+      "kind": "blank",
+      "start_line": 177,
+      "end_line": 177,
+      "raw": "\n"
+    },
+    {
+      "id": "b000063",
+      "kind": "paragraph",
+      "start_line": 178,
+      "end_line": 184,
+      "raw": "Windows/Linux test executables include the GPU quality/resource checks but\nwere never executed or emulated. Their driver initialization, runtime shader\ncompilation, actual hardware selection, glyph output, DPI changes, presentation\nand device-pixel readback remain unverified on those desktops. Windows\nevidence uses the MinGW native ABI; an MSVC build is still unverified. The\nLinux sysroot is Debian 13 ARM64, not a claim of a universal Linux binary.\nNative compilation remains required for other distributions/architectures.\n"
+    },
+    {
+      "id": "b000064",
+      "kind": "blank",
+      "start_line": 185,
+      "end_line": 185,
+      "raw": "\n"
+    },
+    {
+      "id": "b000065",
+      "kind": "paragraph",
+      "start_line": 186,
+      "end_line": 192,
+      "raw": "The Linux build exposed an inherited macOS PKG_CONFIG_PATH contaminating\ntarget Cairo include paths. The verifier and relocated package script now\nclear that path for toolchain builds; tooling tests cover the isolation while\npreserving native-host custom package paths. The sysroot's official Debian\npackage URLs and SHA256 values are recorded in\nbuild/linux-toolchain/modern-packages.json. No host library is substituted to\nmake the cross link pass.\n"
+    },
+    {
+      "id": "b000066",
+      "kind": "blank",
+      "start_line": 193,
+      "end_line": 193,
+      "raw": "\n"
+    },
+    {
+      "id": "b000067",
+      "kind": "paragraph",
+      "start_line": 194,
+      "end_line": 194,
+      "raw": "Current run reports and logs:\n"
+    },
+    {
+      "id": "b000068",
+      "kind": "blank",
+      "start_line": 195,
+      "end_line": 195,
+      "raw": "\n"
+    },
+    {
+      "id": "b000069",
+      "kind": "list",
+      "start_line": 196,
+      "end_line": 200,
+      "raw": "- macOS: build/modern-verification/macos/runs/20261016T074132.699692Z/\n- Windows: build/modern-verification/windows/runs/20261016T074132.699766Z/\n- Linux: build/modern-verification/linux/runs/20261016T074725.898044Z/\n- Sanitizers: build/modern-sanitizer/modern-sanitizer-tests.xml\n- Aggregate/current-source and binary audit: build/modernization-verification.json\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "macOS: build/modern-verification/macos/runs/20261016T074132.699692Z/",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Windows: build/modern-verification/windows/runs/20261016T074132.699766Z/",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Linux: build/modern-verification/linux/runs/20261016T074725.898044Z/",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Sanitizers: build/modern-sanitizer/modern-sanitizer-tests.xml",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Aggregate/current-source and binary audit: build/modernization-verification.json",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000070",
+      "kind": "blank",
+      "start_line": 201,
+      "end_line": 201,
+      "raw": "\n"
+    },
+    {
+      "id": "b000071",
+      "kind": "paragraph",
+      "start_line": 202,
+      "end_line": 204,
+      "raw": "Global SDK installations, previous evidence and existing running product apps\nare preserved. No Qt performance comparison, full Qt GUI/Quick parity, direct\nWayland/mobile/web GUI implementation or GPU device-loss recovery is asserted.\n"
+    },
+    {
+      "id": "b000072",
+      "kind": "blank",
+      "start_line": 205,
+      "end_line": 205,
+      "raw": "\n"
+    },
+    {
+      "id": "b000073",
+      "kind": "heading",
+      "start_line": 206,
+      "end_line": 206,
+      "raw": "## Core host integration 0.4 result (2026-10-16)\n",
+      "level": 2,
+      "title": "Core host integration 0.4 result (2026-10-16)"
+    },
+    {
+      "id": "b000074",
+      "kind": "blank",
+      "start_line": 207,
+      "end_line": 207,
+      "raw": "\n"
+    },
+    {
+      "id": "b000075",
+      "kind": "paragraph",
+      "start_line": 208,
+      "end_line": 212,
+      "raw": "iiGUI 0.4 requires Core 0.16 Runtime. All three native backends now attach a\nCore HostLoop after their native wake gate is ready, then disconnect/join Core\nbefore detaching that gate. Direct Core producers and TaskToken cancellation\nuse the same native wake path as UiExecutor. Core owns no window/GPU/font API\nand introduces no reverse dependency on iiGUI.\n"
+    },
+    {
+      "id": "b000076",
+      "kind": "blank",
+      "start_line": 213,
+      "end_line": 213,
+      "raw": "\n"
+    },
+    {
+      "id": "b000077",
+      "kind": "table",
+      "start_line": 214,
+      "end_line": 223,
+      "raw": "| Validation | Result | Evidence |\n|---|---|---|\n| macOS ARM64 Builder chain | All eight Core/GUI/HelloGUI configure/build/install steps passed | build/foundation-verification/macos/report.json |\n| macOS native host suite | 19/19 passed, including four Core integration cases | macOS run host-tests.xml |\n| HelloGUI with Operation, TaskScope and FrameLoop | 1/1 passed, actual Metal capture and normal close | macOS run hello-gui-tests.xml |\n| Relocated GUI package consumer | 1/1 executed successfully; background=42, GPU capture, Core frames and scoped timer | macOS run installed-consumer/tests.xml |\n| ASan + UBSan across Core and iiGUI | 19/19 GUI checks passed; both libraries instrumented | build/core-foundation-asan/sanitizer-tests.xml |\n| Core Debug / ASan+UBSan / selected TSan | 40/40, 40/40 and 5/5 passed | ../iiSDKCore/build/gui-foundation*/ |\n| Copied relocated Core Runtime+Values / Contracts / Values consumers | 17/17, 2/2 and 3/3 passed | ../iiSDKCore/build/gui-package/latest.json |\n| Windows x64 and Linux ARM64 Builder chains | All eight steps passed per platform; test executables and relocated GUI consumers compiled/linked | build/foundation-verification/{windows,linux}/ |\n",
+      "columns": [
+        "Validation",
+        "Result",
+        "Evidence"
+      ],
+      "rows": [
+        [
+          "macOS ARM64 Builder chain",
+          "All eight Core/GUI/HelloGUI configure/build/install steps passed",
+          "build/foundation-verification/macos/report.json"
+        ],
+        [
+          "macOS native host suite",
+          "19/19 passed, including four Core integration cases",
+          "macOS run host-tests.xml"
+        ],
+        [
+          "HelloGUI with Operation, TaskScope and FrameLoop",
+          "1/1 passed, actual Metal capture and normal close",
+          "macOS run hello-gui-tests.xml"
+        ],
+        [
+          "Relocated GUI package consumer",
+          "1/1 executed successfully; background=42, GPU capture, Core frames and scoped timer",
+          "macOS run installed-consumer/tests.xml"
+        ],
+        [
+          "ASan + UBSan across Core and iiGUI",
+          "19/19 GUI checks passed; both libraries instrumented",
+          "build/core-foundation-asan/sanitizer-tests.xml"
+        ],
+        [
+          "Core Debug / ASan+UBSan / selected TSan",
+          "40/40, 40/40 and 5/5 passed",
+          "../iiSDKCore/build/gui-foundation*/"
+        ],
+        [
+          "Copied relocated Core Runtime+Values / Contracts / Values consumers",
+          "17/17, 2/2 and 3/3 passed",
+          "../iiSDKCore/build/gui-package/latest.json"
+        ],
+        [
+          "Windows x64 and Linux ARM64 Builder chains",
+          "All eight steps passed per platform; test executables and relocated GUI consumers compiled/linked",
+          "build/foundation-verification/{windows,linux}/"
+        ]
+      ]
+    },
+    {
+      "id": "b000078",
+      "kind": "blank",
+      "start_line": 224,
+      "end_line": 224,
+      "raw": "\n"
+    },
+    {
+      "id": "b000079",
+      "kind": "paragraph",
+      "start_line": 225,
+      "end_line": 232,
+      "raw": "The new pipe tests use a startup acknowledgement and release after I/O admission\nso loader startup cannot masquerade as readiness latency. Once released, the\nchild writes after 120 ms. Native readiness must deliver on the UI owner within\none second against a three-second request timeout, with no periodic UI timer.\nThe native host's final counters confirm a readiness wait occurred and the Core\nconnection was closed before teardown. The other integration cases verify an\nowned temporary completion endpoint, receiver timer cancellation, update then\nprepare_present with actual GPU readback, owner affinity and terminal Core stop.\n"
+    },
+    {
+      "id": "b000080",
+      "kind": "blank",
+      "start_line": 233,
+      "end_line": 233,
+      "raw": "\n"
+    },
+    {
+      "id": "b000081",
+      "kind": "paragraph",
+      "start_line": 234,
+      "end_line": 238,
+      "raw": "HelloGUI and the copied GUI consumer both use the public integration API. The\nconsumer still requests iiGUI 0.1 to verify compatibility with existing source\nconsumers while receiving Core 0.16 transitively. Its compile inputs refer only\nto copied app source and relocated package headers, with Qt discovery disabled.\nNo source-tree or global installed SDK header is substituted.\n"
+    },
+    {
+      "id": "b000082",
+      "kind": "blank",
+      "start_line": 239,
+      "end_line": 239,
+      "raw": "\n"
+    },
+    {
+      "id": "b000083",
+      "kind": "paragraph",
+      "start_line": 240,
+      "end_line": 245,
+      "raw": "One Core readiness thread per default connection parks when there is no pending\nI/O. Pending I/O retains the existing maximum 20 ms cancellation/probe wait;\ncallbacks and graphics remain on the UI owner. Core Operation::wait_for returns\nwould_block for a pending result on that external host thread. These contracts\ndo not intercept arbitrary blocking application calls or imply hard real-time\nscheduling, native display-vsync pacing, or an IOCP backend.\n"
+    },
+    {
+      "id": "b000084",
+      "kind": "blank",
+      "start_line": 246,
+      "end_line": 246,
+      "raw": "\n"
+    },
+    {
+      "id": "b000085",
+      "kind": "paragraph",
+      "start_line": 247,
+      "end_line": 247,
+      "raw": "The final runs are:\n"
+    },
+    {
+      "id": "b000086",
+      "kind": "blank",
+      "start_line": 248,
+      "end_line": 248,
+      "raw": "\n"
+    },
+    {
+      "id": "b000087",
+      "kind": "list",
+      "start_line": 249,
+      "end_line": 252,
+      "raw": "- macOS: build/foundation-verification/macos/runs/20261016T084414.196306Z/\n- Windows: build/foundation-verification/windows/runs/20261016T084414.196380Z/\n- Linux: build/foundation-verification/linux/runs/20261016T084414.196389Z/\n- Current-source/package/binary aggregation: build/core-integration-verification.json\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "macOS: build/foundation-verification/macos/runs/20261016T084414.196306Z/",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Windows: build/foundation-verification/windows/runs/20261016T084414.196380Z/",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Linux: build/foundation-verification/linux/runs/20261016T084414.196389Z/",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Current-source/package/binary aggregation: build/core-integration-verification.json",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000088",
+      "kind": "blank",
+      "start_line": 253,
+      "end_line": 253,
+      "raw": "\n"
+    },
+    {
+      "id": "b000089",
+      "kind": "paragraph",
+      "start_line": 254,
+      "end_line": 260,
+      "raw": "Windows/Linux target tests, HelloGUI execution and installed-consumer execution\nremain explicitly not_run at the user's request; their two passing source and\ntooling checks run on the macOS build host. Core's additional iOS, Android and\nWASM compilations are not iiGUI mobile/web backends or target execution proof.\nGlobal SDK installs, previous validation runs and running product applications\nremain untouched. Source/native-runtime and cross-compilation evidence are kept\nseparate in both module reports.\n"
+    },
+    {
+      "id": "b000090",
+      "kind": "blank",
+      "start_line": 261,
+      "end_line": 261,
+      "raw": "\n"
+    },
+    {
+      "id": "b000091",
+      "kind": "heading",
+      "start_line": 262,
+      "end_line": 262,
+      "raw": "## LVUI implementation verification — 2026-10-20\n",
+      "level": 2,
+      "title": "LVUI implementation verification — 2026-10-20"
+    },
+    {
+      "id": "b000092",
+      "kind": "blank",
+      "start_line": 263,
+      "end_line": 263,
+      "raw": "\n"
+    },
+    {
+      "id": "b000093",
+      "kind": "paragraph",
+      "start_line": 264,
+      "end_line": 266,
+      "raw": "The working-tree LVUI addition was built and executed on macOS with an Apple\nM1 Max Metal device. The source package version remains the previously released\niiGUI 0.4.1; these results describe the new source, not an already published SDK.\n"
+    },
+    {
+      "id": "b000094",
+      "kind": "blank",
+      "start_line": 267,
+      "end_line": 267,
+      "raw": "\n"
+    },
+    {
+      "id": "b000095",
+      "kind": "list",
+      "start_line": 268,
+      "end_line": 278,
+      "raw": "- LVUI parser: 4/4 tests passed, including grammar, styles, diagnostics and limits.\n- iiGUI: 23/23 tests passed, including the previous host/Core/GPU suite,\n  LVUI layout/invalid/native tests and HelloLVUI's real native self-test.\n- A separately copied consumer built and ran against relocated installed\n  Core/LVUI/iiGUI packages. It verified actual LVUI glyph pixels in GPU capture\n  and printed `lvui=true` in its acceptance result.\n- LVUI native rendering verified sRGB source colors, shaped glyph pixels,\n  linear-light text alpha, explicit rectangular glyph clipping, resize/reflow,\n  retained equal-scene reuse and preservation after invalid view replacement.\n- HelloLVUI's `--capture` output was converted to PNG and visually inspected:\n  Korean/Latin text, native wrapping, inline colors and rounded backgrounds.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "LVUI parser: 4/4 tests passed, including grammar, styles, diagnostics and limits.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "iiGUI: 23/23 tests passed, including the previous host/Core/GPU suite,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "A separately copied consumer built and ran against relocated installed",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "LVUI native rendering verified sRGB source colors, shaped glyph pixels,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "HelloLVUI's `--capture` output was converted to PNG and visually inspected:",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000096",
+      "kind": "blank",
+      "start_line": 279,
+      "end_line": 279,
+      "raw": "\n"
+    },
+    {
+      "id": "b000097",
+      "kind": "paragraph",
+      "start_line": 280,
+      "end_line": 283,
+      "raw": "Evidence is under the canonical iiGUI `build/`: `lvui-full-tests.xml`,\n`lvui-full-tests.log`, `lvui-package-check.log`, `lvui-preview.png`, and the\nfinal `lvui-verification.json`. Parser evidence is under the sibling LVUI\n`build/`: `lvui-parser-tests.xml` and `lvui-parser-tests.log`.\n"
+    },
+    {
+      "id": "b000098",
+      "kind": "blank",
+      "start_line": 284,
+      "end_line": 284,
+      "raw": "\n"
+    },
+    {
+      "id": "b000099",
+      "kind": "paragraph",
+      "start_line": 285,
+      "end_line": 292,
+      "raw": "The executable's direct links and undefined symbols contain no Qt, WebKit or\nWebView API. The actual dyld inventory on macOS 27.0.1 does include OS WebKit\nimages: a separate minimal AppKit window with no LVUI, Core, iiGUI, text label\nor GPU renderer loads the same images. Merely linking AppKit, running parser\ncontracts, or measuring LVUI fonts does not load them. This is observed native\nwindow-system behavior on this host, not a WebView used for LVUI parsing or\nrendering. The report preserves the actual and baseline module inventories;\nit does not claim that the macOS process maps no browser-related system image.\n"
+    },
+    {
+      "id": "b000100",
+      "kind": "blank",
+      "start_line": 293,
+      "end_line": 293,
+      "raw": "\n"
+    },
+    {
+      "id": "b000101",
+      "kind": "paragraph",
+      "start_line": 294,
+      "end_line": 297,
+      "raw": "Windows and Linux have corresponding native text/composition implementations,\nbut this LVUI change has not been built or executed on those targets. Earlier\nplatform results above describe earlier source snapshots. No installed global\nSDK, Congregation UI or running user application was replaced by this check.\n"
+    },
+    {
+      "id": "b000102",
+      "kind": "blank",
+      "start_line": 298,
+      "end_line": 298,
+      "raw": "\n"
+    },
+    {
+      "id": "b000103",
+      "kind": "heading",
+      "start_line": 299,
+      "end_line": 299,
+      "raw": "## Native acceleration and Vulkan fallback verification\n",
+      "level": 2,
+      "title": "Native acceleration and Vulkan fallback verification"
+    },
+    {
+      "id": "b000104",
+      "kind": "blank",
+      "start_line": 300,
+      "end_line": 300,
+      "raw": "\n"
+    },
+    {
+      "id": "b000105",
+      "kind": "paragraph",
+      "start_line": 301,
+      "end_line": 303,
+      "raw": "The subsequent working-tree renderer addition uses Cocoa/AppKit + Metal on\nmacOS, Win32 + Direct3D 11 hardware on Windows, and Vulkan as the shared\nfallback/Linux default. The old Linux EGL/GLES source is retired.\n"
+    },
+    {
+      "id": "b000106",
+      "kind": "blank",
+      "start_line": 304,
+      "end_line": 304,
+      "raw": "\n"
+    },
+    {
+      "id": "b000107",
+      "kind": "paragraph",
+      "start_line": 305,
+      "end_line": 305,
+      "raw": "On macOS 27.0.1 arm64 with an Apple M1 Max:\n"
+    },
+    {
+      "id": "b000108",
+      "kind": "blank",
+      "start_line": 306,
+      "end_line": 306,
+      "raw": "\n"
+    },
+    {
+      "id": "b000109",
+      "kind": "list",
+      "start_line": 307,
+      "end_line": 322,
+      "raw": "- The full iiGUI suite passed 28/28, including renderer policy, native and\n  forced-Vulkan LVUI, native and Vulkan GPU quality, shader provenance, host\n  lifecycle and Core integration. The final Vulkan source checks device\n  buffer/image limits before allocation.\n- Relocated installed consumers passed 2/2: automatic/native-first and forced\n  Vulkan. Vulkan dependency paths are forwarded from the same target kit;\n  LD/DYLD runtime overrides are removed during configure/build/execution.\n- Vulkan/MoltenVK 1.4.2 executed real graphics, native swapchain presentation,\n  capture, resize and text composition. Default macOS execution reported\n  Metal; forced execution reported Vulkan. Discovery alone is not the proof.\n- The same 1600 x 1080 LVUI scene captured with Metal and Vulkan had identical\n  RGB values across all 1,728,000 pixels. This is parity for this scene/device,\n  not a cross-platform image-quality or performance claim.\n- Automatic native-initialization/draw failure and strict hardware behavior\n  are deterministic private policy tests. No physical Metal/DirectX device\n  was disabled; forced Vulkan supplies the separate real execution evidence.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "The full iiGUI suite passed 28/28, including renderer policy, native and",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Relocated installed consumers passed 2/2: automatic/native-first and forced",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Vulkan/MoltenVK 1.4.2 executed real graphics, native swapchain presentation,",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "The same 1600 x 1080 LVUI scene captured with Metal and Vulkan had identical",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Automatic native-initialization/draw failure and strict hardware behavior",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000110",
+      "kind": "blank",
+      "start_line": 323,
+      "end_line": 323,
+      "raw": "\n"
+    },
+    {
+      "id": "b000111",
+      "kind": "paragraph",
+      "start_line": 324,
+      "end_line": 329,
+      "raw": "The first cold Vulkan LVUI test hit a pre-initialization five-second callback\nwatchdog. Initialization is now bounded by the outer CTest timeout, and the\ncallback watchdog is armed after admission. The final full suite passed with\nall functional assertions retained. Initial failure logs are preserved in\n`build/Testing/Temporary/LastTestsFailed.log` when CTest retains them; only the\nfinal named XML/log files below describe the completed run.\n"
+    },
+    {
+      "id": "b000112",
+      "kind": "blank",
+      "start_line": 330,
+      "end_line": 330,
+      "raw": "\n"
+    },
+    {
+      "id": "b000113",
+      "kind": "paragraph",
+      "start_line": 331,
+      "end_line": 334,
+      "raw": "Evidence: `build/vulkan-full-tests.xml`, `build/vulkan-full-tests.log`,\n`build/vulkan-package-check.log`, `build/vulkan-final-consumer.log`,\n`build/vulkan-metal-comparison.json`, `build/vulkan-preview.png`, and\n`build/vulkan-verification.json`. See [renderer contracts](Renderers.md).\n"
+    },
+    {
+      "id": "b000114",
+      "kind": "blank",
+      "start_line": 335,
+      "end_line": 335,
+      "raw": "\n"
+    },
+    {
+      "id": "b000115",
+      "kind": "paragraph",
+      "start_line": 336,
+      "end_line": 339,
+      "raw": "This Vulkan change has not been compiled or executed on Windows/Linux in this\nrun. Their implementation and native surface code are present; earlier SDK\nplatform results do not establish this change's target execution. Global SDK\ninstalls, Congregation's LVRS/QML UI, and running user apps remain untouched.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Verification",
+      "anchor": "verification",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Automated checks",
+      "anchor": "automated-checks",
+      "start_line": 11
+    },
+    {
+      "block_id": "b000013",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Reproduction",
+      "anchor": "reproduction",
+      "start_line": 47
+    },
+    {
+      "block_id": "b000019",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Limits",
+      "anchor": "limits",
+      "start_line": 63
+    },
+    {
+      "block_id": "b000023",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Historical macOS 0.1 result (2026-10-16)",
+      "anchor": "historical-macos-01-result-2026-10-16",
+      "start_line": 70
+    },
+    {
+      "block_id": "b000037",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Desktop backends 0.2 result (2026-10-16)",
+      "anchor": "desktop-backends-02-result-2026-10-16",
+      "start_line": 107
+    },
+    {
+      "block_id": "b000051",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Graphics and native text 0.3 result (2026-10-16)",
+      "anchor": "graphics-and-native-text-03-result-2026-10-16",
+      "start_line": 146
+    },
+    {
+      "block_id": "b000073",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Core host integration 0.4 result (2026-10-16)",
+      "anchor": "core-host-integration-04-result-2026-10-16",
+      "start_line": 206
+    },
+    {
+      "block_id": "b000091",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "LVUI implementation verification — 2026-10-20",
+      "anchor": "lvui-implementation-verification--2026-10-20",
+      "start_line": 262
+    },
+    {
+      "block_id": "b000103",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Native acceleration and Vulkan fallback verification",
+      "anchor": "native-acceleration-and-vulkan-fallback-verification",
+      "start_line": 299
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000011",
+        "line": 44,
+        "text": "instrument the new GUI implementation and its tests; they do not imply that",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 55,
+        "text": "when native execution is requested; it is never silently converted to a pass.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000043",
+        "line": 123,
+        "text": "across configurations and do not represent distinct features.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000057",
+        "line": 161,
+        "text": "configurations and do not count unique features.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000063",
+        "line": 179,
+        "text": "were never executed or emulated. Their driver initialization, runtime shader",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000063",
+        "line": 184,
+        "text": "Native compilation remains required for other distributions/architectures.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000079",
+        "line": 227,
+        "text": "child writes after 120 ms. Native readiness must deliver on the UI owner within",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000083",
+        "line": 244,
+        "text": "do not intercept arbitrary blocking application calls or imply hard real-time",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000115",
+        "line": 338,
+        "text": "platform results do not establish this change's target execution. Global SDK",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000113",
+        "label": "renderer contracts",
+        "target": "Renderers.md",
+        "kind": "relative",
+        "line": 334
+      }
+    ],
+    "tables": [
+      {
+        "block_id": "b000007",
+        "columns": [
+          "Test",
+          "Actual behavior checked"
+        ],
+        "rows": [
+          [
+            "contracts",
+            "UTF-8/NUL/native-size/budget/capacity validation; main-thread construction on AppKit, owner-thread construction elsewhere; inactive/empty endpoint errors"
+          ],
+          [
+            "lifecycle",
+            "Visible native window; Core timer; Runtime result on UI thread; 820×520 resize; closed snapshot; reentrancy rejection"
+          ],
+          [
+            "wakeup",
+            "A worker wakes an idle native loop without a frame timer or user input"
+          ],
+          [
+            "earlier_deadline",
+            "A worker posts an earlier timer while a long native timer is armed"
+          ],
+          [
+            "close_veto",
+            "Native close veto and later acceptance; cancelled timer does not run"
+          ],
+          [
+            "failure",
+            "Callback exception becomes a returned error and releases the window"
+          ],
+          [
+            "close_failure",
+            "A throwing close-veto callback returns an error and still releases the window"
+          ],
+          [
+            "shutdown_race",
+            "Late weak endpoint rejects after the host has been destroyed"
+          ],
+          [
+            "producer_race",
+            "Two producers race close; bounded admission and no UI delivery after the close barrier"
+          ],
+          [
+            "full_queue",
+            "A full one-slot queue does not prevent native startup or lose accepted pre-run work"
+          ],
+          [
+            "wrong_thread",
+            "Foreign run, inspect, resize, retitle and close operations return wrong_executor"
+          ],
+          [
+            "graphics_contracts",
+            "Pure geometry/color/radius/panel-count/policy validation and inactive GPU endpoint errors"
+          ],
+          [
+            "graphics",
+            "Actual native device and sRGB pixel readback, linear blend/gradient/rounded AA, 100-to-1 update coalescing, identical-scene reuse, resize, strict policy and teardown"
+          ],
+          [
+            "core_io",
+            "A real pipe fixture acknowledges startup and waits for release after I/O admission; readiness wakes the native host, delivers on UI and joins its waiter before teardown"
+          ],
+          [
+            "core_operation",
+            "Tracked completion owns a temporary weak UI endpoint; scoped timed UI submission runs; removal cancels an earlier scope's timer"
+          ],
+          [
+            "core_frame",
+            "Borrowed Core loop rejects foreign/blocking drivers; update then prepare_present reaches actual GPU capture for three frames"
+          ],
+          [
+            "core_stop",
+            "Direct Core submission and terminal request_stop close the native host through normal cleanup"
+          ],
+          [
+            "boundary",
+            "Public C++/Core boundary; no Qt/SDL package or include; no direct native file creation"
+          ],
+          [
+            "tooling",
+            "Verifier output stays under build/, foreign execution requires explicit omission, all kits share sources, cross pkg-config cannot inherit host package paths"
+          ]
+        ]
+      },
+      {
+        "block_id": "b000027",
+        "columns": [
+          "Configuration / consumer",
+          "Passed",
+          "Failed",
+          "Evidence below build/"
+        ],
+        "rows": [
+          [
+            "Debug host regression",
+            "10",
+            "0",
+            "host-tests.xml"
+          ],
+          [
+            "Builder Release host regression",
+            "10",
+            "0",
+            "release-tests.xml"
+          ],
+          [
+            "ASan + UBSan host regression",
+            "10",
+            "0",
+            "sanitizer-tests.xml"
+          ],
+          [
+            "HelloGUI native self-test",
+            "1",
+            "0",
+            "hello-gui-tests.xml"
+          ],
+          [
+            "Relocated installed-package consumer",
+            "1",
+            "0",
+            "installed-consumer/tests.xml"
+          ]
+        ]
+      },
+      {
+        "block_id": "b000041",
+        "columns": [
+          "Target",
+          "Compiler / image",
+          "Builder",
+          "Host executable tests",
+          "Relocated consumer"
+        ],
+        "rows": [
+          [
+            "Windows x64",
+            "LLVM-MinGW Clang 23.1.2; PE32+ x64",
+            "Core → iiGUI → HelloGUI, all 8 steps passed",
+            "Test binary compiled; 2 build-host checks passed; native execution not run",
+            "Installed/moved, configured and linked; execution not run"
+          ],
+          [
+            "Linux ARM64",
+            "Clang 21 with GCC 14/libstdc++ and Debian 13 sysroot; ELF AArch64",
+            "All 8 steps passed",
+            "Test binary compiled; 2 build-host checks passed; native execution not run",
+            "Installed/moved, configured and linked; execution not run"
+          ],
+          [
+            "macOS ARM64",
+            "Apple Clang 21; Mach-O arm64",
+            "All 8 steps passed",
+            "13 checks passed; HelloGUI self-test passed",
+            "Installed/moved, configured, linked and executed successfully"
+          ]
+        ]
+      },
+      {
+        "block_id": "b000055",
+        "columns": [
+          "Target",
+          "Builder configure/build/install steps",
+          "Target execution",
+          "Relocated installed consumer"
+        ],
+        "rows": [
+          [
+            "macOS ARM64, Apple Clang 21",
+            "All 8 passed",
+            "15 host checks and HelloGUI self-test passed",
+            "Compiled, linked and executed, including native GPU capture"
+          ],
+          [
+            "Windows x64, LLVM-MinGW Clang 23.1.2",
+            "All 8 passed",
+            "Explicitly not run; 2 build-host source/tooling checks passed",
+            "Installed/moved, compiled and linked; execution not run"
+          ],
+          [
+            "Linux ARM64, Clang 21 + GCC 14 / Debian 13 sysroot",
+            "All 8 passed",
+            "Explicitly not run; 2 build-host source/tooling checks passed",
+            "Installed/moved, compiled and linked; execution not run"
+          ]
+        ]
+      },
+      {
+        "block_id": "b000077",
+        "columns": [
+          "Validation",
+          "Result",
+          "Evidence"
+        ],
+        "rows": [
+          [
+            "macOS ARM64 Builder chain",
+            "All eight Core/GUI/HelloGUI configure/build/install steps passed",
+            "build/foundation-verification/macos/report.json"
+          ],
+          [
+            "macOS native host suite",
+            "19/19 passed, including four Core integration cases",
+            "macOS run host-tests.xml"
+          ],
+          [
+            "HelloGUI with Operation, TaskScope and FrameLoop",
+            "1/1 passed, actual Metal capture and normal close",
+            "macOS run hello-gui-tests.xml"
+          ],
+          [
+            "Relocated GUI package consumer",
+            "1/1 executed successfully; background=42, GPU capture, Core frames and scoped timer",
+            "macOS run installed-consumer/tests.xml"
+          ],
+          [
+            "ASan + UBSan across Core and iiGUI",
+            "19/19 GUI checks passed; both libraries instrumented",
+            "build/core-foundation-asan/sanitizer-tests.xml"
+          ],
+          [
+            "Core Debug / ASan+UBSan / selected TSan",
+            "40/40, 40/40 and 5/5 passed",
+            "../iiSDKCore/build/gui-foundation*/"
+          ],
+          [
+            "Copied relocated Core Runtime+Values / Contracts / Values consumers",
+            "17/17, 2/2 and 3/3 passed",
+            "../iiSDKCore/build/gui-package/latest.json"
+          ],
+          [
+            "Windows x64 and Linux ARM64 Builder chains",
+            "All eight steps passed per platform; test executables and relocated GUI consumers compiled/linked",
+            "build/foundation-verification/{windows,linux}/"
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

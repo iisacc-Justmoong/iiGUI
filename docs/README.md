@@ -34,6 +34,7 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/ContainerLayout.md`](ContainerLayout.md) | [JSON](ContainerLayout.agent.json) |
 | [`docs/ContentHosts.md`](ContentHosts.md) | [JSON](ContentHosts.agent.json) |
 | [`docs/CoreApplication.md`](CoreApplication.md) | [JSON](CoreApplication.agent.json) |
+| [`docs/CustomWindowChrome.md`](CustomWindowChrome.md) | [JSON](CustomWindowChrome.agent.json) |
 | [`docs/DialogLayout.md`](DialogLayout.md) | [JSON](DialogLayout.agent.json) |
 | [`docs/DisplayFrames.md`](DisplayFrames.md) | [JSON](DisplayFrames.agent.json) |
 | [`docs/DynamicLinking.md`](DynamicLinking.md) | [JSON](DynamicLinking.agent.json) |
@@ -80,6 +81,7 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/TextInputProvider.md`](TextInputProvider.md) | [JSON](TextInputProvider.agent.json) |
 | [`docs/TextLine.md`](TextLine.md) | [JSON](TextLine.agent.json) |
 | [`docs/TextRasterCache.md`](TextRasterCache.md) | [JSON](TextRasterCache.agent.json) |
+| [`docs/TextWrapFallback.md`](TextWrapFallback.md) | [JSON](TextWrapFallback.agent.json) |
 | [`docs/Usage.md`](Usage.md) | [JSON](Usage.agent.json) |
 | [`docs/Verification.md`](Verification.md) | [JSON](Verification.agent.json) |
 | [`docs/VirtualViewports.md`](VirtualViewports.md) | [JSON](VirtualViewports.agent.json) |

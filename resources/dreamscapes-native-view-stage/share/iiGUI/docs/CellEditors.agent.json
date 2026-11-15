@@ -1,0 +1,149 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:f62c9b9245195c556d8c1b608a55e028d90837329548d8cd279ae1548124d225",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/CellEditors.md",
+    "sha256": "53a4212fb76fe3096b1cf18428fe29881cddbb001291dc9ac6d11b4425c216b5",
+    "bytes": 2163,
+    "line_count": 28,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "조합 컨트롤의 편집기와 셀 경계",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 조합 컨트롤의 편집기와 셀 경계\n",
+      "level": 1,
+      "title": "조합 컨트롤의 편집기와 셀 경계"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "`InputOptions::style`은 자체 C++ 입력 위젯의 외형을 명시적으로 교체한다.\n생략하면 기존 InputField의 높이 30, 가로 여백 8, hover 배경과 포커스 링이 유지된다.\n`InputStyle`은 높이·글자 크기·행 높이·가로 여백·모서리·배경·hover 배경·글자색과\n포커스 링을 지정한다. 투명 배경, 여백 0과 링 끄기로 표 셀 안의 편집기를 구성한다.\n운영체제 입력 컨트롤은 생성하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 13,
+      "raw": "`Widget::set_input_options`는 텍스트·폭·스타일·활성 상태를 검증한 뒤 교체한다.\n텍스트가 같으면 커서와 선택을 유지하고, 다르면 새 텍스트 끝으로 옮긴다.\n프로그램 변경은 `edited`를 발생시키지 않는다. 비활성화 시 기존\n`commit_on_focus_loss`가 켜져 있으면 기존 포커스 해제 계약에 따라 submit은 가능하다.\nUTF-8·길이·유한한 기하·RGBA 검증 실패는 기존 옵션을 보존한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 19,
+      "raw": "`set_label_options`는 같은 Label의 텍스트·타이포그래피·색상·정렬을 교체한다.\n`LabelOptions::elide_right`와 하위 `TextRun::elide_right`는 한 행의 오른쪽을\n네이티브 텍스트 엔진의 말줄임표로 처리한다. macOS는 AppKit 조판,\nWindows는 DirectWrite trimming, Linux는 Pango ellipsize를 사용한다.\n실제 실행·GPU 검사는 macOS에서 수행하며 다른 OS 실행 증거와 구분한다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 24,
+      "raw": "`set_clip_content`는 일반 스택의 자손을 같은 사각형으로 클리핑한다. 기존 scroll 및\npopup clip과 교차하며 GPU scissor·포인터 대상·가상 접근성 노출이 같은 경계를 사용한다.\n별도로 소유된 popup은 기존 portal 계약에 따라 조상 clip에서 벗어날 수 있다.\n운영체제 클리핑 위젯이나 스크롤 컨트롤은 추가하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 28,
+      "raw": "`tests/cell_editor.cpp`는 Unicode 편집, 옵션 변경의 무편집 이벤트, 잘못된 대상·기하 거절,\n실제 GPU clip과 말줄임표의 픽셀 변화를 검사한다. 기존 입력기의 전체 IME\nreplacement-range·클립보드·선택 표시 완성을 뜻하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "조합 컨트롤의 편집기와 셀 경계",
+      "anchor": "조합-컨트롤의-편집기와-셀-경계",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 7,
+        "text": "운영체제 입력 컨트롤은 생성하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 24,
+        "text": "운영체제 클리핑 위젯이나 스크롤 컨트롤은 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 28,
+        "text": "replacement-range·클립보드·선택 표시 완성을 뜻하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -84,6 +84,15 @@ int main() {
             check(Vulkan::created==0&&chain.info().api==GraphicsApi::metal,"Explicit native selection silently changed renderer"); }
         reset(); { Chain chain(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::vulkan);
             check(Native::created==0 && Vulkan::created==1 && !chain.info().fallback,"Explicit Vulkan"); }
+        reset(); Native::fail_draw=true;
+        {
+            auto bound=std::make_unique<Native>(nullptr,nullptr,Acceleration::require_hardware);
+            Chain chain(std::move(bound),Acceleration::require_hardware);
+            (void)failure([&]{chain.draw(frame,1,100);});
+            check(Native::drawn==1 && Vulkan::created==0 && !chain.info().fallback,
+                "A bound transparent target silently fell back to an opaque renderer");
+        }
+        check(Native::destroyed==1,"The bound target was not retired exactly once");
         reset(); Native::fail_init=true;
         (void)failure([] { Chain c(nullptr,nullptr,Acceleration::prefer_hardware,Renderer::native); });
         check(Vulkan::created==0,"Explicit native never silently changes API");

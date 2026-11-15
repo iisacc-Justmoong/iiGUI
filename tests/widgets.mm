@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#include <iiGUI/Host.h>
 #include <iiGUI/NativeWidgets.h>
 #include <cmath>
 #include <iostream>

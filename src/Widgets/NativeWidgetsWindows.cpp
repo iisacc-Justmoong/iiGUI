@@ -1,5 +1,7 @@
 #include <iiGUI/FontDatabase.h>
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #include <windowsx.h>
 #include <imm.h>
@@ -9,6 +11,7 @@
 #include <iiGUI/DesktopCommon.h>
 #include "../Platform/Win32ImeProtocol.h"
 #include "WindowsAccessibility.h"
+#include "SurfaceInvalidation.h"
 #include <algorithm>
 
 namespace ii::gui::detail {
@@ -32,16 +35,30 @@ struct Win32ImeHost final {
 };
 }
 struct NativeWidgetSurface::Impl final {
-    HWND parent;WidgetSurfaceCallbacks callbacks;NativeCanvas canvas;Win32ImeProtocol ime;Win32Utf16Input text_input;WindowsAccessibility accessibility;bool dirty=true,frame_paced=false,releasing_capture=false;
-    Impl(HWND window,WidgetSurfaceCallbacks value):parent(window),callbacks(std::move(value)),canvas(window,nullptr,Acceleration::prefer_hardware,callbacks.renderer,callbacks.presentations),accessibility(window,callbacks){DragAcceptFiles(parent,TRUE);}
-    ~Impl(){DragAcceptFiles(parent,FALSE);}
+    HWND parent;WidgetSurfaceCallbacks callbacks;std::function<void()> wake;std::shared_ptr<NativeCanvas> canvas;
+    Win32ImeProtocol ime;Win32Utf16Input text_input;WindowsAccessibility accessibility;
+    SurfaceInvalidation dirty;
+    bool frame_paced=false,releasing_capture=false,owned_drop_registration=false,owned_capture=false;
+    Impl(HWND window,WidgetSurfaceCallbacks value,std::shared_ptr<NativeCanvas> bound={},std::function<void()> external={})
+        :parent(window),callbacks(std::move(value)),wake(std::move(external)),
+         canvas(bound?std::move(bound):std::make_shared<NativeCanvas>(window,nullptr,Acceleration::prefer_hardware,callbacks.renderer,callbacks.presentations)),
+         accessibility(window,callbacks){
+        if(!wake){
+            DragAcceptFiles(parent,TRUE);owned_drop_registration=true;
+        }
+    }
+    ~Impl(){
+        if(owned_capture && GetCapture()==parent)ReleaseCapture();
+        if(owned_drop_registration && IsWindow(parent))DragAcceptFiles(parent,FALSE);
+    }
     double scale()const{const auto dpi=GetDpiForWindow(parent);return dpi?dpi/96.:1;}
     Size size()const{RECT r{};GetClientRect(parent,&r);return {(r.right-r.left)/scale(),(r.bottom-r.top)/scale()};}
-    void flush(){if(!dirty)return;auto s=size();if(s.width<=0||s.height<=0)return;auto frame=callbacks.frame(s);accessibility.refresh();canvas.draw(frame,scale(),s.height);dirty=false;}
-    void send(WidgetInput input){callbacks.input(std::move(input));dirty=true;if(!frame_paced)InvalidateRect(parent,nullptr,FALSE);}
+    void invalidate(){dirty.invalidate();if(!frame_paced){if(wake)wake();else InvalidateRect(parent,nullptr,FALSE);}}
+    void flush(){if(!dirty.pending())return;auto s=size();if(s.width<=0||s.height<=0)return;(void)dirty.flush([&]{auto frame=callbacks.frame(s);accessibility.refresh();canvas->draw(frame,scale(),s.height);});}
+    void send(WidgetInput input){callbacks.input(std::move(input));invalidate();}
     void ime_result(core::Result<void> result){
         if(!result){if(result.error().cause&&callbacks.failure)callbacks.failure(result.error().cause);return;}
-        dirty=true;if(!frame_paced)InvalidateRect(parent,nullptr,FALSE);
+        invalidate();
     }
     std::optional<WidgetSnapshot> editor()const{for(auto& value:callbacks.accessibility())if(value.focused&&value.text_input)return value;return {};}
     void caret(){auto focused=editor();if(!focused)return;auto r=focused->caret_bounds;HIMC context=ImmGetContext(parent);if(!context)return;COMPOSITIONFORM form{CFS_POINT,{LONG(r.x*scale()),LONG((r.y+r.height)*scale())},{}};ImmSetCompositionWindow(context,&form);CANDIDATEFORM candidates{0,CFS_CANDIDATEPOS,form.ptCurrentPos,{}};ImmSetCandidateWindow(context,&candidates);ImmReleaseContext(parent,context);}
@@ -50,11 +67,11 @@ struct NativeWidgetSurface::Impl final {
         if(accessibility.input(&message))return true;
         if(code==WM_MOVE||code==WM_WINDOWPOSCHANGED){accessibility.refresh();return false;}
         if(code==WM_DROPFILES){auto drop=reinterpret_cast<HDROP>(w);struct Release final{HDROP value;~Release(){DragFinish(value);}} release{drop};auto content=std::make_shared<ClipboardContent>();POINT location{};DragQueryPoint(drop,&location);const UINT count=DragQueryFileW(drop,0xffffffff,nullptr,0);if(count>256)return true;for(UINT i=0;i<count;++i){const UINT length=DragQueryFileW(drop,i,nullptr,0);if(length>32768)return true;std::wstring path(std::size_t(length)+1,L'\0');DragQueryFileW(drop,i,path.data(),length+1);path.resize(length);content->files.push_back(utf8(path));}if(valid_clipboard(*content))send({.kind=WidgetInputKind::drop,.x=location.x/dpi,.y=location.y/dpi,.content=std::move(content)});return true;}
-        if(code==WM_PAINT){PAINTSTRUCT paint{};BeginPaint(parent,&paint);dirty=true;flush();EndPaint(parent,&paint);return true;}if(code==WM_SIZE){dirty=true;flush();return false;}
+        if(code==WM_PAINT){if(wake)return false;PAINTSTRUCT paint{};BeginPaint(parent,&paint);dirty.invalidate();flush();EndPaint(parent,&paint);return true;}if(code==WM_SIZE){if(wake){invalidate();return false;}dirty.invalidate();flush();return false;}
         // The host applies the suggested frame after this event. A paint before
         // that transaction finishes would use a mixture of old size/new DPI.
-        if(code==WM_DPICHANGED){dirty=true;return false;}
-        if(code==WM_CAPTURECHANGED&&releasing_capture)return false;
+        if(code==WM_DPICHANGED){dirty.invalidate();return false;}
+        if(code==WM_CAPTURECHANGED){owned_capture=false;if(releasing_capture)return false;}
         if(code==WM_KILLFOCUS||code==WM_CAPTURECHANGED||code==WM_CANCELMODE){ime.abandon();text_input.clear();send(event(WidgetInputKind::focus_lost));return false;}
         if(code==WM_MOUSEMOVE||code==WM_LBUTTONDOWN||code==WM_RBUTTONDOWN||code==WM_MBUTTONDOWN||code==WM_XBUTTONDOWN||code==WM_LBUTTONDBLCLK||code==WM_RBUTTONDBLCLK||code==WM_MBUTTONDBLCLK||code==WM_XBUTTONDBLCLK||code==WM_LBUTTONUP||code==WM_RBUTTONUP||code==WM_MBUTTONUP||code==WM_XBUTTONUP){
             // Promoted pen messages are already delivered with pressure below.
@@ -65,8 +82,8 @@ struct NativeWidgetSurface::Impl final {
             auto input=event(down?WidgetInputKind::pointer_down:up?WidgetInputKind::pointer_up:WidgetInputKind::pointer_move);input.x=GET_X_LPARAM(l)/dpi;input.y=GET_Y_LPARAM(l)/dpi;
             if(down)input.native_click_count=doubled?2:1;
             input.buttons=((w&MK_LBUTTON)?1:0)|((w&MK_RBUTTON)?2:0)|((w&MK_MBUTTON)?4:0)|((w&MK_XBUTTON1)?8:0)|((w&MK_XBUTTON2)?16:0);
-            if(down){SetFocus(parent);SetCapture(parent);}send(std::move(input));
-            if(up&&GetCapture()==parent){releasing_capture=true;ReleaseCapture();releasing_capture=false;}caret();return true;
+            if(down){SetFocus(parent);const bool already_captured=GetCapture()==parent;SetCapture(parent);if(!wake||!already_captured)owned_capture=true;}send(std::move(input));
+            if(up&&owned_capture&&GetCapture()==parent){releasing_capture=true;ReleaseCapture();releasing_capture=false;owned_capture=false;}caret();return true;
         }
         if(code==WM_POINTERDOWN||code==WM_POINTERUPDATE||code==WM_POINTERUP){POINTER_PEN_INFO pen{};const auto id=GET_POINTERID_WPARAM(w);if(!GetPointerPenInfo(id,&pen))return false;POINT point=pen.pointerInfo.ptPixelLocation;ScreenToClient(parent,&point);auto input=event(code==WM_POINTERDOWN?WidgetInputKind::pointer_down:code==WM_POINTERUP?WidgetInputKind::pointer_up:WidgetInputKind::pointer_move);input.x=point.x/dpi;input.y=point.y/dpi;input.device=(pen.penFlags&PEN_FLAG_ERASER)?PointerDevice::eraser:PointerDevice::pen;input.device_id=id;input.pressure=(pen.penMask&PEN_MASK_PRESSURE)?std::clamp(pen.pressure/1024.,0.,1.):1;input.tilt_x=pen.tiltX;input.tilt_y=pen.tiltY;input.rotation=pen.rotation;input.buttons=(pen.pointerInfo.pointerFlags&POINTER_FLAG_FIRSTBUTTON)?1:0;send(std::move(input));return true;}
         if(code==WM_MOUSEWHEEL||code==WM_MOUSEHWHEEL){POINT p{GET_X_LPARAM(l),GET_Y_LPARAM(l)};ScreenToClient(parent,&p);auto input=event(WidgetInputKind::scroll);input.x=p.x/dpi;input.y=p.y/dpi;if(code==WM_MOUSEWHEEL)input.scroll_y=GET_WHEEL_DELTA_WPARAM(w)*48./WHEEL_DELTA;else input.scroll_x=GET_WHEEL_DELTA_WPARAM(w)*48./WHEEL_DELTA;send(std::move(input));return true;}
@@ -97,12 +114,14 @@ struct NativeWidgetSurface::Impl final {
             if(message)ime_result(ime.apply(host,*message));caret();return true;
         }
         if(code==WM_IME_ENDCOMPOSITION){Win32ImeHost host{callbacks};ime_result(ime.end(host));return false;}
-        return canvas.native_event(&message);
+        return canvas->native_event(&message);
     }
 };
 NativeWidgetSurface::NativeWidgetSurface(void* p,WidgetSurfaceCallbacks callbacks):impl_(std::make_unique<Impl>(static_cast<HWND>(p),std::move(callbacks))){}
+NativeWidgetSurface::NativeWidgetSurface(void* p,WidgetSurfaceCallbacks callbacks,std::shared_ptr<NativeCanvas> canvas,std::function<void()> wake)
+    :impl_(std::make_unique<Impl>(static_cast<HWND>(p),std::move(callbacks),std::move(canvas),std::move(wake))){}
 NativeWidgetSurface::~NativeWidgetSurface(){if(impl_)impl_->accessibility.retire();}
-void NativeWidgetSurface::invalidate(){impl_->dirty=true;if(!impl_->frame_paced)InvalidateRect(impl_->parent,nullptr,FALSE);}
+void NativeWidgetSurface::invalidate(){impl_->invalidate();}
 void NativeWidgetSurface::accessibility_changed(){auto held=impl_;held->accessibility.structure_changed();}
 void NativeWidgetSurface::accessibility_value_changed(std::string_view id){auto held=impl_;held->accessibility.value_changed(id);}
 void NativeWidgetSurface::set_frame_paced(bool value){impl_->frame_paced=value;}
@@ -110,8 +129,8 @@ void NativeWidgetSurface::flush(){auto held=impl_;held->flush();}
 Size NativeWidgetSurface::size()const{return impl_->size();}
 double NativeWidgetSurface::backing_scale()const{return impl_->scale();}
 std::string NativeWidgetSurface::resolve_font_family(std::string_view value)const{return FontDatabase::application()->resolve_family(value);}
-GraphicsInfo NativeWidgetSurface::info(){return impl_->canvas.info();}
-PixelBuffer NativeWidgetSurface::capture(){impl_->flush();return impl_->canvas.capture();}
+GraphicsInfo NativeWidgetSurface::info(){return impl_->canvas->info();}
+PixelBuffer NativeWidgetSurface::capture(){impl_->flush();return impl_->canvas->capture();}
 bool NativeWidgetSurface::native_event(const void* value){auto held=impl_;try{return held->process(*static_cast<const MSG*>(value));}catch(...){if(held->callbacks.failure)held->callbacks.failure(std::current_exception());return true;}}
 std::optional<std::intptr_t> NativeWidgetSurface::native_result(const void* value){auto held=impl_;return held->accessibility.result(value);}
 }

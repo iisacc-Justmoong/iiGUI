@@ -712,6 +712,14 @@ core::Result<void> Host::attach_external(void* native_parent,HostCallbacks callb
     }
     return {};
 }
+core::Result<void> Host::external_parent_resized() {
+    if (auto ready=impl_->ready();!ready) return ready;
+    if (!impl_->embedded) return core::fail(core::ErrorCode::invalid_argument,"An attached external surface is required");
+    if (!impl_->embedded_parent || !impl_->embedded_parent.window)
+        return core::fail(core::ErrorCode::closed,"The external parent view is detached");
+    if (impl_->native.resize) impl_->native.resize();
+    return {};
+}
 core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
     if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Secondary windows require the owning main thread");
     if(impl_->application_driver)return core::fail(core::ErrorCode::invalid_argument,"An application driver cannot be a secondary window");

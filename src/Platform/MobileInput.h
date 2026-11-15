@@ -11,6 +11,13 @@ struct MobileTouch final {double x=0,y=0,force=0,maximum_force=0,altitude=std::n
 inline bool mobile_text_service_key(const WidgetInput& input,bool editing)noexcept{
     return editing&&input.kind==WidgetInputKind::key_down&&input.key==WidgetKey::space&&!input.control&&!input.meta&&!input.alt;
 }
+// Outside an editor, printable hardware-key presses must reach application
+// shortcuts. In an editor, UIKit retains ordinary/Option character input;
+// Command and Control combinations still reach the widget event path.
+inline bool mobile_widget_key(const WidgetInput& input,bool editing)noexcept{
+    return input.kind==WidgetInputKind::key_down&&
+        (!editing||input.key!=WidgetKey::character||input.control||input.meta);
+}
 inline WidgetInput touch_input(WidgetInputKind kind,MobileTouch touch){
     WidgetInput input;input.kind=kind;input.device=touch.pencil?PointerDevice::pen:PointerDevice::touch;
     input.x=std::isfinite(touch.x)?touch.x:0;input.y=std::isfinite(touch.y)?touch.y:0;

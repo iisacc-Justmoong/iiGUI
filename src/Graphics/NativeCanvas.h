@@ -38,7 +38,7 @@ public:
     PlatformCanvas(ExternalMetalLayer target, Acceleration policy);
 #endif
 #if defined(_WIN32)
-    struct ExternalDirect3DSwapChain final { void* swapchain; };
+    struct ExternalDirect3DSwapChain final { void* swapchain; bool premultiplied_srgb=false; };
     PlatformCanvas(ExternalDirect3DSwapChain target, Acceleration policy);
 #endif
     ~PlatformCanvas();
@@ -58,6 +58,10 @@ private:
 class NativeCanvas final {
 public:
     NativeCanvas(void* parent,void* display,Acceleration policy,Renderer renderer,std::shared_ptr<PresentationStream> = {});
+#if defined(_WIN32)
+    struct DirectCompositionParent final {void* window;};
+    NativeCanvas(DirectCompositionParent,Acceleration policy,std::shared_ptr<PresentationStream> = {});
+#endif
     ~NativeCanvas();
     NativeCanvas(const NativeCanvas&)=delete;
     NativeCanvas& operator=(const NativeCanvas&)=delete;

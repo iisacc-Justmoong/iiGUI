@@ -1,0 +1,93 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7c06eb9f41f4e57b7fb7d9d23dbdddfc6a6c5d152ff37ba9718f346679119b75",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/SourceLayout.md",
+    "sha256": "5a44d71ea33dc5ed1f5a09cd007b06d2dd568244889cb33d05856dd40ddd4cf2",
+    "bytes": 692,
+    "line_count": 5,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "소스 구조",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 소스 구조\n",
+      "level": 1,
+      "title": "소스 구조"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 3,
+      "raw": "공개 헤더와 구현은 `src/` 아래 책임에 따라 함께 둔다. 앱 수명과 전달은 `Core/`, 플랫폼 호스트와 데스크톱 연결은 `Platform/`, 렌더링은 `Graphics/`, 폰트와 텍스트는 `Text/`, 위젯은 `Widgets/`, 모양과 프레젠테이션은 `Presentation/`, 통합 공개 헤더는 `API/`에 둔다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 4,
+      "end_line": 4,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "빌드 중 생성한 연결 헤더와 설치된 원본 헤더는 기존 `<iiGUI/...>` 경로를 유지한다. `iiGUI.source_layout`, 공개 경계 및 설치 소비자 검사는 소스 분류와 API 경계를 함께 확인한다. 이 구조 변경 자체는 다른 운영체제나 실제 창·GPU 실행의 검증을 뜻하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "소스 구조",
+      "anchor": "소스-구조",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 5,
+        "text": "빌드 중 생성한 연결 헤더와 설치된 원본 헤더는 기존 `<iiGUI/...>` 경로를 유지한다. `iiGUI.source_layout`, 공개 경계 및 설치 소비자 검사는 소스 분류와 API 경계를 함께 확인한다. 이 구조 변경 자체는 다른 운영체제나 실제 창·GPU 실행의 검증을 뜻하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

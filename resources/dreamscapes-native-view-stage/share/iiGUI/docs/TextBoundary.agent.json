@@ -1,0 +1,163 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:408f264d0b0fd0dcd2a1d0be62fde5904413693617b4861336a183ec7e279dd2",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/TextBoundary.md",
+    "sha256": "ad0661c3868e55d05950f0c0df467e7b7c8b7550f263b544a9c726a78f8a4ab6",
+    "bytes": 1850,
+    "line_count": 22,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "창 없는 Unicode 텍스트 인덱스",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 창 없는 Unicode 텍스트 인덱스\n",
+      "level": 1,
+      "title": "창 없는 Unicode 텍스트 인덱스"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "TextIndex는 UTF-8 원문을 소유하는 불변 값이며 네이티브 텍스트 서비스의 UTF-16 위치를\n바이트 위치로 변환한다. 창·렌더러·폰트·UI 소유 스레드가 필요 없으며 사본은 같은 데이터를\n공유한다. 잘못된 UTF-8, 대리 쌍 또는 UTF-8 스칼라 중간을 가리키는 위치는 거절한다.\nNUL은 텍스트에서 허용하며 파일 경로의 제한을 텍스트로 확장하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 10,
+      "raw": "문자소 이동은 고정한 utf8proc 2.11.3의 확장 문자소 경계를 사용한다. 결합 문자, 한글\n자모, 지역 표시자 쌍과 ZWJ 이모지를 분리하지 않는다. 단어 이동은 LVRS의 문자·숫자·\n밑줄 규칙을 문자소 단위로 적용한다. 이는 모든 언어의 사전식 단어 분석을 뜻하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 15,
+      "raw": "ASCII 구간에는 스칼라마다 인덱스를 만들지 않는다. UTF-8 길이와 UTF-16 길이가 달라지는\n스칼라와 여러 UTF-16 단위를 합치는 문자소만 저장한다. 위치 변환과 문자소 이동은 이\n희소 표를 이진 탐색하고, 단어 이동은 만나는 문자소만 읽는다. 입력은 64 MiB, 소유 인덱스\n저장 공간은 128 MiB로 제한하며 초과는 Result 오류이다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 19,
+      "raw": "Unicode 소스는 iiFileProvider에 이미 고정된 원본을 해시로 검증해 독립 소스로 복사했다.\nSDK 모듈 사이의 비공개 헤더나 심벌에 의존하지 않는다. 출처·버전·해시와 MIT/Unicode\n데이터 라이선스는 src/third_party/utf8proc 및 설치 패키지의 licenses/iiGUI/utf8proc에 둔다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 20,
+      "end_line": 20,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 21,
+      "end_line": 22,
+      "raw": "검사는 소스·설치 소비자의 컴파일까지 준비하며 실제 실행은 전체 LVRS 작업의 마지막\n일괄 단계로 보류한다. 경계 규칙의 실행 통과나 플랫폼 입력 동등성을 아직 주장하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "창 없는 Unicode 텍스트 인덱스",
+      "anchor": "창-없는-unicode-텍스트-인덱스",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 6,
+        "text": "NUL은 텍스트에서 허용하며 파일 경로의 제한을 텍스트로 확장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 9,
+        "text": "자모, 지역 표시자 쌍과 ZWJ 이모지를 분리하지 않는다. 단어 이동은 LVRS의 문자·숫자·",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "밑줄 규칙을 문자소 단위로 적용한다. 이는 모든 언어의 사전식 단어 분석을 뜻하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 18,
+        "text": "SDK 모듈 사이의 비공개 헤더나 심벌에 의존하지 않는다. 출처·버전·해시와 MIT/Unicode",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 22,
+        "text": "일괄 단계로 보류한다. 경계 규칙의 실행 통과나 플랫폼 입력 동등성을 아직 주장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

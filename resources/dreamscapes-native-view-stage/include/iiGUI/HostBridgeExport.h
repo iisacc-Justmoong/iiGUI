@@ -1,0 +1,43 @@
+
+#ifndef IIGUI_HOST_BRIDGE_EXPORT_H
+#define IIGUI_HOST_BRIDGE_EXPORT_H
+
+#ifdef IIGUI_HOST_BRIDGE_STATIC_DEFINE
+#  define IIGUI_HOST_BRIDGE_EXPORT
+#  define IIGUI_HOST_BRIDGE_NO_EXPORT
+#else
+#  ifndef IIGUI_HOST_BRIDGE_EXPORT
+#    ifdef iiGUIHostBridge_EXPORTS
+        /* We are building this library */
+#      define IIGUI_HOST_BRIDGE_EXPORT 
+#    else
+        /* We are using this library */
+#      define IIGUI_HOST_BRIDGE_EXPORT 
+#    endif
+#  endif
+
+#  ifndef IIGUI_HOST_BRIDGE_NO_EXPORT
+#    define IIGUI_HOST_BRIDGE_NO_EXPORT 
+#  endif
+#endif
+
+#ifndef IIGUI_HOST_BRIDGE_DEPRECATED
+#  define IIGUI_HOST_BRIDGE_DEPRECATED __attribute__ ((__deprecated__))
+#endif
+
+#ifndef IIGUI_HOST_BRIDGE_DEPRECATED_EXPORT
+#  define IIGUI_HOST_BRIDGE_DEPRECATED_EXPORT IIGUI_HOST_BRIDGE_EXPORT IIGUI_HOST_BRIDGE_DEPRECATED
+#endif
+
+#ifndef IIGUI_HOST_BRIDGE_DEPRECATED_NO_EXPORT
+#  define IIGUI_HOST_BRIDGE_DEPRECATED_NO_EXPORT IIGUI_HOST_BRIDGE_NO_EXPORT IIGUI_HOST_BRIDGE_DEPRECATED
+#endif
+
+/* NOLINTNEXTLINE(readability-avoid-unconditional-preprocessor-if) */
+#if 0 /* DEFINE_NO_DEPRECATED */
+#  ifndef IIGUI_HOST_BRIDGE_NO_DEPRECATED
+#    define IIGUI_HOST_BRIDGE_NO_DEPRECATED
+#  endif
+#endif
+
+#endif /* IIGUI_HOST_BRIDGE_EXPORT_H */

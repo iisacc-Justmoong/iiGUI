@@ -1,0 +1,215 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:87b657205d7f2c7acbad2a664e371e6ffe6ba235db2ca9504e4410c37e39a94c",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Menus.md",
+    "sha256": "581f641ca434cddc578d30dff6125c1ba6172850ab4e39a62d65af3de80f7386",
+    "bytes": 4460,
+    "line_count": 73,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Self-rendered menus",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Self-rendered menus\n",
+      "level": 1,
+      "title": "Self-rendered menus"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "`WidgetBuilder::menu`, `menu_item` and `menu_divider` construct C++ widget nodes.\nNo OS menu, popup control, native item view or source interpreter renders them.\nThe macOS adapter translates input and exposes virtual accessibility peers; iiGUI\nowns placement, scrolling, hit testing, keyboard navigation, action dispatch and\nGPU paint. Windows/Linux widget mounting still requires its platform adapter.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 15,
+      "raw": "Menus belong to the same widget generation as their parent, including when a\nmenu belongs to a button or a menu item. They take no space in the parent's flow.\n`open_at(x,y)` uses logical surface coordinates; `open_for(anchor,x,y)` maps an\noffset from an anchor in the same generation. Placement chooses the available\nside and clamps to the window margin. Repositioning an open menu does not emit a\nsecond opened event. `close_popup()` is idempotent and restores the previous\neligible focus. Closing an owner popup also closes its descendants.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "fenced_code",
+      "start_line": 17,
+      "end_line": 26,
+      "raw": "```cpp\nauto root = builder.vstack({}, \"root\");\n// Check Results before dereferencing in application code.\nauto popup = builder.menu(*root, \"actions\", {}, {\n    .triggered = [](int index) { /* stable index, including divider slots */ }\n});\nauto action = builder.menu_item(*popup, \"open\", {\n    .label = \"Open\", .shortcut = \"Ctrl+O\", .has_child_items = false\n}, [] { /* application action */ });\n```\n",
+      "language": "cpp",
+      "code": "auto root = builder.vstack({}, \"root\");\n// Check Results before dereferencing in application code.\nauto popup = builder.menu(*root, \"actions\", {}, {\n    .triggered = [](int index) { /* stable index, including divider slots */ }\n});\nauto action = builder.menu_item(*popup, \"open\", {\n    .label = \"Open\", .shortcut = \"Ctrl+O\", .has_child_items = false\n}, [] { /* application action */ });\n",
+      "closed": true
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 32,
+      "raw": "Regular menus use 24-unit rows and 4-unit vertical padding. Context style uses\n18-unit rows and 8-unit padding, with Inter Regular 12-unit labels and Pretendard\nshortcuts. The five bundled font faces and both OFL notices are attached through\nCore application resources. LVRS factories hydrate original SVG icons and arrows.\nStandalone menu items/dividers are also supported for component catalogs.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 34,
+      "end_line": 40,
+      "raw": "The popup captures input. Up/Down, Home/End and Tab navigate eligible items;\ninactive/disabled items and dividers are skipped. Navigation reveals offscreen\nrows. Pointer wheels scroll logical pixels. The popup is clipped to the viewport,\nand scrolled rows preserve their model index. Outside input dismisses eligible\npopups and consumes the matching release, preventing clicks through to content.\nEscape closes the current popup; focus loss closes the open branch. A parent\nmenu can receive a click after a child popup is dismissed at that point.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 46,
+      "raw": "`set_context_menu(popup)` binds context requests to a widget. Passing an empty\nhandle removes the binding. macOS right mouse events and the virtual Show Menu\naction use the same state transition. `set_selected_index`, `set_menu_state`,\n`set_menu_expanded`, text and enabled mutations remain UI-thread operations.\nInactive state cannot be bypassed by setting enabled to true.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 47,
+      "end_line": 47,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 48,
+      "end_line": 53,
+      "raw": "Entry action, typed menu index callback and automatic close run in that order.\nChild-bearing entries stay open by default; an explicit `close_on_trigger`\noverrides the menu default. If a callback retires the tree, later dispatch stops.\nIf it reopens/repositions the menu, the previous activation cannot close that\nnew popup occurrence. All callbacks share the host exception barrier and retain\ntheir accepted scope only for the current dispatch.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 58,
+      "raw": "`WidgetSnapshot` reports visibility, blocked input, popup membership, model index,\ncontent height and scroll offset. Virtual accessibility menus contain only their\nvisible, clipped entries; background controls are excluded while the popup owns\ninput. Peers remain accessibility metadata and do not create OS control objects.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 67,
+      "raw": "Each popup uses an opaque authored material base and a 12% tint coating, then a\nseparate clipped content layer. Metal/Vulkan/D3D11 scissoring covers panels,\nglyphs and images together. Changing only a clip does not rerasterize/upload the\nforeground. Up to eight popups fit the sixteen-layer limit. The original 64-unit\nbackdrop blur, accent radial coating, grain and spring/open transitions remain\nunimplemented; the current base/coating is an explicit material fallback.\nDynamic object models, named multi-event payloads, full inherited APIs and glyph\natlas/large-window memory parity also remain part of the LVRS migration.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 73,
+      "raw": "`tests/menus.mm` checks lifecycle/order, placement, input capture, native/virtual\ncontext requests, descendant close and scope retirement, regular/context paints,\nand a 150-entry scrolling menu. `tests/images.cpp` checks actual Metal/Vulkan\nclip pixels and foreground-cache reuse. D3D11 was updated in source; macOS tests\ndo not establish Windows runtime validation.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Self-rendered menus",
+      "anchor": "self-rendered-menus",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000017",
+        "line": 58,
+        "text": "input. Peers remain accessibility metadata and do not create OS control objects.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000021",
+        "line": 73,
+        "text": "do not establish Windows runtime validation.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

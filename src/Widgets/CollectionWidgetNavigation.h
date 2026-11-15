@@ -2,6 +2,7 @@
 #include <iiGUI/NativeWidgets.h>
 #include <iiSDKCore/Core/Property/Observable.h>
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -40,8 +41,10 @@ public:
     }
     void publish(const Frame& frame){owner();if(active_)frame_=std::make_shared<const Frame>(frame);}
     void select_on_click(bool enabled){owner();if(active_)select_on_click_=enabled;}
+    void activate_on_click(bool enabled){owner();if(active_&&click_enabled_!=enabled){click_enabled_=enabled;reset_click();}}
+    void activate_on_double_click(bool enabled){owner();if(active_&&double_click_enabled_!=enabled){double_click_enabled_=enabled;reset_click();}}
     void close(){owner();if(!active_)return;active_=false;watch_.reset();frame_.reset();viewport_.reset();
-        admission_={};revision_={};events_={};filter_={};navigation_=nullptr;}
+        reset_click();admission_={};revision_={};events_={};filter_={};navigation_=nullptr;}
 private:
     BasicCollectionWidgetNavigation(ii::gui::Widget target,Navigation& navigation,
         std::shared_ptr<VirtualViewport> viewport,Admission admission,std::function<void()> revision,
@@ -58,28 +61,76 @@ private:
         if(focus){auto callback=events_.current_changed;if(callback)callback(snapshot.current_key);}
         if(active_&&admission()&&active_&&selection){auto callback=events_.selection_changed;if(callback)callback(snapshot.selected_keys);}
     }
+    void reset_click(){last_click_key_.clear();pending_click_key_.clear();last_click_time_=0;last_click_released_=false;}
     ii::core::Result<bool> input(const ii::gui::WidgetInput& event){
         owner();if(!active_)return false;auto admission=admission_;if(!admission)return false;auto admitted=admission();if(!admitted||!active_||!frame_||!frame_->source)return false;
+        if(event.kind==ii::gui::WidgetInputKind::pointer_cancel||event.kind==ii::gui::WidgetInputKind::focus_lost||event.kind==ii::gui::WidgetInputKind::key_cancel){reset_click();return false;}
         if(event.kind==ii::gui::WidgetInputKind::key_down&&event.key==ii::gui::WidgetKey::escape)escape_allowed_=!event.text_input_active&&!event.native_navigation_active;
         auto frame=frame_;
         const auto filter=filter_;const auto eligible=[filter](const T& value,std::size_t index){return !filter||filter(value,index);};
         const auto modifiers=CollectionModifiers{.range=event.shift,.additive=event.control||event.meta};
         CollectionNavigationReply reply;
         if(event.kind==ii::gui::WidgetInputKind::pointer_down){
-            if(event.buttons&~1u)return false;
+            if(event.buttons&~1u){reset_click();return false;}
             auto snapshot=target_.snapshot();if(!snapshot)return std::unexpected(snapshot.error());
             // The collection's own input handler marks its target as a control.
             // Only a distinct nested control should suppress row selection.
             const std::string_view id=snapshot->id,target=event.target;
             const bool self=id==target||(!target.empty()&&id.size()>target.size()&&id.ends_with(target)&&id[id.size()-target.size()-1]=='/');
-            if(event.native_control_active&&!self)return false;
+            if(event.native_control_active&&!self){reset_click();return false;}
             if(!active_||!admission()||!active_||!frame_)return true;frame=frame_;
-            const auto x=event.x-snapshot->bounds.x,y=event.y-snapshot->bounds.y;
+            // Snapshot bounds are in window coordinates for embedded views,
+            // while dispatched event.x/y belong to this content host. The
+            // handler-local position is stable at every nesting depth.
+            const auto x=event.local_position?event.local_position->x:event.x-snapshot->bounds.x;
+            const auto y=event.local_position?event.local_position->y:event.y-snapshot->bounds.y;
+            std::string clicked;
             for(std::size_t n=0;n<frame->cells.size();++n){const auto& cell=frame->cells[n];
                 if(cell.width<=0||cell.height<=0||x<cell.x||y<cell.y||x>=cell.x+cell.width||y>=cell.y+cell.height)continue;
                 const bool select=select_on_click_||modifiers.additive||modifiers.range;
+                clicked=frame->collection.items[n].key;
                 reply=navigation_->focus_at(*frame->source,frame->collection.items[n].index,modifiers,select,eligible);break;
             }
+            if(!active_||!admission()||!active_)return reply.handled;
+            if(!reply.handled||clicked.empty()||navigation_->state.get().current_key!=clicked){reset_click();}
+            else if(click_enabled_){
+                reset_click();pending_click_key_=clicked;pending_click_x_=event.x;pending_click_y_=event.y;
+                last_click_device_=event.device;last_click_device_id_=event.device_id;
+            }
+            else if(!double_click_enabled_||modifiers.range||modifiers.additive||event.alt){reset_click();}
+            else{
+                const bool same_device=last_click_device_==event.device&&(!last_click_device_id_||!event.device_id||last_click_device_id_==event.device_id);
+                const bool same=last_click_released_&&last_click_key_==clicked&&same_device&&std::hypot(event.x-last_click_x_,event.y-last_click_y_)<=4;
+                const bool timed=event.native_click_count==0&&same&&std::isfinite(event.timestamp)&&last_click_time_>0&&
+                    event.timestamp>last_click_time_&&event.timestamp-last_click_time_<=.4;
+                const bool doubled=same&&(event.native_click_count==2||timed);
+                pending_click_key_=doubled?clicked:std::string{};pending_click_x_=event.x;pending_click_y_=event.y;
+                last_click_key_=doubled||event.native_click_count>2?std::string{}:clicked;
+                last_click_time_=std::isfinite(event.timestamp)&&event.timestamp>0?event.timestamp:0;
+                last_click_x_=event.x;last_click_y_=event.y;last_click_device_=event.device;last_click_device_id_=event.device_id;
+                last_click_released_=false;
+            }
+        }else if(event.kind==ii::gui::WidgetInputKind::pointer_up){
+            const bool pending=!pending_click_key_.empty();
+            auto key=pending?pending_click_key_:last_click_key_;
+            if(key.empty())return false;
+            const bool same_device=last_click_device_==event.device&&(!last_click_device_id_||!event.device_id||last_click_device_id_==event.device_id);
+            const auto down_x=pending?pending_click_x_:last_click_x_,down_y=pending?pending_click_y_:last_click_y_;
+            if(!same_device||(!click_enabled_&&(event.alt||modifiers.range||modifiers.additive))||
+               std::hypot(event.x-down_x,event.y-down_y)>4||navigation_->state.get().current_key!=key){reset_click();return false;}
+            auto snapshot=target_.snapshot();if(!snapshot)return std::unexpected(snapshot.error());
+            const std::string_view id=snapshot->id,target=event.target;
+            const bool self=id==target||(!target.empty()&&id.size()>target.size()&&id.ends_with(target)&&id[id.size()-target.size()-1]=='/');
+            if(event.native_control_active&&!self){reset_click();return false;}
+            const auto x=event.local_position?event.local_position->x:event.x-snapshot->bounds.x;
+            const auto y=event.local_position?event.local_position->y:event.y-snapshot->bounds.y;
+            bool inside=false;
+            for(std::size_t n=0;n<frame->cells.size();++n){const auto& cell=frame->cells[n];
+                if(frame->collection.items[n].key==key&&cell.width>0&&cell.height>0&&x>=cell.x&&y>=cell.y&&x<cell.x+cell.width&&y<cell.y+cell.height){inside=true;break;}}
+            if(!inside||!active_||!admission()||!active_){reset_click();return false;}
+            if(!pending){last_click_released_=true;return false;}
+            reset_click();
+            auto callback=events_.activated;if(callback)callback(key);return true;
         }else if(event.kind==ii::gui::WidgetInputKind::key_down){
             if(event.text_input_active||event.native_navigation_active||event.alt)return false;
             using Key=ii::gui::WidgetKey;using Command=CollectionCommand;
@@ -124,6 +175,11 @@ private:
     }
     const std::thread::id owner_=std::this_thread::get_id();
     bool active_=true,select_on_click_=true,escape_allowed_=true;
+    bool click_enabled_=false,double_click_enabled_=false,last_click_released_=false;
+    std::string last_click_key_,pending_click_key_;
+    double last_click_time_=0,last_click_x_=0,last_click_y_=0,pending_click_x_=0,pending_click_y_=0;
+    ii::gui::PointerDevice last_click_device_=ii::gui::PointerDevice::mouse;
+    std::uint64_t last_click_device_id_=0;
     ii::gui::Widget target_;
     Navigation* navigation_;
     std::shared_ptr<VirtualViewport> viewport_;

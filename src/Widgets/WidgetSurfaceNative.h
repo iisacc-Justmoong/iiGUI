@@ -2,10 +2,16 @@
 #include "WidgetSurface.h"
 
 namespace ii::gui::detail {
+class NativeCanvas;
 // Host-side OS adapter. This type must be linked only by the host package.
 class NativeWidgetSurface final : public WidgetSurface {
 public:
     NativeWidgetSurface(void*, WidgetSurfaceCallbacks);
+#if defined(_WIN32)
+    // The window is borrowed; invalidation schedules the owner's iiGUI pump
+    // instead of claiming the foreign window's paint cycle.
+    NativeWidgetSurface(void*, WidgetSurfaceCallbacks, std::shared_ptr<NativeCanvas>, std::function<void()> invalidation);
+#endif
     ~NativeWidgetSurface() override;
     void invalidate() override;
     void accessibility_changed() override;

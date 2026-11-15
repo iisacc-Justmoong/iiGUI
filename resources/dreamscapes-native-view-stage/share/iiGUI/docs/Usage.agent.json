@@ -1,0 +1,367 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:9879a18a078bc7141e995d83ebc72b596652285cace95de4af259ea9c73d58b4",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Usage.md",
+    "sha256": "eadccc95b788d7ebdcee63a6cbeb82d5129adcf4ec84a365a5a0a38f2989c8d8",
+    "bytes": 5620,
+    "line_count": 129,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "C++23 host usage",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# C++23 host usage\n",
+      "level": 1,
+      "title": "C++23 host usage"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 4,
+      "raw": "For declarative `.lvui` views with inline styles, start with [LVUI](LVUI.md)\nand `Host::set_view`. The imperative host/canvas API below remains available.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 5,
+      "end_line": 5,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "fenced_code",
+      "start_line": 6,
+      "end_line": 13,
+      "raw": "```cmake\nfind_package(iiGUI 0.4 CONFIG REQUIRED)\nadd_executable(MyApp WIN32 MACOSX_BUNDLE main.cpp)\ntarget_link_libraries(MyApp PRIVATE iiGUI::iiGUI)\nif(MSVC)\n    target_link_options(MyApp PRIVATE /ENTRY:mainCRTStartup)\nendif()\n```\n",
+      "language": "cmake",
+      "code": "find_package(iiGUI 0.4 CONFIG REQUIRED)\nadd_executable(MyApp WIN32 MACOSX_BUNDLE main.cpp)\ntarget_link_libraries(MyApp PRIVATE iiGUI::iiGUI)\nif(MSVC)\n    target_link_options(MyApp PRIVATE /ENTRY:mainCRTStartup)\nendif()\n",
+      "closed": true
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "fenced_code",
+      "start_line": 15,
+      "end_line": 39,
+      "raw": "```cpp\n#include <iiGUI/iiGUI.h>\n#include <iiSDKCore/Runtime/Runtime.h>\n#include <chrono>\n#include <stdexcept>\n\nint main() {\n    using namespace std::chrono_literals;\n    ii::gui::Host host({.title=\"My native app\"});\n    auto ui = host.executor();\n    ii::runtime::Runtime workers({.workers=1});\n    auto result = host.run({.opened=[&] {\n        if (!workers.post([&, ui] {\n            const int answer = 6 * 7;\n            (void)ui.post([&, answer] {\n                (void)host.set_text(\"Answer: \" + std::to_string(answer));\n            });\n        })) throw std::runtime_error(\"Worker admission failed\");\n        if (!ui.after(2s, [&] { (void)host.request_close(); }))\n            throw std::runtime_error(\"Timer admission failed\");\n    }});\n    auto joined = workers.join();\n    return result && joined ? 0 : 1;\n}\n```\n",
+      "language": "cpp",
+      "code": "#include <iiGUI/iiGUI.h>\n#include <iiSDKCore/Runtime/Runtime.h>\n#include <chrono>\n#include <stdexcept>\n\nint main() {\n    using namespace std::chrono_literals;\n    ii::gui::Host host({.title=\"My native app\"});\n    auto ui = host.executor();\n    ii::runtime::Runtime workers({.workers=1});\n    auto result = host.run({.opened=[&] {\n        if (!workers.post([&, ui] {\n            const int answer = 6 * 7;\n            (void)ui.post([&, answer] {\n                (void)host.set_text(\"Answer: \" + std::to_string(answer));\n            });\n        })) throw std::runtime_error(\"Worker admission failed\");\n        if (!ui.after(2s, [&] { (void)host.request_close(); }))\n            throw std::runtime_error(\"Timer admission failed\");\n    }});\n    auto joined = workers.join();\n    return result && joined ? 0 : 1;\n}\n",
+      "closed": true
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 44,
+      "raw": "`UiExecutor` also satisfies Core's structural TaskExecutor concept and can be\nused for explicit reply delivery and scoped posts. Do not send UI callbacks\ndirectly to an unrelated EventLoop: it would bypass this host's native wakeup.\nUse UiExecutor for both immediate work and timer changes.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 46,
+      "end_line": 48,
+      "raw": "Always check Submission/Result where application correctness depends on it.\nThe runnable HelloGUI example handles admission errors and has an explicit\nself-test watchdog. It does not persist generated files or application data.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 49,
+      "end_line": 49,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 50,
+      "end_line": 53,
+      "raw": "HelloGUI's main.cpp is identical on Windows, macOS and Linux, without native\nheaders or OS conditionals. Link iiGUI::iiGUI; its installed target supplies\nC++23 and transitive Core/native dependencies. The installed consumer retains\nfind_package(iiGUI 0.1) to check source and package compatibility.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 54,
+      "end_line": 54,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 55,
+      "end_line": 58,
+      "raw": "Windows retains ordinary C++ main in a GUI-subsystem executable, without a\nseparate console window. MinGW supplies its native CRT entry adapter; MSVC\nselects mainCRTStartup explicitly. CRT initialization and C++ static-object\nlifetime are preserved. No separate WinMain source is required.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 64,
+      "raw": "The verifier places HelloGUI under\nbuild/verify-desktop/<platform>/kits/<platform>/Release/app/build:\nHelloGUI.exe on Windows, HelloGUI on Linux, and\nHelloGUI.app/Contents/MacOS/HelloGUI on macOS. Run with --self-test for a real\nGUI lifecycle check; any missing milestone returns a nonzero exit code.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 65,
+      "end_line": 65,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "heading",
+      "start_line": 66,
+      "end_line": 66,
+      "raw": "## Native GPU canvas\n",
+      "level": 2,
+      "title": "Native GPU canvas"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 67,
+      "end_line": 67,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "Call on the UI owner after `opened`:\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 69,
+      "end_line": 69,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "fenced_code",
+      "start_line": 70,
+      "end_line": 84,
+      "raw": "```cpp\nii::gui::CanvasFrame scene{\n    .viewport={28,180,480,240},\n    .background={0.01f,0.02f,0.04f,1},\n    .acceleration=ii::gui::Acceleration::require_hardware\n};\nscene.panels.push_back({\n    .bounds={16,16,448,208},\n    .top={0.02f,0.12f,0.85f,1}, .bottom={0.01f,0.65f,0.2f,1}, .radius=20\n});\nauto admitted=host.set_canvas(std::move(scene));\nauto device=host.graphics_info();\n// Optional synchronous test/preview readback, not part of ordinary presentation:\nauto pixels=host.capture_canvas();\n```\n",
+      "language": "cpp",
+      "code": "ii::gui::CanvasFrame scene{\n    .viewport={28,180,480,240},\n    .background={0.01f,0.02f,0.04f,1},\n    .acceleration=ii::gui::Acceleration::require_hardware\n};\nscene.panels.push_back({\n    .bounds={16,16,448,208},\n    .top={0.02f,0.12f,0.85f,1}, .bottom={0.01f,0.65f,0.2f,1}, .radius=20\n});\nauto admitted=host.set_canvas(std::move(scene));\nauto device=host.graphics_info();\n// Optional synchronous test/preview readback, not part of ordinary presentation:\nauto pixels=host.capture_canvas();\n",
+      "closed": true
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 85,
+      "end_line": 85,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 86,
+      "end_line": 95,
+      "raw": "Colors above are linear-light sRGB components. Viewport coordinates are logical\ncontent coordinates, panels are viewport-local, and radius uses logical units.\nThe application places text and canvas in separate areas; the native canvas\noccludes the text in its rectangle. Recompute viewport in the resize callback.\n`set_canvas` accepts a value snapshot; submit worker results through UiExecutor.\nAccepted requests coalesce, and a synchronous capture first flushes the latest\nrequest. Inspect `scene_renders` after a host dispatch or capture. Handle an\n`unsupported` initialization result by choosing the app's text/error UI or a\npermitted software policy. `clear_canvas` releases the device and attachments.\nCaptures stay in memory; file export belongs to iiFileProvider.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "heading",
+      "start_line": 97,
+      "end_line": 97,
+      "raw": "## Core operations, scopes and frames\n",
+      "level": 2,
+      "title": "Core operations, scopes and frames"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 98,
+      "end_line": 98,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "fenced_code",
+      "start_line": 99,
+      "end_line": 113,
+      "raw": "```cpp\nii::runtime::OperationOwner work_owner;\nii::runtime::TaskScope view;\n// workers is a Runtime that outlives work_owner; call inside/after opened.\nauto task=work_owner.submit<int>(workers, [](ii::runtime::WorkContext& context)\n    -> ii::core::Result<int> {\n    if (auto ready=context.checkpoint(); !ready) return std::unexpected(ready.error());\n    return 6*7;\n});\n(void)task.then_on(host.executor(), view.sender(), [&](auto result) {\n    if (result->value) (void)host.set_text(std::to_string(*result->value));\n});\nauto ui=host.executor();\n(void)view.sender().at(ui, ii::runtime::Clock::now()+std::chrono::milliseconds(100), []{});\n```\n",
+      "language": "cpp",
+      "code": "ii::runtime::OperationOwner work_owner;\nii::runtime::TaskScope view;\n// workers is a Runtime that outlives work_owner; call inside/after opened.\nauto task=work_owner.submit<int>(workers, [](ii::runtime::WorkContext& context)\n    -> ii::core::Result<int> {\n    if (auto ready=context.checkpoint(); !ready) return std::unexpected(ready.error());\n    return 6*7;\n});\n(void)task.then_on(host.executor(), view.sender(), [&](auto result) {\n    if (result->value) (void)host.set_text(std::to_string(*result->value));\n});\nauto ui=host.executor();\n(void)view.sender().at(ui, ii::runtime::Clock::now()+std::chrono::milliseconds(100), []{});\n",
+      "closed": true
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 114,
+      "end_line": 114,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 115,
+      "end_line": 121,
+      "raw": "Close tracked owners/scopes and join workers after run returns. For frames,\nconstruct FrameLoop(host.event_loop()->get()) on the open UI thread and call\nstep from a UiExecutor timer. HelloGUI uses prepare_present to prepare the GPU\nscene; the native host submits it after Core dispatch. Destroy FrameLoop after\nrun returns while Host remains alive. The installed consumer checks the same\npath through relocated packages. Channel watch/read/write callbacks use the same\nUI endpoint and ownership rules; use Runtime/AsyncIO for blocking transfers.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 122,
+      "end_line": 122,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "heading",
+      "start_line": 123,
+      "end_line": 123,
+      "raw": "## Graphics backend selection\n",
+      "level": 2,
+      "title": "Graphics backend selection"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 124,
+      "end_line": 124,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 125,
+      "end_line": 129,
+      "raw": "`CanvasFrame::renderer` selects `Renderer::automatic`, `Renderer::native` or\n`Renderer::vulkan`. The default tries Metal/Direct3D hardware, then Vulkan.\nLinux starts with Vulkan. `Host::set_view(document, renderer)` forwards the\nsame selection. Inspect `GraphicsInfo::fallback` and `fallback_reason` alongside\n`api`/`adapter` for the actual outcome. See [Renderers](Renderers.md).\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "C++23 host usage",
+      "anchor": "c23-host-usage",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000019",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Native GPU canvas",
+      "anchor": "native-gpu-canvas",
+      "start_line": 66
+    },
+    {
+      "block_id": "b000027",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Core operations, scopes and frames",
+      "anchor": "core-operations-scopes-and-frames",
+      "start_line": 97
+    },
+    {
+      "block_id": "b000033",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Graphics backend selection",
+      "anchor": "graphics-backend-selection",
+      "start_line": 123
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000009",
+        "line": 42,
+        "text": "used for explicit reply delivery and scoped posts. Do not send UI callbacks",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000015",
+        "line": 58,
+        "text": "lifetime are preserved. No separate WinMain source is required.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "LVUI",
+        "target": "LVUI.md",
+        "kind": "relative",
+        "line": 3
+      },
+      {
+        "block_id": "b000035",
+        "label": "Renderers",
+        "target": "Renderers.md",
+        "kind": "relative",
+        "line": 129
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

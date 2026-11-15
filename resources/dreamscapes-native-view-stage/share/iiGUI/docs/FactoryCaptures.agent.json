@@ -1,0 +1,157 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:96279685e1b172d3a927bbf9f0bbb86af4839f7a4f307f7914ac2c08f86bdce3",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/FactoryCaptures.md",
+    "sha256": "a36937f9faa361604e8fcf5eb5febd8192a522daeff1a9fcce313b745d8fefa3",
+    "bytes": 1986,
+    "line_count": 24,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "반환 함수의 네이티브 수신자·인자 수명",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 반환 함수의 네이티브 수신자·인자 수명\n",
+      "level": 1,
+      "title": "반환 함수의 네이티브 수신자·인자 수명"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`tests/native_factory_captures.cpp`는 LVUI 생성 코드를 창 없는 WidgetState에 연결한다.\n임시 수신자와 임시 인자가 첫 실행 전에 파괴되는 두 실패를 함수 호출 없이 수명 카운터로\n재현한 뒤, 함수 버전의 소유권 보존을 검사한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 11,
+      "raw": "선택된 공유 객체의 참조·값 반환 함수, 이동 불가 함수 객체, 실행 중 교체와 재진입,\n실패 후 이전 버전 보존·복구, Static·가변 초기 선택, 입력 내용·포커스·위젯 ID 유지와\n파일 리비전 비변경을 확인한다. 문자열 이벤트·인덱스·조건부 재활성화·자기 제거도 포함한다.\n혼합 인자 검사는 참조 인자를 보존하면서 같은 호출의 이동 불가 값 매개변수는 C++의\n보장된 복사 생략을 유지해야 한다. 모든 인자를 좌측값 또는 우측값 참조로 강제하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 15,
+      "raw": "설치·재배치 소비자는 설치한 LVUI 생성기로 임시 부모에서 반환한 함수와 임시 인자의\n포획 팩토리를 생성하여 컴파일·링크한다. 실제 실행은 위의 창 없는 위젯 검사와 구분한다.\n실제 LVRS 앱·OS 창·GPU·다른 플랫폼 실행은 전체 완료 감사의 별도 조건이다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 18,
+      "raw": "언어·공개 C++ 계약은 [LVUI 포획 수명](../../LVUI/docs/FactoryCaptures.md), 최종 범위는\n[전체 완료 감사](../../LVUI/docs/Completion.md)를 따른다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 20,
+      "end_line": 24,
+      "raw": "2026-10-26 macOS arm64에서 기존 창 없는 동작과 생성 코드 검사 209개를 일반·ASan·UBSan\n빌드에서 각각 통과했다. 새 포획 동작은 각 12개이며 전체 수와 합산하지 않는다. 임시\n수신자·인자의 실패는 함수 호출 없이 먼저 재현했다. 설치·재배치 소비자의 포획 팩토리는\n컴파일·링크했으며 실행 증거와 구분한다. 원시 증거는 LVUI의\n`build/lvui-completion/factory-captures-verification-20261026.json`에 기록한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "반환 함수의 네이티브 수신자·인자 수명",
+      "anchor": "반환-함수의-네이티브-수신자인자-수명",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 11,
+        "text": "보장된 복사 생략을 유지해야 한다. 모든 인자를 좌측값 또는 우측값 참조로 강제하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 21,
+        "text": "빌드에서 각각 통과했다. 새 포획 동작은 각 12개이며 전체 수와 합산하지 않는다. 임시",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000009",
+        "label": "LVUI 포획 수명",
+        "target": "../../LVUI/docs/FactoryCaptures.md",
+        "kind": "relative",
+        "line": 17
+      },
+      {
+        "block_id": "b000009",
+        "label": "전체 완료 감사",
+        "target": "../../LVUI/docs/Completion.md",
+        "kind": "relative",
+        "line": 18
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -139,6 +139,8 @@ public:
     [[nodiscard]] core::Result<void> menu_state(std::size_t,MenuItemState);
     [[nodiscard]] core::Result<void> menu_expanded(std::size_t,bool);
     [[nodiscard]] core::Result<void> context_menu(std::size_t,Widget);
+    [[nodiscard]] core::Result<void> touch_context_options(std::size_t,TouchContextOptions);
+    [[nodiscard]] core::Result<TouchContextOptions> touch_context_options(std::size_t) const;
     [[nodiscard]] core::Result<void> color_model(std::size_t,std::shared_ptr<ColorPickerModel>);
     [[nodiscard]] core::Result<std::shared_ptr<ColorPickerModel>> color_model(std::size_t);
     [[nodiscard]] core::Result<void> color_field(std::size_t,ColorField);
@@ -160,6 +162,7 @@ public:
     [[nodiscard]] core::Result<void> backdrop_sources(std::size_t,Widget,Widget);
     [[nodiscard]] core::Result<void> repaint(std::size_t);
     [[nodiscard]] core::Result<void> input_handler(std::size_t,WidgetInputHandler);
+    [[nodiscard]] core::Result<void> horizontal_drag_handler(std::size_t,HorizontalDragOptions,HorizontalDragHandler);
     [[nodiscard]] core::Result<void> text_input_provider(std::size_t,std::shared_ptr<const TextInputProvider>);
 #if defined(IIGUI_TEXT_GEOMETRY_API)
     [[nodiscard]] core::Result<void> text_geometry_provider(std::size_t,TextGeometryProvider);
@@ -221,7 +224,8 @@ private:
     core::Result<void> flush_viewports();
     core::Result<void> flush_interactions();
     core::Result<void> scroll_position_at(std::size_t,double,double,std::optional<WidgetPoint>);
-    core::Result<void> input_impl(const WidgetInput&, WidgetInput* scroll_remainder=nullptr, bool scroll_normalized=false, bool accessibility_text=false);
+    core::Result<void> input_impl(const WidgetInput&, WidgetInput* scroll_remainder=nullptr, bool scroll_normalized=false, bool accessibility_text=false, bool synthetic_drag_cancel=false);
+    core::Result<bool> route_horizontal_drag(const WidgetInput&);
     void advance_touch_motion(runtime::Clock::time_point);
     core::Result<bool> route_input_handler(const WidgetInput&);
     core::Result<void> create_popup_content(std::size_t);

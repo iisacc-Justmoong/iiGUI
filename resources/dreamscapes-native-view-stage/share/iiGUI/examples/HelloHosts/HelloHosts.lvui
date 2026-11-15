@@ -1,0 +1,10 @@
+import actions HostActions
+ApplicationWindow(title: "iiGUI Native Hosts") {
+    VStack(id: "root", spacing: 16, padding: 32) {
+        Label(id: "greeting", text: "Hello World", style: .title, fontSize: 32)
+        Label(text: "iiSDKCore + LVUI + iiGUI", style: .body, fontSize: 18)
+        Label(id: "timer", text: "Timer: 0", style: .description, fontSize: 16)
+        Label(id: "worker", text: "Background: waiting", style: .description, fontSize: 16)
+        PushButton(actions.close, id: "close", text: "Close")
+    }
+}

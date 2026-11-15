@@ -1,0 +1,107 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:4125bf7157d7354f65a821bf951dec2ec192dd1f0c82bf9b220ea05beea158ff",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/InferredValues.md",
+    "sha256": "05b0cb1206c7df16fce131649aaccc2841080973228838553a6cfc8e30de3dab",
+    "bytes": 1187,
+    "line_count": 15,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "LVUI 타입 생략 선언의 위젯 연결",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# LVUI 타입 생략 선언의 위젯 연결\n",
+      "level": 1,
+      "title": "LVUI 타입 생략 선언의 위젯 연결"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "일반 `let`·`var`·`@Static let`은 LVUI가 생성한 C++의 실제 타입으로 값 또는 함수\n저장소를 선택한다. iiGUI에는 별도의 타입 해석기나 함수 실행기를 추가하지 않는다.\n기존 위젯 이벤트와 속성 갱신이 LVUI Native·iiSDKCore 그래프를 사용한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 11,
+      "raw": "`tests/native_inferred_values.cpp`는 두 실제 `.lvui`를 생성·컴파일한 뒤 창 없는\n`WidgetState`에 연결한다. 메서드 참조, 이동 전용 반환 함수, 함수 필드, 별칭의\n갱신, Static 선택, 가변 교체, 임시 수신자·인자 수명과 타입 지정 구성 입력의 전달을\n검사한다. 함수 선택 시 작업을 실행하지 않으며 입력값·포커스·위젯 ID를 보존한다.\n순수 뷰 선택으로 파일 revision이 바뀌지 않는 계약도 검사한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 15,
+      "raw": "실패한 함수 선택은 마지막 정상값을 유지하며 원천이 복구되면 갱신을 재개한다.\n재진입 호출과 자기 제거 중에는 입장한 버전을 유지하고 종료 후 구독과 포획을 해제한다.\n이 검사는 실제 OS 창·플랫폼 입력·GPU 그리기의 검증과 구분한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "LVUI 타입 생략 선언의 위젯 연결",
+      "anchor": "lvui-타입-생략-선언의-위젯-연결",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "저장소를 선택한다. iiGUI에는 별도의 타입 해석기나 함수 실행기를 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

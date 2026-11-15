@@ -4,9 +4,23 @@
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 namespace ii::gui {
+// Cell coordinates are viewport-relative. Retained overscan is not visible.
+template<class Frame> std::vector<std::string> visible_collection_keys(const Frame& frame){
+    std::vector<std::string> keys;
+    if(frame.width<=0||frame.height<=0)return keys;
+    const auto count=(std::min)(frame.cells.size(),frame.collection.items.size());keys.reserve(count);
+    for(std::size_t index=0;index<count;++index){
+        const auto& cell=frame.cells[index];
+        if(cell.width>0&&cell.height>0&&cell.x<frame.width&&cell.y<frame.height&&
+           cell.x+cell.width>0&&cell.y+cell.height>0)keys.push_back(frame.collection.items[index].key);
+    }
+    return keys;
+}
 // Plans only the visible and overscan cells of an already indexed snapshot.
 template<class Policy> struct BasicVirtualCollectionPlanner final {
     using VirtualCollectionLayout=typename Policy::Layout;
@@ -23,9 +37,12 @@ static auto frame(const Source& source,VirtualCollectionLayout layout,
        layout.columns>Policy::maximum_items||layout.overscan>Policy::maximum_items||
        (layout.horizontal&&(!layout.item_width||layout.columns>1)))
         throw std::invalid_argument("Invalid virtual collection layout");
+    double focal_position=0;bool proportional=false;
+    if constexpr(requires {anchor.focus;anchor.proportional;}){focal_position=anchor.focus;proportional=anchor.proportional;}
     if(!metric(viewport.width)||!metric(viewport.height)||viewport.width>8192||viewport.height>8192||
        !std::isfinite(viewport.x)||!std::isfinite(viewport.y)||viewport.x<0||viewport.y<0||
-       !std::isfinite(anchor.delta)||anchor.delta<0||static_cast<unsigned>(viewport.reveal_alignment)>3)
+       !std::isfinite(anchor.delta)||anchor.delta<0||!std::isfinite(focal_position)||focal_position<0||focal_position>8192||
+       (proportional&&anchor.delta>1)||static_cast<unsigned>(viewport.reveal_alignment)>3)
         throw std::invalid_argument("Invalid virtual collection viewport or anchor");
     const auto& items=source.items();
     typename Policy::template Frame<T> result;
@@ -55,7 +72,8 @@ static auto frame(const Source& source,VirtualCollectionLayout layout,
         anchored_index=index;
         const auto line=layout.horizontal?index:index/result.columns;
         const auto length=layout.measure_height?height(line)+layout.spacing:stride;
-        offset=start(line)+(std::min)(anchor.delta,(std::max)(0.,std::nextafter(length,0.)));
+        const auto within=proportional?anchor.delta*length:anchor.delta;
+        offset=start(line)+(std::min)(within,(std::max)(0.,std::nextafter(length,0.)))-(proportional?focal_position:0.);
     }
     const auto visible_extent=layout.horizontal?viewport.width:viewport.height;
     if(viewport.width>0&&viewport.height>0&&!viewport.reveal_key.empty())if(auto index=source.find(viewport.reveal_key)){

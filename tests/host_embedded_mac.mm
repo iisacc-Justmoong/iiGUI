@@ -71,6 +71,11 @@ int main(int argc, char**) {
                 }
                 if(state->window.delegate!=state->windowDelegate)
                     state->error="The external window delegate was replaced";
+                [state->parent setFrameSize:NSMakeSize(280,160)];
+                const auto resized=state->host->external_parent_resized();
+                const auto snapshot=state->host->snapshot();
+                if(!resized || !snapshot || snapshot->size.width!=280 || snapshot->size.height!=160)
+                    state->error="The embedded host did not adopt its explicitly resized parent";
                 auto title=state->host->set_title("must not replace the external window title");
                 if(title || title.error().code!=ii::core::ErrorCode::invalid_argument)
                     state->error="Embedded host accepted external window mutation";

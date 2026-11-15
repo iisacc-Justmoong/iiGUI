@@ -199,6 +199,7 @@ core::Result<void> Host::run(HostCallbacks callbacks){
 }
 core::Result<void> Host::show_external(HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External event-loop hosting is not implemented on Wayland");}
 core::Result<void> Host::attach_external(void*,HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Wayland");}
+core::Result<void> Host::external_parent_resized(){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Wayland");}
 core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
     if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Wayland windows require the UI owner thread");
     if(this==&parent||impl_->application_driver)return core::fail(core::ErrorCode::invalid_argument,"A secondary window cannot be an application driver");

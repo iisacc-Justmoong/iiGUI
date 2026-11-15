@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <windowsx.h>
+#include <shellapi.h>
 #include <iiGUI/Host.h>
 #include "DisplayPixelsPolicy.h"
 #include <iiGUI/DispatchState.h>
@@ -9,11 +10,16 @@
 #include "HostLegacyText.h"
 #include "HostCallback.h"
 #include "HostDriverPolicy.h"
+#include "Win32DeferredClose.h"
+#include "Win32Wake.h"
+#include "ExternalCloseBarrier.h"
+#include "Win32ParentHook.h"
 #include "FrameDemand.h"
 #include "WindowForeground.h"
 #include "Win32Foreground.h"
 #include "WindowChromeGeometry.h"
 #include <iiGUI/CanvasState.h>
+#include <iiGUI/NativeCanvas.h>
 #include <iiGUI/WidgetState.h>
 #include <iiGUI/WidgetSurfaceNative.h>
 #include <iiGUI/WidgetSurface.h>
@@ -30,6 +36,7 @@ namespace ii::gui {
 namespace {
 constexpr UINT wake_message = WM_APP + 0x149;
 constexpr UINT_PTR deadline_timer = 0x49494755;
+constexpr UINT_PTR wake_retry_timer = 0x4949574b;
 std::atomic_flag active_host = ATOMIC_FLAG_INIT;
 std::runtime_error native_error(const char* operation) {
     return std::runtime_error(std::string(operation)+" (Win32 error "+std::to_string(GetLastError())+")");
@@ -65,7 +72,7 @@ struct WakeGate final {
         std::lock_guard lock(mutex);
         if (!event) return;
         SetEvent(event);
-        if (window && !queued) queued = PostMessageW(window, wake_message, 0, 0) != FALSE;
+        if (window && !queued) queued=detail::post_win32_wake(window,wake_message,wake_retry_timer);
     }
     void consumed() {
         std::lock_guard lock(mutex);
@@ -98,7 +105,7 @@ struct Host::Impl {
     }
     std::shared_ptr<detail::WidgetState> widgets;
     Widget legacy_text;
-    bool mounting=false, application_driver=false;
+    bool mounting=false, application_driver=false, external_application=false, external_close_scheduled=false, embedded=false;
     Impl* parent=nullptr;
     std::vector<Impl*> children;
     std::shared_ptr<detail::NativeDialog> dialog;
@@ -111,6 +118,10 @@ struct Host::Impl {
     std::shared_ptr<detail::DispatchState> dispatch;
     std::shared_ptr<PresentationStream> presentations=std::make_shared<PresentationStream>([this](runtime::Task task){return dispatch->loop.post(std::move(task));});
     std::shared_ptr<WakeGate> gate;
+    std::unique_ptr<detail::Win32DeferredClose> external_close;
+    std::unique_ptr<detail::Win32ParentHook> external_parent_hook;
+    std::shared_ptr<detail::NativeCanvas> embedded_canvas;
+    detail::ExternalCloseBarrier external_callback_barrier;
     const std::thread::id owner = std::this_thread::get_id();
     Phase phase = Phase::created;
     HostCallbacks callbacks;
@@ -123,6 +134,8 @@ struct Host::Impl {
     detail::HostFailure failure;
     bool draining = false, opened_delivered = false;
     HWND window = nullptr;
+    HWND external_parent = nullptr, external_previous_focus = nullptr;
+    bool external_drop_registration=false;
     HINSTANCE instance = GetModuleHandleW(nullptr);
     std::wstring class_name;
     bool registered = false;
@@ -147,15 +160,16 @@ struct Host::Impl {
         return rectangle;
     }
     void update_snapshot() {
-        if (!window || phase == Phase::closed) return;
+        const auto target=embedded?external_parent:window;
+        if (!target || phase == Phase::closed) return;
         RECT content{};
-        if (!GetClientRect(window, &content)) throw native_error("Cannot read window size");
-        const UINT current = GetDpiForWindow(window);
+        if (!GetClientRect(target, &content)) throw native_error("Cannot read window size");
+        const UINT current = GetDpiForWindow(target);
         if (current) dpi = current;
         state.backing_scale = dpi/96.0;
         state.size = {(content.right-content.left)/state.backing_scale,
                       (content.bottom-content.top)/state.backing_scale};
-        state.visible = IsWindowVisible(window) != FALSE;
+        state.visible = IsWindowVisible(target) != FALSE;
     }
     Impl* primary_host() noexcept {
         auto* host=this;
@@ -175,6 +189,14 @@ struct Host::Impl {
         if(parent)forget_foreground_window();else foreground.close();
         dispatch->retire();
         if(!parent)dispatch->loop.request_stop();
+        if (external_application) {
+            // A native input or Core task may still be on the stack. Keep its
+            // widget surface and pump alive until the foreign loop dispatches
+            // our independent close endpoint.
+            state.visible=false; state.closed=true; presentations->close();
+            if(!schedule_external_close()) remember_failure("Cannot schedule external host close");
+            return;
+        }
         if(widgets){widgets->close();widgets.reset();}
         dialog.reset();auto closing=children;for(auto* child:closing){child->force_close();child->cleanup();}
         canvas.clear();
@@ -199,6 +221,27 @@ struct Host::Impl {
             return;
         }
         guard([&] { if (callbacks.closed) callbacks.closed(); });
+    }
+    bool schedule_external_close() noexcept {
+        if(external_close_scheduled) return true;
+        if(!external_close) return false;
+        try {
+            const auto scheduled=external_close->schedule([this] {
+                external_close_scheduled=false;
+                if(!external_callback_barrier.admit()) return;
+                auto callback=std::move(callbacks.closed);
+                detail::HostFailure::Handler handler;
+                try { handler=failure.handler_snapshot(); } catch (...) {}
+                cleanup();
+                try { if(callback) callback(); }
+                catch (...) {
+                    try { if(handler) handler({core::ErrorCode::failed,"External host close callback failed",std::current_exception()}); }
+                    catch (...) {}
+                }
+            });
+            external_close_scheduled=scheduled;
+            return scheduled;
+        } catch (...) { return false; }
     }
     void force_close() noexcept {
         if (phase == Phase::running) {
@@ -252,7 +295,7 @@ struct Host::Impl {
         auto scheduled=dispatch->track(dispatch->loop.every(std::chrono::milliseconds(16),[this,weak]{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;(void)endpoint->tasks.run([&]{guard([&]{frame_tick();});});}));
         if(!scheduled)throw std::runtime_error("Cannot admit native frame cadence");cadence=scheduled.token;
     }
-    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);return frames();},.activity=[this](bool active){auto* primary=primary_host();primary->frame_demand.motion(active);primary->ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations};}
+    detail::WidgetFrameHooks frame_hooks(){return {.frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);return frames();},.activity=[this](bool active){auto* primary=primary_host();primary->frame_demand.motion(active);primary->ensure_cadence();},.preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations,.transparent_background=embedded};}
     void drain() noexcept {
         if (phase != Phase::running || draining) return;
         if(parent){guard([&]{if(!opened_delivered){opened_delivered=true;detail::deliver_host_opened(callbacks.opened);}if(widgets)widgets->present();});return;}
@@ -280,6 +323,43 @@ struct Host::Impl {
         struct End final { HWND window; PAINTSTRUCT& state; ~End() { EndPaint(window,&state); } } end{window,paint_state};
         if (widgets) widgets->present();
     }
+    void leave_native_callback() noexcept {
+        if(external_callback_barrier.leave() && !schedule_external_close())
+            remember_failure("Cannot reschedule external host close");
+    }
+    struct CallbackScope final {
+        Impl* owner;
+        explicit CallbackScope(Impl* value):owner(value){owner->external_callback_barrier.enter();}
+        ~CallbackScope(){owner->leave_native_callback();}
+    };
+    void synchronize_external_parent() {
+        if(!external_parent || !IsWindow(external_parent))throw std::runtime_error("External parent is closed");
+        const auto old_size=state.size;const auto old_scale=state.backing_scale;
+        update_snapshot();
+        if(old_size==state.size && old_scale==state.backing_scale)return;
+        if(auto current=widgets){
+            MSG event{external_parent,WM_SIZE,0,0,static_cast<DWORD>(GetMessageTime()),{}};
+            (void)current->native_event(&event);
+        }
+        gate->signal();
+        if(phase==Phase::running && opened_delivered && callbacks.resized)callbacks.resized(state.size);
+    }
+    std::optional<LRESULT> external_parent_event(HWND handle,UINT message,WPARAM w,LPARAM l) noexcept {
+        if(phase!=Phase::running || handle!=external_parent)return {};
+        if(message==WM_DESTROY || message==WM_NCDESTROY){force_close();return {};}
+        if(message==WM_SIZE || message==WM_DPICHANGED){guard([&]{synchronize_external_parent();});return {};}
+        // The external app owns paint validation and all non-input messages.
+        if(message==WM_PAINT || message==WM_ERASEBKGND)return {};
+        std::optional<LRESULT> result;
+        guard([&]{
+            if(auto current=widgets){
+                MSG event{handle,message,w,l,static_cast<DWORD>(GetMessageTime()),{}};
+                if(auto native=current->native_result(&event)){result=static_cast<LRESULT>(*native);return;}
+                if(current->native_event(&event))result=0;
+            }
+        });
+        return result;
+    }
     static LRESULT CALLBACK procedure(HWND handle, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
         auto* self = reinterpret_cast<Impl*>(GetWindowLongPtrW(handle, GWLP_USERDATA));
         if (message == WM_NCCREATE) {
@@ -288,6 +368,7 @@ struct Host::Impl {
             self->window = handle;
         }
         if (!self) return DefWindowProcW(handle, message, wparam, lparam);
+        CallbackScope scope{self};
         if(message==WM_ACTIVATEAPP && !self->parent && self->phase==Phase::running)
             self->guard([&]{self->activity.observe(wparam!=0);self->gate->signal();});
         if(self->phase==Phase::running && !self->application_driver &&
@@ -297,7 +378,7 @@ struct Host::Impl {
                 auto* primary=self->primary_host();
                 if(primary->phase==Phase::running){primary->foreground.set_window_visible(self,self->window_visibility.visible());primary->gate->signal();}
             });
-        if(auto widgets=self->widgets){MSG event{handle,message,wparam,lparam,static_cast<DWORD>(GetMessageTime()),{}};
+        if(auto widgets=self->phase==Phase::running?self->widgets:nullptr){MSG event{handle,message,wparam,lparam,static_cast<DWORD>(GetMessageTime()),{}};
             if(auto result=widgets->native_result(&event))return static_cast<LRESULT>(*result);
             if(widgets->native_event(&event))return 0;}
         if(message==WM_COMMAND){auto found=self->menu_actions.find(LOWORD(wparam));if(found!=self->menu_actions.end()){self->guard([&]{if(found->second){auto task=found->second;(void)self->dispatch->track(self->dispatch->loop.post([weak=std::weak_ptr<detail::DispatchState>(self->dispatch),task=std::move(task)]{if(auto endpoint=weak.lock();endpoint&&endpoint->accepting.load())(void)endpoint->tasks.run(task);}));}});return 0;}}
@@ -335,6 +416,10 @@ struct Host::Impl {
                 handled=false;break;
             case wake_message: self->gate->consumed(); self->drain(); break;
             case WM_TIMER:
+                if (wparam == wake_retry_timer) {
+                    KillTimer(handle,wake_retry_timer);
+                    self->gate->consumed(); self->drain(); break;
+                }
                 if (wparam != deadline_timer) { handled = false; break; }
                 KillTimer(handle, deadline_timer);
                 ++self->statistics.timer_wakes;
@@ -388,8 +473,10 @@ struct Host::Impl {
         return handled ? result : DefWindowProcW(handle, message, wparam, lparam);
     }
     void open_native() {
-        previous_dpi = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-        if (!previous_dpi) throw native_error("Cannot set UI thread DPI awareness");
+        if(!embedded){
+            previous_dpi = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+            if (!previous_dpi) throw native_error("Cannot set UI thread DPI awareness");
+        }
         dpi = GetDpiForSystem();
         if (!dpi) dpi = 96;
         class_name = L"iiGUI.Host."+std::to_wstring(reinterpret_cast<std::uintptr_t>(this));
@@ -404,6 +491,22 @@ struct Host::Impl {
         type.lpszClassName = class_name.c_str();
         if (!RegisterClassExW(&type)) throw native_error("Cannot register native window class");
         registered = true;
+        if(embedded){
+            window=CreateWindowExW(0,class_name.c_str(),L"",0,0,0,0,0,HWND_MESSAGE,nullptr,instance,this);
+            if(!window)throw native_error("Cannot create embedded host wake endpoint");
+            gate->attach(window);
+            dispatch->connect([wake=gate]() noexcept {wake->signal();});
+            phase=Phase::running;
+            external_previous_focus=GetFocus();
+            external_parent_hook=std::make_unique<detail::Win32ParentHook>(external_parent,
+                [this](HWND h,UINT message,WPARAM w,LPARAM l){return external_parent_event(h,message,w,l);},this,
+                [](void* value)noexcept{static_cast<Impl*>(value)->external_callback_barrier.enter();},
+                [](void* value)noexcept{static_cast<Impl*>(value)->leave_native_callback();});
+            if(!(GetWindowLongPtrW(external_parent,GWL_EXSTYLE)&WS_EX_ACCEPTFILES)){
+                DragAcceptFiles(external_parent,TRUE);external_drop_registration=true;
+            }
+            update_snapshot();ensure_cadence();gate->signal();return;
+        }
         const auto rectangle = frame(options.size);
         const auto title = native_text(state.title);
         window = CreateWindowExW(0, class_name.c_str(), title.c_str(), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
@@ -463,7 +566,16 @@ struct Host::Impl {
         if(parent)forget_foreground_window();else foreground.close();
         dispatch->retire();
         if(!parent)dispatch->loop.request_stop();
+        external_parent_hook.reset();
         if(widgets){widgets->close();widgets.reset();}dialog.reset();(void)cadence.cancel();
+        embedded_canvas.reset();
+        if(embedded && external_parent && IsWindow(external_parent)){
+            if(external_drop_registration)DragAcceptFiles(external_parent,FALSE);
+            if(external_previous_focus && external_previous_focus!=external_parent &&
+               IsWindow(external_previous_focus) && GetFocus()==external_parent)
+                SetFocus(external_previous_focus);
+        }
+        external_parent=nullptr;external_previous_focus=nullptr;external_drop_registration=false;
         if(parent){std::erase(parent->children,this);parent=nullptr;}
         if (auto detached=dispatch->disconnect(); !detached)
             remember_failure(detached.error().message,detached.error().cause);
@@ -478,6 +590,7 @@ struct Host::Impl {
         if (registered) { UnregisterClassW(class_name.c_str(), instance); registered = false; }
         if (previous_dpi) { SetThreadDpiAwarenessContext(previous_dpi); previous_dpi = nullptr; }
         if(shortcuts){DestroyAcceleratorTable(shortcuts);shortcuts=nullptr;}if(app_menu){DestroyMenu(app_menu);app_menu=nullptr;}menu_actions.clear();
+        external_close.reset();
         callbacks = {};
         state.visible = false;
         state.closed = true;presentations->close();
@@ -545,6 +658,7 @@ core::Result<void> Host::run(HostCallbacks callbacks) {
 }
 core::Result<void> Host::set_title(std::string_view title) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    if (impl_->embedded) return core::fail(core::ErrorCode::invalid_argument,"The external application controls its window");
     if (!detail::valid_title(title) || title.size() > INT_MAX)
         return core::fail(core::ErrorCode::invalid_argument, "Title must be UTF-8 without NUL and fit native text limits");
     const auto native = native_text(title);
@@ -576,6 +690,7 @@ core::Result<void> Host::set_text(std::string_view text) {
 }
 core::Result<void> Host::set_content_size(Size size) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    if (impl_->embedded) return core::fail(core::ErrorCode::invalid_argument,"The external application controls its window");
     if (!detail::valid_content_size(size, impl_->options))
         return core::fail(core::ErrorCode::invalid_argument, "Content size is outside native/minimum bounds");
     const auto rectangle = impl_->frame(size);
@@ -587,6 +702,7 @@ core::Result<void> Host::set_content_size(Size size) {
 }
 core::Result<void> Host::set_window_geometry(const WindowGeometry& update) {
     if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The external application controls its window");
     impl_->update_snapshot();
     const WindowGeometryValue previous{impl_->state.title,impl_->state.size,impl_->options.minimum_size};
     auto next=resolve_window_geometry(previous,update);if(!next)return std::unexpected(next.error());
@@ -603,12 +719,17 @@ core::Result<void> Host::set_window_geometry(const WindowGeometry& update) {
     impl_->state.title=next->title;impl_->update_snapshot();return {};
 }
 core::Result<void> Host::request_close() {
+    if(is_ui_thread() && impl_->external_application && impl_->phase==Impl::Phase::closing) {
+        if(impl_->schedule_external_close()) return {};
+        return core::fail(core::ErrorCode::failed,"Cannot schedule external host close");
+    }
     if (auto ready = impl_->ready(); !ready) return ready;
     SendMessageW(impl_->window, WM_CLOSE, 0, 0);
     return {};
 }
 core::Result<void> Host::set_canvas(CanvasFrame frame) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    if (impl_->embedded) return core::fail(core::ErrorCode::unsupported,"Use mounted widgets for an external composition surface");
     if(frame.renderer==Renderer::automatic)frame.renderer=impl_->options.renderer;
     if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
     if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}
@@ -645,7 +766,7 @@ core::Result<WindowSnapshot> Host::snapshot() const {
 core::Result<DisplayPixels> Host::display_pixels() const {
     if (auto ready=impl_->ready(); !ready) return std::unexpected(ready.error());
     MONITORINFO info{sizeof(info)};
-    const HMONITOR monitor=MonitorFromWindow(impl_->window,MONITOR_DEFAULTTONEAREST);
+    const HMONITOR monitor=MonitorFromWindow(impl_->embedded?impl_->external_parent:impl_->window,MONITOR_DEFAULTTONEAREST);
     if (!monitor || !GetMonitorInfoW(monitor,&info))
         return core::fail(core::ErrorCode::busy,"The window display is not yet available");
     const auto width=std::int64_t(info.rcMonitor.right)-info.rcMonitor.left;
@@ -666,11 +787,69 @@ core::Result<HostStats> Host::stats() const {
 
 namespace ii::gui {
 
-core::Result<void> Host::show_external(HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External event-loop hosting is not implemented on Windows");}
-core::Result<void> Host::attach_external(void*,HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Windows");}
+core::Result<void> Host::show_external(HostCallbacks callbacks){
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"External host is single use");
+    if(impl_->options.event_loop || impl_->options.frame_loop)
+        return core::fail(core::ErrorCode::invalid_argument,"External host requires its own event pump");
+    if(impl_->activity.has_handler() || impl_->foreground.has_handler())
+        return core::fail(core::ErrorCode::invalid_argument,"The external application owns lifecycle notifications");
+    impl_->external_application=true;
+    impl_->callbacks=std::move(callbacks);
+    try {
+        impl_->external_close=std::make_unique<detail::Win32DeferredClose>();
+        impl_->open_native();
+        // The borrowing application owns the thread's DPI context after the
+        // window is created; do not leave it changed until the host closes.
+        if(impl_->previous_dpi) {
+            if(!SetThreadDpiAwarenessContext(impl_->previous_dpi)) throw native_error("Cannot restore UI thread DPI awareness");
+            impl_->previous_dpi=nullptr;
+        }
+        return {};
+    } catch (...) {
+        auto cause=std::current_exception();
+        impl_->cleanup();
+        return core::fail(core::ErrorCode::failed,"Cannot open external host window",cause);
+    }
+}
+core::Result<void> Host::attach_external(void* parent,HostCallbacks callbacks){
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External surface requires its owner thread");
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"External host is single use");
+    auto window=static_cast<HWND>(parent);
+    if(!window || !IsWindow(window))return core::fail(core::ErrorCode::invalid_argument,"A live external parent window is required");
+    DWORD process=0;const auto thread=GetWindowThreadProcessId(window,&process);
+    if(process!=GetCurrentProcessId() || thread!=GetCurrentThreadId())
+        return core::fail(core::ErrorCode::wrong_executor,"External parent must belong to this process and owner thread");
+    if(impl_->application_driver || impl_->options.event_loop || impl_->options.frame_loop)
+        return core::fail(core::ErrorCode::invalid_argument,"External surface requires its own event pump");
+    if(impl_->options.renderer==Renderer::vulkan)
+        return core::fail(core::ErrorCode::unsupported,"Embedded surfaces require the transparent native renderer");
+    if(impl_->activity.has_handler() || impl_->foreground.has_handler())
+        return core::fail(core::ErrorCode::invalid_argument,"The external application owns lifecycle notifications");
+    impl_->external_application=true;impl_->embedded=true;impl_->external_parent=window;
+    impl_->options.renderer=Renderer::native;impl_->callbacks=std::move(callbacks);
+    try{
+        impl_->external_close=std::make_unique<detail::Win32DeferredClose>();
+        impl_->open_native();
+        return {};
+    }catch(...){
+        auto cause=std::current_exception();impl_->cleanup();
+        return core::fail(core::ErrorCode::failed,"Cannot attach external host surface",cause);
+    }
+}
+core::Result<void> Host::external_parent_resized(){
+    if(auto ready=impl_->ready();!ready)return ready;
+    if(!impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"An attached external surface is required");
+    if(!impl_->external_parent || !IsWindow(impl_->external_parent))
+        return core::fail(core::ErrorCode::closed,"The external parent is closed");
+    Impl::CallbackScope scope{impl_.get()};
+    try{impl_->synchronize_external_parent();return {};}
+    catch(...){return core::fail(core::ErrorCode::failed,"Cannot update external parent geometry",std::current_exception());}
+}
 core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
     if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"Native windows require the UI owner thread");
     if(this==&parent||impl_->application_driver)return core::fail(core::ErrorCode::invalid_argument,"A secondary window cannot be an application driver");
+    if(parent.impl_->external_application)return core::fail(core::ErrorCode::unsupported,"External Windows hosts cannot own secondary hosts");
     if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"Window was already opened");
     if(impl_->activity.has_handler()||impl_->foreground.has_handler())return core::fail(core::ErrorCode::invalid_argument,"Application lifecycle belongs to the primary host");
     if(auto ready=parent.impl_->ready();!ready)return ready;
@@ -681,28 +860,67 @@ core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory){return mount_widgets(std::move(factory),WidgetAppearance{});}
 core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory,const WidgetAppearance& appearance){
     if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());if(!factory)return core::fail(core::ErrorCode::invalid_argument,"Native widget factory is empty");if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
+    Impl::CallbackScope callback_scope{impl_.get()};
     struct Reset final{bool& value;~Reset(){value=false;}}reset{impl_->mounting};impl_->mounting=true;
     try{
-            auto hooks=impl_->frame_hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,std::move(hooks));if(auto built=replacement->construct(std::move(factory));!built)return std::unexpected(built.error());
+        auto hooks=impl_->frame_hooks();hooks.window_geometry=[this](const WindowGeometry& value){return set_window_geometry(value);};
+        auto replacement=std::make_shared<detail::WidgetState>([host=impl_.get()](runtime::Task work){host->guard([&]{if(host->phase==Impl::Phase::running)work();});},appearance,std::move(hooks));
+        if(auto built=replacement->construct(std::move(factory));!built)return std::unexpected(built.error());
         if(auto ready=impl_->ready();!ready)return std::unexpected(ready.error());
-        if(auto attached=replacement->attach(impl_->window, detail::make_native_widget_surface);!attached)return std::unexpected(attached.error());
+        auto composition=impl_->embedded_canvas;
+        if(impl_->embedded){
+            if(!composition)composition=std::make_shared<detail::NativeCanvas>(
+                detail::NativeCanvas::DirectCompositionParent{impl_->external_parent},Acceleration::prefer_hardware,impl_->presentations);
+            auto wake=impl_->gate;
+            auto attached=replacement->attach(impl_->external_parent,[composition,wake](void* parent,detail::WidgetSurfaceCallbacks callbacks){
+                return std::make_unique<detail::NativeWidgetSurface>(parent,std::move(callbacks),composition,[wake]{wake->signal();});
+            });
+            if(!attached)return std::unexpected(attached.error());
+        }else if(auto attached=replacement->attach(impl_->window,detail::make_native_widget_surface);!attached)
+            return std::unexpected(attached.error());
         if(auto committed=replacement->commit_window_properties();!committed)return std::unexpected(committed.error());
-            impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);auto published=impl_->widgets;published->commit_publication();if(auto alive=published->ready();!alive)return std::unexpected(alive.error());return WidgetMount(published);
+        impl_->canvas.clear();if(impl_->widgets)impl_->widgets->close();impl_->widgets=std::move(replacement);
+        impl_->embedded_canvas=std::move(composition);
+        auto published=impl_->widgets;published->commit_publication();
+        if(auto alive=published->ready();!alive)return std::unexpected(alive.error());return WidgetMount(published);
     }catch(...){return core::fail(core::ErrorCode::failed,"Native widget factory failed",std::current_exception());}
 }
-core::Result<void> Host::unmount_widgets(){if(auto ready=impl_->ready();!ready)return ready;if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}return {};}
+core::Result<void> Host::unmount_widgets(){
+    if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->mounting)return core::fail(core::ErrorCode::busy,"A widget factory is active");
+    Impl::CallbackScope scope{impl_.get()};
+    if(impl_->widgets){impl_->widgets->close();impl_->widgets.reset();}
+    if(!impl_->embedded || !impl_->embedded_canvas){impl_->embedded_canvas.reset();return {};}
+    // A native input callback may still retain the old surface. Keep its
+    // compositor until the next requested pump turn so a reentrant remount
+    // can reuse it instead of colliding with the existing HWND target.
+    auto weak=std::weak_ptr<detail::DispatchState>(impl_->dispatch);
+    try{
+        auto submitted=impl_->dispatch->track(impl_->dispatch->loop.post([host=impl_.get(),weak]{
+            auto endpoint=weak.lock();
+            if(endpoint && endpoint->accepting.load() && host->phase==Impl::Phase::running && !host->widgets)
+                host->embedded_canvas.reset();
+        }));
+        if(submitted)return {};
+    }catch(...){}
+    // If admission fails, the in-flight surface still owns the compositor
+    // until its callback returns; it is not retained indefinitely by Host.
+    impl_->embedded_canvas.reset();
+    return core::fail(core::ErrorCode::failed,"Cannot defer external surface retirement");
+}
 core::Result<void> Host::unmount_widgets(const WidgetMount& expected){auto owner=expected.state_.lock();if(!owner)return core::fail(core::ErrorCode::closed,"Widget generation is closed");if(owner!=impl_->widgets)return core::fail(core::ErrorCode::invalid_argument,"Widget generation belongs to another host");return unmount_widgets();}
 core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogCompletion completion){
     if(auto ready=impl_->ready();!ready)return ready;if(impl_->dialog)return core::fail(core::ErrorCode::busy,"A native file dialog is already open");
-    auto weak=std::weak_ptr<detail::DispatchState>(impl_->dispatch);auto opened=detail::native_file_dialog(impl_->window,std::move(options),executor(),[host=impl_.get(),weak,completion=std::move(completion)](auto result)mutable{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;host->dialog.reset();if(completion)completion(std::move(result));});if(!opened)return std::unexpected(opened.error());impl_->dialog=std::move(*opened);return {};
+    auto weak=std::weak_ptr<detail::DispatchState>(impl_->dispatch);auto opened=detail::native_file_dialog(impl_->embedded?impl_->external_parent:impl_->window,std::move(options),executor(),[host=impl_.get(),weak,completion=std::move(completion)](auto result)mutable{auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;host->dialog.reset();if(completion)completion(std::move(result));});if(!opened)return std::unexpected(opened.error());impl_->dialog=std::move(*opened);return {};
 }
 
 }
 
 namespace ii::gui {
-core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(unsigned(action)>unsigned(WindowAction::toggle_maximize))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto window=impl_->window;switch(action){case WindowAction::restore:ShowWindow(window,SW_RESTORE);break;case WindowAction::minimize:ShowWindow(window,SW_MINIMIZE);break;case WindowAction::maximize:ShowWindow(window,SW_MAXIMIZE);break;case WindowAction::toggle_maximize:ShowWindow(window,IsZoomed(window)?SW_RESTORE:SW_MAXIMIZE);break;case WindowAction::raise:ShowWindow(window,SW_SHOWNORMAL);SetForegroundWindow(window);break;case WindowAction::toggle_fullscreen:if(!impl_->fullscreen){impl_->saved_style=GetWindowLongPtrW(window,GWL_STYLE);GetWindowRect(window,&impl_->saved_bounds);MONITORINFO monitor{sizeof(monitor)};if(!GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))return core::fail(core::ErrorCode::failed,"Cannot read fullscreen monitor");SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style&~WS_OVERLAPPEDWINDOW);SetWindowPos(window,HWND_TOP,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_FRAMECHANGED);}else{SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style);auto r=impl_->saved_bounds;SetWindowPos(window,nullptr,r.left,r.top,r.right-r.left,r.bottom-r.top,SWP_FRAMECHANGED|SWP_NOZORDER);}impl_->fullscreen=!impl_->fullscreen;break;}impl_->update_snapshot();return {};}
+core::Result<void> Host::window_action(WindowAction action){if(auto ready=impl_->ready();!ready)return ready;if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The external application controls its window");if(unsigned(action)>unsigned(WindowAction::toggle_maximize))return core::fail(core::ErrorCode::invalid_argument,"Unknown native window action");auto window=impl_->window;switch(action){case WindowAction::restore:ShowWindow(window,SW_RESTORE);break;case WindowAction::minimize:ShowWindow(window,SW_MINIMIZE);break;case WindowAction::maximize:ShowWindow(window,SW_MAXIMIZE);break;case WindowAction::toggle_maximize:ShowWindow(window,IsZoomed(window)?SW_RESTORE:SW_MAXIMIZE);break;case WindowAction::raise:ShowWindow(window,SW_SHOWNORMAL);SetForegroundWindow(window);break;case WindowAction::toggle_fullscreen:if(!impl_->fullscreen){impl_->saved_style=GetWindowLongPtrW(window,GWL_STYLE);GetWindowRect(window,&impl_->saved_bounds);MONITORINFO monitor{sizeof(monitor)};if(!GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))return core::fail(core::ErrorCode::failed,"Cannot read fullscreen monitor");SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style&~WS_OVERLAPPEDWINDOW);SetWindowPos(window,HWND_TOP,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_FRAMECHANGED);}else{SetWindowLongPtrW(window,GWL_STYLE,impl_->saved_style);auto r=impl_->saved_bounds;SetWindowPos(window,nullptr,r.left,r.top,r.right-r.left,r.bottom-r.top,SWP_FRAMECHANGED|SWP_NOZORDER);}impl_->fullscreen=!impl_->fullscreen;break;}impl_->update_snapshot();return {};}
 core::Result<void> Host::begin_window_drag(){
     if(auto ready=impl_->ready();!ready)return ready;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The external application controls its window");
     if(impl_->options.chrome!=WindowChrome::custom)return core::fail(core::ErrorCode::unsupported,"Window drag requires custom chrome");
     if(!(GetKeyState(VK_LBUTTON)&0x8000))return core::fail(core::ErrorCode::invalid_argument,"Window drag requires a primary mouse press");
     POINT point{};if(!GetCursorPos(&point))return core::fail(core::ErrorCode::failed,"Cannot locate window drag");
@@ -711,5 +929,5 @@ core::Result<void> Host::begin_window_drag(){
     SendMessageW(handle,WM_NCLBUTTONDOWN,HTCAPTION,MAKELPARAM(point.x,point.y));
     return {};
 }
-core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){if(auto ready=impl_->ready();!ready)return ready;if(!detail::valid_menu(items))return core::fail(core::ErrorCode::invalid_argument,"Invalid native application menu");HMENU replacement=CreateMenu();if(!replacement)return core::fail(core::ErrorCode::failed,"Cannot allocate native menu");try{std::map<UINT,runtime::Task> actions;std::vector<ACCEL> keys;UINT next=0x4000;const auto build=[&](auto&& self,HMENU menu,const std::vector<AppMenuItem>& source)->void{for(const auto& item:source){if(item.separator){AppendMenuW(menu,MF_SEPARATOR,0,nullptr);continue;}const auto title=native_text(item.title);if(!item.children.empty()){auto popup=CreatePopupMenu();if(!popup)throw native_error("Cannot create native submenu");self(self,popup,item.children);if(!AppendMenuW(menu,MF_POPUP|MF_STRING,reinterpret_cast<UINT_PTR>(popup),title.c_str())){DestroyMenu(popup);throw native_error("Cannot append native submenu");}}else{const auto id=next++;UINT flags=MF_STRING|(item.enabled?MF_ENABLED:MF_GRAYED)|(item.checked?MF_CHECKED:MF_UNCHECKED);if(!AppendMenuW(menu,flags,id,title.c_str()))throw native_error("Cannot append native menu action");actions.emplace(id,item.triggered);if(item.shortcut&&item.enabled){auto key=native_text(item.shortcut->key);if(key.size()!=1)throw std::invalid_argument("Native shortcut must name one character");const auto virtual_key=VkKeyScanW(key[0]);if(virtual_key==-1)throw std::invalid_argument("Shortcut is unavailable in the current keyboard layout");BYTE modifiers=FVIRTKEY;if(item.shortcut->control||item.shortcut->meta)modifiers|=FCONTROL;if(item.shortcut->alt)modifiers|=FALT;if(item.shortcut->shift||(HIBYTE(virtual_key)&1))modifiers|=FSHIFT;keys.push_back({modifiers,WORD(LOBYTE(virtual_key)),WORD(id)});}}}};build(build,replacement,items);HACCEL accelerator=keys.empty()?nullptr:CreateAcceleratorTableW(keys.data(),int(keys.size()));if(!keys.empty()&&!accelerator)throw native_error("Cannot create native keyboard shortcuts");if(!SetMenu(impl_->window,replacement)){if(accelerator)DestroyAcceleratorTable(accelerator);throw native_error("Cannot attach native menu");}if(impl_->app_menu)DestroyMenu(impl_->app_menu);if(impl_->shortcuts)DestroyAcceleratorTable(impl_->shortcuts);impl_->app_menu=replacement;impl_->shortcuts=accelerator;impl_->menu_actions=std::move(actions);DrawMenuBar(impl_->window);return {};}catch(...){DestroyMenu(replacement);return core::fail(core::ErrorCode::failed,"Cannot build the native application menu",std::current_exception());}}
+core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> items){if(auto ready=impl_->ready();!ready)return ready;if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The external application controls its menu");if(!detail::valid_menu(items))return core::fail(core::ErrorCode::invalid_argument,"Invalid native application menu");HMENU replacement=CreateMenu();if(!replacement)return core::fail(core::ErrorCode::failed,"Cannot allocate native menu");try{std::map<UINT,runtime::Task> actions;std::vector<ACCEL> keys;UINT next=0x4000;const auto build=[&](auto&& self,HMENU menu,const std::vector<AppMenuItem>& source)->void{for(const auto& item:source){if(item.separator){AppendMenuW(menu,MF_SEPARATOR,0,nullptr);continue;}const auto title=native_text(item.title);if(!item.children.empty()){auto popup=CreatePopupMenu();if(!popup)throw native_error("Cannot create native submenu");self(self,popup,item.children);if(!AppendMenuW(menu,MF_POPUP|MF_STRING,reinterpret_cast<UINT_PTR>(popup),title.c_str())){DestroyMenu(popup);throw native_error("Cannot append native submenu");}}else{const auto id=next++;UINT flags=MF_STRING|(item.enabled?MF_ENABLED:MF_GRAYED)|(item.checked?MF_CHECKED:MF_UNCHECKED);if(!AppendMenuW(menu,flags,id,title.c_str()))throw native_error("Cannot append native menu action");actions.emplace(id,item.triggered);if(item.shortcut&&item.enabled){auto key=native_text(item.shortcut->key);if(key.size()!=1)throw std::invalid_argument("Native shortcut must name one character");const auto virtual_key=VkKeyScanW(key[0]);if(virtual_key==-1)throw std::invalid_argument("Shortcut is unavailable in the current keyboard layout");BYTE modifiers=FVIRTKEY;if(item.shortcut->control||item.shortcut->meta)modifiers|=FCONTROL;if(item.shortcut->alt)modifiers|=FALT;if(item.shortcut->shift||(HIBYTE(virtual_key)&1))modifiers|=FSHIFT;keys.push_back({modifiers,WORD(LOBYTE(virtual_key)),WORD(id)});}}}};build(build,replacement,items);HACCEL accelerator=keys.empty()?nullptr:CreateAcceleratorTableW(keys.data(),int(keys.size()));if(!keys.empty()&&!accelerator)throw native_error("Cannot create native keyboard shortcuts");if(!SetMenu(impl_->window,replacement)){if(accelerator)DestroyAcceleratorTable(accelerator);throw native_error("Cannot attach native menu");}if(impl_->app_menu)DestroyMenu(impl_->app_menu);if(impl_->shortcuts)DestroyAcceleratorTable(impl_->shortcuts);impl_->app_menu=replacement;impl_->shortcuts=accelerator;impl_->menu_actions=std::move(actions);DrawMenuBar(impl_->window);return {};}catch(...){DestroyMenu(replacement);return core::fail(core::ErrorCode::failed,"Cannot build the native application menu",std::current_exception());}}
 }

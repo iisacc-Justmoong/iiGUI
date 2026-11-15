@@ -1,0 +1,324 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:3f68eb1674509cf3baf6a67244b719fc3fb5c98e68d1c23f05c6ef4aec174c18",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/GpuSceneComposition.md",
+    "sha256": "d59d46ed278c3f3284daf29ea5df81f598c901169eed4568f23a40296fa3303c",
+    "bytes": 6406,
+    "line_count": 76,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "자체 UI의 GPU 장면 합성",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 자체 UI의 GPU 장면 합성\n",
+      "level": 1,
+      "title": "자체 UI의 GPU 장면 합성"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 8,
+      "raw": "LVUI는 뷰를 C++로 AOT 컴파일하고, iiGUI는 그 뷰의 레이아웃·입력·시각\n요소를 직접 관리하여 GPU 렌더링 장면으로 만든다. 데스크톱 앱에 웹 브라우저나\nWebView를 내장하거나 버튼·레이블·입력마다 OS 컨트롤을 생성하지 않는다. OS는\n창과 표시 표면, 입력기·접근성·글꼴·시스템 서비스의 경계에 사용한다. 웹 대상은\n브라우저 안에서 별도로 실행되는 WASM/WebGL 대상이며 데스크톱 앱의 임베디드\n렌더러가 아니다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "## 장면과 배치\n",
+      "level": 2,
+      "title": "장면과 배치"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 16,
+      "raw": "[GPUI 장면 구성](https://github.com/zed-industries/zed/blob/main/crates/gpui/src/scene.rs)은\n그리기 요소와 레이어 순서를 보존하며 형식과 텍스처가 호환되는 명령을 묶는다.\n[GPUI GPU 렌더러](https://github.com/zed-industries/zed/blob/main/crates/gpui_wgpu/src/wgpu_renderer.rs)는\n이 배치를 인스턴스 그리기와 텍스처 아틀라스에 연결한다. iiGUI는 해당 아이디어를\nC++23과 자체 API로 구현하며 GPUI 또는 Rust에 의존하거나 코드를 가져오지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 23,
+      "raw": "iiGUI의 장면은 패널·텍스트·이미지와 그 위에 순서대로 놓이는 레이어, 독립 원본\n장면 및 재질 효과로 표현한다. GPU 인스턴스 배치는 그리기 순서와 클리핑, 변환,\n텍스트·이미지·그림자·배경 캡처의 경계를 보존한다. 그림 요소와 효과가 전혀 없는\n레이어는 출력에 영향을 주지 않으므로 건너뛴다. 이런 빈 레이어를 사이에 둔 패널도\n클립과 변환이 같다면 순서를 유지한 채 하나의 배치로 만들 수 있어야 한다.\n기저 장면과 첫 오버레이는 배경 캡처 의미를 지키기 위해 병합하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 24,
+      "end_line": 24,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 25,
+      "end_line": 28,
+      "raw": "캐시된 GPU 지오메트리는 그 내용이나 변환이 실제 변경될 때만 교체하며, 빈 레이어의\n삽입·삭제와 무관하게 보존해야 한다. 렌더러가 실패한 프레임을 성공으로 취급하거나\n이전 버퍼를 임의로 파괴해서는 안 된다. 이는 변경 영역 전체를 부분 렌더링하거나\nGPUI 수준의 글리프 아틀라스를 구현했다는 뜻은 아니다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "heading",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "## 구현과 경계\n",
+      "level": 2,
+      "title": "구현과 경계"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 32,
+      "end_line": 45,
+      "raw": "현재 패널은 Metal·Direct3D 11·Vulkan과 웹의 WebGL2에서 GPU 인스턴스로 그린다.\nMetal은 원본 이미지 텍스처를 GPU에서 직접 샘플링하고 색상·투명도·둥근 경계·\n테두리·그라데이션을 합성한다. 동일 원본은 장면이 변경될 때도 재사용하며 더 이상\n사용하지 않는 텍스처는 명시적 프레임 변경에서 정리한다. 표면당 이미지 원본\n텍스처의 합계는 512 MiB 이내다. 텍스트와 이미지의 앞뒤 순서는 유지한다.\nMetal에서는 이전 프레임의 마지막 명령 버퍼가 완료된 경우에만, 더 이상 쓰지 않는\n이미지 텍스처를 같은 크기의 새 이미지에 재사용한다. 진행 중이거나 실패한 명령\n버퍼가 있으면 새 텍스처를 할당해 GPU가 읽는 픽셀을 덮어쓰지 않는다. 재사용할\n때도 새 이미지의 전체 픽셀을 업로드한다. `iiGUI.metal_image_pool`은 완료·미완료\n명령, 크기 불일치, 동시 이미지와 실제 Metal 텍스처 픽셀을 검사한다. 부분 업로드나\n실제 iPad의 성능 개선이 검증되었다는 의미는 아니다.\n다른 백엔드의 이미지 전경과 모든 백엔드의 글자는 아직 CPU로 래스터화한 뒤\nGPU 텍스처로 합성한다. 따라서 GPU 글리프 경로와 전체 플랫폼 이미지 전환은\n아직 완료되지 않았다.\n"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 56,
+      "raw": "현재 `prefer_hardware` 정책은 GPU API를 사용하지만 일부 플랫폼의 소프트웨어 장치를\n허용한다. `require_hardware`는 GPU 식별이 가능한 경우에만 이를 제한한다. WebGL2는\n브라우저가 실제 어댑터 정보를 가릴 수 있어 물리 GPU를 증명하지 못한다. Windows와 더 이상 권장하지 않는 X11 호스트의 `Host::set_text`는 별도\nDirect2D·Cairo 표면 대신 iiGUI 레이블 위젯 장면을 사용하도록 소스를 전환했다.\n기본 Linux 대상인 Wayland도 자체 위젯 장면을 사용한다. Windows와 X11의 변경은\n아직 대상 플랫폼에서 컴파일하거나 실행해 검증하지 않았다.\n또한 현재 macOS·Windows의 `Host::set_app_menu`는 각각 OS 애플리케이션 메뉴를\n생성한다. 이 메뉴는 자체 GPU 장면이 아니므로 모든 표시 요소를 자체 렌더링한다는\n계약에는 아직 맞지 않는다. 파일 선택 등 일부 시스템 대화상자도 OS 서비스로 남아 있다.\n이들은 전체 플랫폼에서 물리 GPU 전용 렌더링을 완료했다고 표시하지 않을 이유이다.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 57,
+      "end_line": 57,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 58,
+      "end_line": 62,
+      "raw": "[장면 배치 테스트](../tests/canvas_scene_graph.cpp)는 순서·효과·클립 경계와 빈\n레이어를 검사하고, [모의 WebGL 테스트](../tests/web_canvas_fake.cpp)는 버퍼 재사용과\nGPU 명령 계획을 검사한다. [소스 경계 검사](../tests/boundary.py)는 호스트와 위젯\n표면에서 주요 OS 컨트롤과 내장 브라우저 타입의 도입을 확인한다. 이 검사는 정적\n문자열 검사이므로 간접 로딩과 모든 가능한 구현 방식의 부재를 증명하지 않는다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 63,
+      "end_line": 63,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 64,
+      "end_line": 67,
+      "raw": "2026-11-07 macOS arm64에서 관련 라이브러리와 검사 대상을 빌드하고 장면·렌더러\n선택·글자 캐시·이미지 합성 검사 24건, 소스 경계 검사 2건을 통과했다. 실제 앱이나\n창을 열지 않았다. 모의 WebGL 백엔드는 실제 장치의 렌더링 결과가 아니며 Windows·\nLinux·모바일 장치나 실제 GPU의 출력은 이번에 실행·검증하지 않았다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 71,
+      "raw": "2026-11-10 macOS arm64의 창 없는 Metal 테스트에서는 이미지 셰이더의 GPU 픽셀을\nCPU 기준과 비교했다. 투명도, 색조, 크롭, 둥근 경계, 두꺼운 테두리, 그라데이션과\n소수점 좌표를 검사했다. 이 검사는 전체 위젯과 OS 표시 경로의 화면 검증은 아니다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 72,
+      "end_line": 72,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 73,
+      "end_line": 76,
+      "raw": "Windows·X11 호스트 텍스트는 공통 `HostLegacyText` 위젯 팩터리를 사용한다.\n기존 위젯 트리가 마운트된 경우 덮어쓰지 않고 busy를 반환하며, 같은 문자열의\n반복 설정은 변경을 생략한다. 공통 팩터리의 생성·변경·수명은 헤드리스 검사로\n검증하며, 이를 실제 플랫폼 출력의 증거로 취급하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "자체 UI의 GPU 장면 합성",
+      "anchor": "자체-ui의-gpu-장면-합성",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "장면과 배치",
+      "anchor": "장면과-배치",
+      "start_line": 10
+    },
+    {
+      "block_id": "b000013",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "구현과 경계",
+      "anchor": "구현과-경계",
+      "start_line": 30
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "WebView를 내장하거나 버튼·레이블·입력마다 OS 컨트롤을 생성하지 않는다. OS는",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 23,
+        "text": "기저 장면과 첫 오버레이는 배경 캡처 의미를 지키기 위해 병합하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 26,
+        "text": "삽입·삭제와 무관하게 보존해야 한다. 렌더러가 실패한 프레임을 성공으로 취급하거나",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 27,
+        "text": "이전 버퍼를 임의로 파괴해서는 안 된다. 이는 변경 영역 전체를 부분 렌더링하거나",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000019",
+        "line": 62,
+        "text": "문자열 검사이므로 간접 로딩과 모든 가능한 구현 방식의 부재를 증명하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000025",
+        "line": 76,
+        "text": "검증하며, 이를 실제 플랫폼 출력의 증거로 취급하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000007",
+        "label": "GPUI 장면 구성",
+        "target": "https://github.com/zed-industries/zed/blob/main/crates/gpui/src/scene.rs",
+        "kind": "external",
+        "line": 12
+      },
+      {
+        "block_id": "b000007",
+        "label": "GPUI GPU 렌더러",
+        "target": "https://github.com/zed-industries/zed/blob/main/crates/gpui_wgpu/src/wgpu_renderer.rs",
+        "kind": "external",
+        "line": 14
+      },
+      {
+        "block_id": "b000019",
+        "label": "장면 배치 테스트",
+        "target": "../tests/canvas_scene_graph.cpp",
+        "kind": "relative",
+        "line": 58
+      },
+      {
+        "block_id": "b000019",
+        "label": "모의 WebGL 테스트",
+        "target": "../tests/web_canvas_fake.cpp",
+        "kind": "relative",
+        "line": 59
+      },
+      {
+        "block_id": "b000019",
+        "label": "소스 경계 검사",
+        "target": "../tests/boundary.py",
+        "kind": "relative",
+        "line": 60
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:c34cb08ad03d560532fbebb5bcda9d9c9fa5493dd2ab85fee94201ae665fe917",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/CustomWindowChrome.md",
+    "sha256": "a218232b0208c6e70460ed5bd56b514aab342404d586d2c0bd8027e2c6b1e25f",
+    "bytes": 2307,
+    "line_count": 30,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "사용자 정의 네이티브 창 프레임",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 사용자 정의 네이티브 창 프레임\n",
+      "level": 1,
+      "title": "사용자 정의 네이티브 창 프레임"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "`HostOptions::chrome`의 기본값은 `WindowChrome::system`이다. 창을 열기 전에\n`WindowChrome::custom`을 지정하면 데스크톱 앱이 일반 위젯 트리에서 타이틀바를\n제공할 수 있다. `window_chrome_presentation(backend)`는 타이틀바와 기본 창\n버튼 또는 앱이 그리는 버튼의 표시 정책을 구분한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "list",
+      "start_line": 8,
+      "end_line": 15,
+      "raw": "- macOS에서는 콘텐츠가 투명 타이틀바까지 확장되고 기본 제목은 감춰진다.\n  AppKit 창 버튼과 크기 조절을 유지하므로 뷰는 버튼 공간을 비워야 한다.\n- Windows에서는 클라이언트 영역으로 프레임을 확장하고 가장자리의 네이티브\n  크기 조절 판정을 유지한다. X11에서는 창 관리자에 제목과 버튼 제거를 요청하고\n  크기 조절 테두리는 남긴다. Wayland에서는 클라이언트 가장자리의 크기 조절을\n  컴포지터에 요청한다. 세 플랫폼의 뷰는 자체 창 버튼을 제공해야 한다.\n- iPadOS와 Android는 창 버튼 없이 앱 타이틀바를 사용할 수 있다. 창 형상은\n  운영체제가 관리한다. 웹과 지원하지 않는 호스트는 이 정책을 활성화하지 않는다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "macOS에서는 콘텐츠가 투명 타이틀바까지 확장되고 기본 제목은 감춰진다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "Windows에서는 클라이언트 영역으로 프레임을 확장하고 가장자리의 네이티브",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "iPadOS와 Android는 창 버튼 없이 앱 타이틀바를 사용할 수 있다. 창 형상은",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 21,
+      "raw": "창 닫기는 `Host::request_close()`를 호출하여 기존 닫기 승인 절차를 거친다.\n최소화와 최대화·복원 전환은 각각 `Host::window_action()`의 `minimize`와\n`toggle_maximize`를 사용한다. 창 제어의 실제 가능 여부는 운영체제와 창 관리자에\n따른다. 특히 X11의 장식·이동·최대화 요청은 창 관리자의 Motif 및 EWMH 지원에\n의존한다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 26,
+      "raw": "앱이 정의한 이동 영역의 기본 마우스 누름 처리 안에서\n`Host::begin_window_drag()`를 동기적으로 호출한다. 호스트는 위젯 포인터 캡처를\n취소한 뒤 창 이동을 운영체제에 넘긴다. Wayland에서는 해당 누름의 직렬 번호를\n보존해 컴포지터에 전달한다. 이동 영역에 버튼 등 대화형 위젯을 포함하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 30,
+      "raw": "`HostOptions`의 레이아웃이 변경되므로 소비자와 iiGUI 라이브러리를 같은 헤더로\n다시 빌드해야 한다. 호스트 정책 및 Wayland 모의 이벤트 검사는 실제 Windows나\nLinux 창 관리자에서의 실행 검증을 대신하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "사용자 정의 네이티브 창 프레임",
+      "anchor": "사용자-정의-네이티브-창-프레임",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 13,
+        "text": "컴포지터에 요청한다. 세 플랫폼의 뷰는 자체 창 버튼을 제공해야 한다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000005",
+        "line": 15,
+        "text": "운영체제가 관리한다. 웹과 지원하지 않는 호스트는 이 정책을 활성화하지 않는다.",
+        "basis": "lexical_match",
+        "context": "list"
+      },
+      {
+        "block_id": "b000009",
+        "line": 26,
+        "text": "보존해 컴포지터에 전달한다. 이동 영역에 버튼 등 대화형 위젯을 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 29,
+        "text": "다시 빌드해야 한다. 호스트 정책 및 Wayland 모의 이벤트 검사는 실제 Windows나",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 30,
+        "text": "Linux 창 관리자에서의 실행 검증을 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

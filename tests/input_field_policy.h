@@ -11,7 +11,8 @@ struct Configuration{std::string text,placeholder,accessibility_name="Text field
  Palette palette;double double_click_interval=.5,double_click_distance=4;bool use_native_click_count=true,reveal_caret_in_ancestors=false;
  friend bool operator==(const Configuration&,const Configuration&)=default;};
 struct Callbacks{std::function<void(std::string)> edited;std::function<void()> submitted;std::function<void(bool)> focus_changed;
- std::function<void(std::string)> displayed_changed;std::function<void(double)> content_height_changed;};
+ std::function<void(std::string)> displayed_changed;std::function<void(double)> content_height_changed;
+ std::function<void(bool)> wrapping_fallback_changed;};
 struct Clipboard{std::function<ii::core::Result<void>(std::string)> write;};
 struct Snapshot{std::string text;TextEditRange selection;std::optional<TextEditRange> marked;std::size_t anchor=0,caret=0;
  double horizontal_scroll=0,vertical_scroll=0;NativeTextAffinity affinity=NativeTextAffinity::downstream;bool wrapping_fallback=false;double content_height=0;};

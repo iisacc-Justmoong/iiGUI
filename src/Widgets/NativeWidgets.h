@@ -240,6 +240,14 @@ struct MenuOptions final {
     bool auto_close_on_trigger=true,dismiss_on_outside_press=true,dismiss_on_context_request=true;
 };
 struct MenuEvents final { std::function<void(int)> triggered;runtime::Task opened,closed; };
+// Touch-only context gesture. The host may apply its platform accessibility
+// settings to a target without changing mouse or keyboard context requests.
+struct TouchContextOptions final {
+    std::chrono::milliseconds delay{500};
+    double movement_tolerance=8;
+    bool enabled=true;
+    friend bool operator==(const TouchContextOptions&,const TouchContextOptions&)=default;
+};
 enum class PopoverPlacement { anchored, centered };
 struct PopoverShadow final {
     double offset_x=0,offset_y=16,blur_radius=32;
@@ -508,6 +516,13 @@ inline constexpr double pinch_scroll_units = 500.0;
 // Ancestor interception before ordinary control behavior. A handled pointer
 // press captures move/release until release, focus loss, hiding or retirement.
 using WidgetInputHandler=std::function<core::Result<bool>(const WidgetInput&)>;
+// A horizontal gesture waits for an axis decision before taking capture from
+// nested controls. Delta is incremental; total_x is measured from the press.
+// The origin is local to the receiving widget and first marks the first update.
+struct HorizontalDrag final { double delta_x=0; WidgetPoint origin; double total_x=0; bool first=false; };
+struct HorizontalDragOptions final { double threshold=6; };
+using HorizontalDragHandler=std::function<core::Result<void>(const HorizontalDrag&)>;
+#define IIGUI_HORIZONTAL_DRAG_API 1
 struct WidgetSnapshot final {
     WidgetKind kind;
     std::string id, text, native_class;
@@ -668,6 +683,8 @@ public:
     [[nodiscard]] core::Result<void> set_menu_state(MenuItemState) const;
     [[nodiscard]] core::Result<void> set_menu_expanded(bool) const;
     [[nodiscard]] core::Result<void> set_context_menu(Widget popup) const;
+    [[nodiscard]] core::Result<void> set_touch_context_options(TouchContextOptions) const;
+    [[nodiscard]] core::Result<TouchContextOptions> touch_context_options() const;
     [[nodiscard]] core::Result<void> set_color_model(std::shared_ptr<ColorPickerModel>) const;
     [[nodiscard]] core::Result<std::shared_ptr<ColorPickerModel>> color_model() const;
     [[nodiscard]] core::Result<void> set_color_field(ColorField) const;
@@ -715,6 +732,7 @@ public:
     [[nodiscard]] core::Result<void> set_frame_handler(WidgetFrameHandler,bool active=false) const;
     [[nodiscard]] core::Result<void> request_frames() const;
     [[nodiscard]] core::Result<void> set_input_handler(WidgetInputHandler) const;
+    [[nodiscard]] core::Result<void> set_horizontal_drag_handler(HorizontalDragOptions,HorizontalDragHandler) const;
     [[nodiscard]] core::Result<void> set_text_input_provider(std::shared_ptr<const TextInputProvider>) const;
     // Geometry is separately registered to preserve the existing provider ABI.
     // Replacing the text provider removes its associated geometry provider.

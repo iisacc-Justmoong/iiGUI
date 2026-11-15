@@ -206,8 +206,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_source_files_properties(src/Platform/Host.mm src/Platform/CocoaHostDelegate.mm src/Widgets/NativeWidgetsMac.mm src/Platform/DesktopMac.mm src/Graphics/CanvasMetal.mm src/Text/TextMac.mm src/Text/TextLineMac.mm src/Graphics/VulkanWindowMac.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
     set_source_files_properties(${_font_source} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 elseif(WIN32)
-    target_sources(iiGUI PRIVATE src/Widgets/WindowsAccessibility.cpp src/Graphics/Direct3DPaintDevice.cpp)
-    target_link_libraries(iiGUI PRIVATE user32 gdi32 d3d11 dxgi d3dcompiler d2d1 dwrite windowscodecs ole32 oleacc oleaut32 imm32 shell32)
+    target_sources(iiGUI PRIVATE src/Widgets/WindowsAccessibility.cpp src/Graphics/Direct3DPaintDevice.cpp src/Graphics/DirectCompositionSurface.cpp)
+    target_link_libraries(iiGUI PRIVATE user32 gdi32 d3d11 dxgi dcomp d3dcompiler d2d1 dwrite windowscodecs ole32 oleacc oleaut32 imm32 shell32 comctl32)
     target_compile_definitions(iiGUI PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
 elseif(ANDROID)
     target_link_libraries(iiGUI PRIVATE android log dl jnigraphics)
@@ -1124,6 +1124,34 @@ if(BUILD_TESTING)
     target_link_libraries(iiGUIWrappedTextTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.wrapped_text COMMAND iiGUIWrappedTextTests)
     set_tests_properties(iiGUI.wrapped_text PROPERTIES TIMEOUT 30)
+    add_executable(iiGUIWebTextWrapTests tests/web_text_wrap.cpp)
+    target_link_libraries(iiGUIWebTextWrapTests PRIVATE iiGUI::iiGUI)
+    add_test(NAME iiGUI.web_text_wrap COMMAND iiGUIWebTextWrapTests)
+    set_tests_properties(iiGUI.web_text_wrap PROPERTIES TIMEOUT 30)
+    if(EMSCRIPTEN)
+        # Exercise the real backend with a deterministic font/Canvas boundary;
+        # its private implementation need not be exported by the shared SDK.
+        add_executable(iiGUIWebTextBackendTests tests/web_text_backend.cpp src/Text/TextWeb.cpp
+            src/Text/TextBoundary.cpp src/third_party/utf8proc/utf8proc.c)
+        target_compile_features(iiGUIWebTextBackendTests PRIVATE cxx_std_23)
+        target_compile_definitions(iiGUIWebTextBackendTests PRIVATE IIGUI_WEB_TEXT_TEST_FONT IIGUI_STATIC_DEFINE UTF8PROC_STATIC)
+        target_include_directories(iiGUIWebTextBackendTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_link_libraries(iiGUIWebTextBackendTests PRIVATE iiSDKCore::Contracts)
+        target_compile_options(iiGUIWebTextBackendTests PRIVATE -fexceptions "$<$<COMPILE_LANGUAGE:CXX>:-fexperimental-library>")
+        target_link_options(iiGUIWebTextBackendTests PRIVATE -fexceptions -fexperimental-library
+            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/tests/web_text_canvas_fake.js\""
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sEXIT_RUNTIME=1)
+        set_target_properties(iiGUIWebTextBackendTests PROPERTIES SUFFIX ".js" C_STANDARD 99 C_STANDARD_REQUIRED YES
+            CXX_SCAN_FOR_MODULES OFF)
+        find_program(_iigui_node NAMES node nodejs)
+        if(_iigui_node)
+            add_test(NAME iiGUI.web_text_backend COMMAND "${_iigui_node}" "$<TARGET_FILE:iiGUIWebTextBackendTests>")
+            set_tests_properties(iiGUI.web_text_backend PROPERTIES TIMEOUT 30)
+        endif()
+    endif()
+    add_executable(iiGUIVirtualViewportLegacyPolicyTests tests/virtual_viewport_legacy_policy.cpp)
+    target_link_libraries(iiGUIVirtualViewportLegacyPolicyTests PRIVATE iiGUI::iiGUI)
+    add_test(NAME iiGUI.virtual_viewport_legacy_policy COMMAND iiGUIVirtualViewportLegacyPolicyTests)
     add_executable(iiGUISegmentedLayoutTests tests/segmented_layout.cpp)
     target_link_libraries(iiGUISegmentedLayoutTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.segmented_layout COMMAND iiGUISegmentedLayoutTests)
@@ -1231,6 +1259,9 @@ if(BUILD_TESTING)
     add_executable(iiGUIHostEmbeddedFrameTests tests/host_embedded_frame.cpp)
     target_link_libraries(iiGUIHostEmbeddedFrameTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.host_embedded_frame COMMAND iiGUIHostEmbeddedFrameTests)
+    add_executable(iiGUIHostExternalGeometryContractTests tests/host_external_geometry_contract.cpp)
+    target_link_libraries(iiGUIHostExternalGeometryContractTests PRIVATE iiGUI::iiGUI)
+    add_test(NAME iiGUI.host_external_geometry_contract COMMAND iiGUIHostExternalGeometryContractTests)
     if(APPLE AND NOT IOS)
         add_executable(iiGUIHostExternalLoopMacTests tests/host_external_loop_mac.mm)
         target_compile_options(iiGUIHostExternalLoopMacTests PRIVATE -fobjc-arc)
@@ -1255,6 +1286,10 @@ if(BUILD_TESTING)
     target_compile_features(iiGUIUIKitSceneBindingTests PRIVATE cxx_std_23)
     add_test(NAME iiGUI.uikit_scene_binding COMMAND iiGUIUIKitSceneBindingTests)
     set_tests_properties(iiGUI.uikit_scene_binding PROPERTIES TIMEOUT 15)
+    add_executable(iiGUIUIKitEmbeddedStateTests tests/uikit-embedded-state/main.cpp)
+    target_compile_features(iiGUIUIKitEmbeddedStateTests PRIVATE cxx_std_23)
+    add_test(NAME iiGUI.uikit_embedded_state COMMAND iiGUIUIKitEmbeddedStateTests)
+    set_tests_properties(iiGUI.uikit_embedded_state PROPERTIES TIMEOUT 15)
     add_executable(iiGUIUIKitSceneRouterTests tests/uikit_scene_router.cpp)
     target_compile_features(iiGUIUIKitSceneRouterTests PRIVATE cxx_std_23)
     add_test(NAME iiGUI.uikit_scene_router COMMAND iiGUIUIKitSceneRouterTests)
@@ -1422,6 +1457,35 @@ if(BUILD_TESTING)
     target_compile_features(iiGUIWin32ForegroundTests PRIVATE cxx_std_23)
     add_test(NAME iiGUI.win32_foreground COMMAND iiGUIWin32ForegroundTests)
     set_tests_properties(iiGUI.win32_foreground PROPERTIES TIMEOUT 15)
+    add_executable(iiGUIWin32ExternalCloseTests tests/win32_external_close.cpp)
+    target_include_directories(iiGUIWin32ExternalCloseTests BEFORE PRIVATE tests/win32_external_fake)
+    target_compile_features(iiGUIWin32ExternalCloseTests PRIVATE cxx_std_23)
+    add_test(NAME iiGUI.win32_external_close COMMAND iiGUIWin32ExternalCloseTests)
+    set_tests_properties(iiGUI.win32_external_close PROPERTIES TIMEOUT 15)
+    add_executable(iiGUIWin32ParentHookTests tests/win32_parent_hook.cpp)
+    target_include_directories(iiGUIWin32ParentHookTests BEFORE PRIVATE tests/win32_external_fake)
+    target_compile_features(iiGUIWin32ParentHookTests PRIVATE cxx_std_23)
+    add_test(NAME iiGUI.win32_parent_hook COMMAND iiGUIWin32ParentHookTests)
+    set_tests_properties(iiGUI.win32_parent_hook PROPERTIES TIMEOUT 15)
+    add_executable(iiGUICompositionResizeTests tests/directcomposition_resize.cpp)
+    target_compile_features(iiGUICompositionResizeTests PRIVATE cxx_std_23)
+    add_test(NAME iiGUI.composition_resize COMMAND iiGUICompositionResizeTests)
+    set_tests_properties(iiGUI.composition_resize PROPERTIES TIMEOUT 15)
+    add_executable(iiGUISurfaceInvalidationTests tests/surface_invalidation.cpp)
+    target_compile_features(iiGUISurfaceInvalidationTests PRIVATE cxx_std_23)
+    add_test(NAME iiGUI.surface_invalidation COMMAND iiGUISurfaceInvalidationTests)
+    set_tests_properties(iiGUI.surface_invalidation PROPERTIES TIMEOUT 15)
+    if(WIN32)
+        add_executable(iiGUIHostExternalLoopWindowsTests tests/host_external_loop_windows.cpp)
+        target_link_libraries(iiGUIHostExternalLoopWindowsTests PRIVATE iiGUI::iiGUI)
+        add_test(NAME iiGUI.host_external_loop_windows COMMAND iiGUIHostExternalLoopWindowsTests)
+        set_tests_properties(iiGUI.host_external_loop_windows PROPERTIES TIMEOUT 12)
+        add_executable(iiGUIHostEmbeddedWindowsTests tests/host_embedded_windows.cpp)
+        target_link_libraries(iiGUIHostEmbeddedWindowsTests PRIVATE iiGUI::iiGUI)
+        add_test(NAME iiGUI.host_embedded_windows COMMAND iiGUIHostEmbeddedWindowsTests)
+        add_test(NAME iiGUI.host_embedded_parent_close_windows COMMAND iiGUIHostEmbeddedWindowsTests parent-close)
+        set_tests_properties(iiGUI.host_embedded_windows iiGUI.host_embedded_parent_close_windows PROPERTIES TIMEOUT 12)
+    endif()
     add_executable(iiGUIX11ForegroundTests tests/x11_foreground.cpp)
     if(iiGUI_HOST_BACKEND STREQUAL "x11")
         target_include_directories(iiGUIX11ForegroundTests PRIVATE "${X11_INCLUDE_DIR}")
@@ -1649,10 +1713,18 @@ if(BUILD_TESTING)
     add_test(NAME iiGUI.reveal_local_rect COMMAND iiGUIRevealLocalRectTests)
     add_executable(iiGUIInteractionHandlerTests tests/interaction_handler.cpp)
     target_link_libraries(iiGUIInteractionHandlerTests PRIVATE iiGUI::iiGUI)
-    foreach(_case committed reentrant fanout retirement capacity owner programmatic_focus)
+    foreach(_case committed consumed_hover reentrant fanout retirement capacity owner programmatic_focus)
         add_test(NAME iiGUI.interaction_handler.${_case} COMMAND iiGUIInteractionHandlerTests ${_case})
         set_tests_properties(iiGUI.interaction_handler.${_case} PROPERTIES TIMEOUT 30)
     endforeach()
+    add_executable(iiGUITouchContextTests tests/touch_context.cpp)
+    target_link_libraries(iiGUITouchContextTests PRIVATE iiGUI::iiGUI)
+    add_test(NAME iiGUI.touch_context COMMAND iiGUITouchContextTests)
+    set_tests_properties(iiGUI.touch_context PROPERTIES TIMEOUT 30)
+    add_executable(iiGUIHorizontalDragTests tests/horizontal_drag.cpp)
+    target_link_libraries(iiGUIHorizontalDragTests PRIVATE iiGUI::iiGUI)
+    add_test(NAME iiGUI.horizontal_drag COMMAND iiGUIHorizontalDragTests)
+    set_tests_properties(iiGUI.horizontal_drag PROPERTIES TIMEOUT 30)
     add_executable(iiGUIPaintOnlyInvalidationTests tests/paint_only_invalidation.cpp)
     target_link_libraries(iiGUIPaintOnlyInvalidationTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.paint_only_invalidation COMMAND iiGUIPaintOnlyInvalidationTests)
@@ -1971,7 +2043,7 @@ if(BUILD_TESTING)
         target_include_directories(iiGUINativeVirtualRepetitionTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
             "${iiGUI_LVUI_SOURCE_DIR}/src" "${iiGUI_LVUI_SOURCE_DIR}/build/include" "${iiGUI_LVUI_SOURCE_DIR}/tests/fixtures")
         target_link_libraries(iiGUINativeVirtualRepetitionTests PRIVATE iiGUI::iiGUI "${iiGUI_LVUI_SOURCE_DIR}/build/libLVUINative.a")
-        foreach(_case viewport anchor resize rollback lifetime horizontal empty reentry autoheight)
+        foreach(_case viewport anchor resize rollback lifetime horizontal empty reentry autoheight visible_failure reveal_request)
             add_test(NAME iiGUI.native_virtual_repetition.${_case} COMMAND iiGUINativeVirtualRepetitionTests ${_case})
             set_tests_properties(iiGUI.native_virtual_repetition.${_case} PROPERTIES TIMEOUT 30)
         endforeach()
@@ -1980,12 +2052,13 @@ if(BUILD_TESTING)
         add_custom_command(OUTPUT "${_measured_repetition_generated}"
             COMMAND "${CMAKE_COMMAND}" "-DLVUI_AOT_COMPILER=${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
                 "-DLVUI_AOT_SOURCE=${_measured_repetition_source}" "-DLVUI_AOT_OUTPUT=${_measured_repetition_generated}"
-                "-DLVUI_AOT_NAME=NativeMeasuredRepetitionRuntime" "-DLVUI_AOT_INCLUDES=NativeRepetitionFixture.h"
+                "-DLVUI_AOT_NAME=NativeMeasuredRepetitionRuntime" "-DLVUI_AOT_INCLUDES=NativeDoubleClickBackend.h"
                 -P "${iiGUI_LVUI_SOURCE_DIR}/cmake/RunLVUICompiler.cmake"
-            DEPENDS "${_measured_repetition_source}" "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
+            DEPENDS "${_measured_repetition_source}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/NativeDoubleClickBackend.h"
+                "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
             VERBATIM)
         add_executable(iiGUINativeMeasuredRepetitionTests tests/native_measured_repetition.cpp "${_measured_repetition_generated}")
-        target_include_directories(iiGUINativeMeasuredRepetitionTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+        target_include_directories(iiGUINativeMeasuredRepetitionTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"
             "${iiGUI_LVUI_SOURCE_DIR}/src" "${iiGUI_LVUI_SOURCE_DIR}/build/include" "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-generated-icons" "${iiGUI_LVUI_SOURCE_DIR}/tests/fixtures")
         target_link_libraries(iiGUINativeMeasuredRepetitionTests PRIVATE iiGUI::iiGUI "${iiGUI_LVUI_SOURCE_DIR}/build/libLVUINative.a")
         foreach(_case measured changing anchor resize zero lifetime offscreen navigation)
@@ -1997,18 +2070,51 @@ if(BUILD_TESTING)
         add_custom_command(OUTPUT "${_navigated_repetition_generated}"
             COMMAND "${CMAKE_COMMAND}" "-DLVUI_AOT_COMPILER=${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
                 "-DLVUI_AOT_SOURCE=${_navigated_repetition_source}" "-DLVUI_AOT_OUTPUT=${_navigated_repetition_generated}"
-                "-DLVUI_AOT_NAME=NativeNavigatedRepetitionRuntime" "-DLVUI_AOT_INCLUDES=NativeRepetitionFixture.h"
+                "-DLVUI_AOT_NAME=NativeNavigatedRepetitionRuntime" "-DLVUI_AOT_INCLUDES=NativeDoubleClickBackend.h"
                 -P "${iiGUI_LVUI_SOURCE_DIR}/cmake/RunLVUICompiler.cmake"
-            DEPENDS "${_navigated_repetition_source}" "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
+            DEPENDS "${_navigated_repetition_source}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/NativeDoubleClickBackend.h"
+                "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
             VERBATIM)
         add_executable(iiGUINativeNavigatedRepetitionTests tests/native_navigated_repetition.cpp "${_navigated_repetition_generated}")
-        target_include_directories(iiGUINativeNavigatedRepetitionTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+        target_include_directories(iiGUINativeNavigatedRepetitionTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"
             "${iiGUI_LVUI_SOURCE_DIR}/src" "${iiGUI_LVUI_SOURCE_DIR}/build/include" "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-generated-icons" "${iiGUI_LVUI_SOURCE_DIR}/tests/fixtures")
         target_link_libraries(iiGUINativeNavigatedRepetitionTests PRIVATE iiGUI::iiGUI "${iiGUI_LVUI_SOURCE_DIR}/build/libLVUINative.a")
         foreach(_case navigation selection programmatic controls pointer lifetime source)
             add_test(NAME iiGUI.native_navigated_repetition.${_case} COMMAND iiGUINativeNavigatedRepetitionTests ${_case})
             set_tests_properties(iiGUI.native_navigated_repetition.${_case} PROPERTIES TIMEOUT 30)
         endforeach()
+        if(APPLE AND EXISTS "${iiGUI_LVUI_SOURCE_DIR}/build/libLVUINative.dylib")
+            set(_double_click_generated "${CMAKE_CURRENT_BINARY_DIR}/NativeDoubleClickRuntime.generated.h")
+            add_custom_command(OUTPUT "${_double_click_generated}"
+                COMMAND "${CMAKE_COMMAND}" "-DLVUI_AOT_COMPILER=${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
+                    "-DLVUI_AOT_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/NativeDoubleClick.lvui"
+                    "-DLVUI_AOT_OUTPUT=${_double_click_generated}" "-DLVUI_AOT_NAME=NativeDoubleClickRuntime"
+                    "-DLVUI_AOT_INCLUDES=NativeDoubleClickBackend.h" -P "${iiGUI_LVUI_SOURCE_DIR}/cmake/RunLVUICompiler.cmake"
+                DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/NativeDoubleClick.lvui"
+                    "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}" VERBATIM)
+            add_executable(iiGUINativeDoubleClickGeneratedTests tests/native_double_click_generated.cpp "${_double_click_generated}")
+            target_include_directories(iiGUINativeDoubleClickGeneratedTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"
+                "${iiGUI_LVUI_SOURCE_DIR}/src" "${iiGUI_LVUI_SOURCE_DIR}/build/include"
+                "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-generated-icons" "${iiGUI_LVUI_SOURCE_DIR}/tests/fixtures")
+            target_link_libraries(iiGUINativeDoubleClickGeneratedTests PRIVATE iiGUI::iiGUI "${iiGUI_LVUI_SOURCE_DIR}/build/libLVUINative.dylib")
+            add_test(NAME iiGUI.native_double_click_generated COMMAND iiGUINativeDoubleClickGeneratedTests)
+            set(_single_click_generated "${CMAKE_CURRENT_BINARY_DIR}/NativeSingleClickRuntime.generated.h")
+            add_custom_command(OUTPUT "${_single_click_generated}"
+                COMMAND "${CMAKE_COMMAND}" "-DLVUI_AOT_COMPILER=${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}"
+                    "-DLVUI_AOT_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/NativeSingleClick.lvui"
+                    "-DLVUI_AOT_OUTPUT=${_single_click_generated}" "-DLVUI_AOT_NAME=NativeSingleClickRuntime"
+                    "-DLVUI_AOT_INCLUDES=NativeDoubleClickBackend.h" -P "${iiGUI_LVUI_SOURCE_DIR}/cmake/RunLVUICompiler.cmake"
+                DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/NativeSingleClick.lvui"
+                    "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-compile${CMAKE_EXECUTABLE_SUFFIX}" VERBATIM)
+            add_executable(iiGUINativeSingleClickGeneratedTests tests/native_single_click_generated.cpp "${_single_click_generated}")
+            target_include_directories(iiGUINativeSingleClickGeneratedTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures" "${iiGUI_LVUI_SOURCE_DIR}/src"
+                "${iiGUI_LVUI_SOURCE_DIR}/build/include" "${iiGUI_LVUI_SOURCE_DIR}/build/lvui-generated-icons"
+                "${iiGUI_LVUI_SOURCE_DIR}/tests/fixtures")
+            target_link_libraries(iiGUINativeSingleClickGeneratedTests PRIVATE iiGUI::iiGUI "${iiGUI_LVUI_SOURCE_DIR}/build/libLVUINative.dylib")
+            add_test(NAME iiGUI.native_single_click_generated COMMAND iiGUINativeSingleClickGeneratedTests)
+        endif()
         set(_colors_generated "${CMAKE_CURRENT_BINARY_DIR}/NativeColorsRuntime.generated.h")
         set(_colors_source "${iiGUI_LVUI_SOURCE_DIR}/tests/fixtures/NativeColors.lvui")
         add_custom_command(OUTPUT "${_colors_generated}"

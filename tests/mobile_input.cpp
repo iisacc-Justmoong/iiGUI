@@ -41,6 +41,17 @@ int main() {
         check(mobile_text_service_key(space,true)&&!mobile_text_service_key(space,false),
               "UIKit space did not distinguish an editor from a button");
         space.meta=true;check(!mobile_text_service_key(space,true),"UIKit diverted a modified shortcut to text input");
+        WidgetInput letter{.kind=WidgetInputKind::key_down,.key=WidgetKey::character,.text="b"};
+        check(mobile_widget_key(letter,false), "UIKit dropped a printable shortcut without an editor");
+        check(!mobile_widget_key(letter,true), "UIKit sent an unmodified text character to widgets while editing");
+        letter.alt=true;
+        check(mobile_widget_key(letter,false) && !mobile_widget_key(letter,true),
+              "UIKit did not preserve Option text input and non-editor shortcuts");
+        letter.alt=false;letter.meta=true;
+        check(mobile_widget_key(letter,true), "UIKit dropped a modified shortcut while editing");
+        WidgetInput arrow{.kind=WidgetInputKind::key_down,.key=WidgetKey::up};
+        check(mobile_widget_key(arrow,false) && mobile_widget_key(arrow,true),
+              "UIKit dropped a non-character key");
         const auto nan = std::numeric_limits<double>::quiet_NaN();
         auto invalid = touch_input(WidgetInputKind::focus_lost,
                                    {.x=nan, .y=nan, .force=nan,

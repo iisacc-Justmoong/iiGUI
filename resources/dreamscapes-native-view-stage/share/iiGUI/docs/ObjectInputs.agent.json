@@ -1,0 +1,175 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:00b56f367696c1cf0072eb61a236dddf62aab1d160e60bcc98d6e05d59f54c4c",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/ObjectInputs.md",
+    "sha256": "07660af2693b811848e7d5b208a2fd21ba10286e68b54e9f0d28bd520187b3f7",
+    "bytes": 1628,
+    "line_count": 20,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "생성 C++ 객체 입력의 위젯 연결",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 생성 C++ 객체 입력의 위젯 연결\n",
+      "level": 1,
+      "title": "생성 C++ 객체 입력의 위젯 연결"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "LVUI의 [타입 지정 C++ 구성 입력](../../LVUI/docs/ObjectInputs.md)을 기존 iiGUI 위젯\n트리에 연결한다. iiGUI에 런타임 타입 등록이나 스크립트 실행기를 추가하지 않는다.\n구조체 값·공유 객체·raw 포인터·표준 참조의 실제 타입과 const는 생성 C++에서 결정한다.\n입력의 재평가는 위젯의 표시 속성을 바꾸며 문서 파일 상태와 편집 중인 입력을 재생성하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "`tests/native_object_inputs.cpp`는 창 없는 `WidgetState`에서 다음을 검사한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "list",
+      "start_line": 10,
+      "end_line": 16,
+      "raw": "- 하나의 계산 결과를 여러 표시 요소와 기본값·전달 View가 공유한다.\n- 비비교 구조체의 변경과 객체 멤버의 Observable publication을 표시한다.\n- 선택 객체가 바뀌면 이전 구독을 끊고 새 객체를 표시하며, 불필요한 공유 소유권을 해제한다.\n- 널 입력은 마지막 정상값을 보존하고 다음 정상값으로 복구한다. 최초 널 입력으로 만든\n  후보가 실패하면 기존 활성화와 위젯을 보존한다.\n- 입력 변경 시 로컬 편집 문자열·포커스·노드 수와 파일 revision을 보존한다.\n- 루트 Window 입력·중첩 구성·조건부 활성화·키가 있는 행 재정렬에 연결한다.\n",
+      "items": [
+        {
+          "marker": "-",
+          "text": "하나의 계산 결과를 여러 표시 요소와 기본값·전달 View가 공유한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "비비교 구조체의 변경과 객체 멤버의 Observable publication을 표시한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "선택 객체가 바뀌면 이전 구독을 끊고 새 객체를 표시하며, 불필요한 공유 소유권을 해제한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "널 입력은 마지막 정상값을 보존하고 다음 정상값으로 복구한다. 최초 널 입력으로 만든",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "입력 변경 시 로컬 편집 문자열·포커스·노드 수와 파일 revision을 보존한다.",
+          "checked": null
+        },
+        {
+          "marker": "-",
+          "text": "루트 Window 입력·중첩 구성·조건부 활성화·키가 있는 행 재정렬에 연결한다.",
+          "checked": null
+        }
+      ]
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 20,
+      "raw": "`tests/layout_consumer/ObjectInput.lvui`는 임시 설치를 재배치한 뒤 공개 패키지만으로\n팩터리를 생성·컴파일·링크한다. 소비자는 OS 창을 열지 않는다. 창 없는 검증은 실제\nGPU 표시나 각 플랫폼의 입력·IME·접근성 실행 검증을 대신하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "생성 C++ 객체 입력의 위젯 연결",
+      "anchor": "생성-c-객체-입력의-위젯-연결",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "트리에 연결한다. iiGUI에 런타임 타입 등록이나 스크립트 실행기를 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000003",
+        "line": 6,
+        "text": "입력의 재평가는 위젯의 표시 속성을 바꾸며 문서 파일 상태와 편집 중인 입력을 재생성하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 20,
+        "text": "GPU 표시나 각 플랫폼의 입력·IME·접근성 실행 검증을 대신하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000003",
+        "label": "타입 지정 C++ 구성 입력",
+        "target": "../../LVUI/docs/ObjectInputs.md",
+        "kind": "relative",
+        "line": 3
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

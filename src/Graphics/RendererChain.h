@@ -7,6 +7,12 @@ namespace ii::gui::detail {
 // failure tests without environment overrides or a production fault-injection API.
 template<class Primary,class Vulkan,bool HasPrimary=true> class RendererChain final {
 public:
+    // A borrowed compositing target fixes the native backend; silently
+    // switching to another window or opaque renderer would break its owner.
+    RendererChain(std::unique_ptr<Primary> bound,Acceleration acceleration)
+        :parent_(nullptr),display_(nullptr),acceleration_(acceleration),renderer_(Renderer::native),primary_(std::move(bound)) {
+        if(!primary_)throw std::invalid_argument("Bound renderer is required");
+    }
     RendererChain(void* parent,void* display,Acceleration acceleration,Renderer renderer)
         : parent_(parent),display_(display),acceleration_(acceleration),renderer_(renderer) {
         if (renderer==Renderer::vulkan) vulkan_=std::make_unique<Vulkan>(parent,display,acceleration);

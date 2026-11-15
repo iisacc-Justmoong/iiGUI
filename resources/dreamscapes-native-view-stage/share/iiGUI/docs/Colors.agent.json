@@ -1,0 +1,333 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:a0b82efb8f4116756f624b3efd505358cfc92f0e9d9db80043e34963ac4890dc",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Colors.md",
+    "sha256": "47f1a0c22d4759f9e9f5398e1cb90d4bda7b9687b4ff643ca53e3645c12bd7d0",
+    "bytes": 6374,
+    "line_count": 102,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Native color model and fields",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Native color model and fields\n",
+      "level": 1,
+      "title": "Native color model and fields"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "`ColorPickerModel` is native C++23 state shared by application code and iiGUI's\nown color fields. It uses encoded sRGB `WidgetColor` and Core `Result`/typed query\ncontracts. There is no QColor, platform color well, system color panel or source\ninterpreter. Construct and use a model on its owning UI thread; worker results\nreturn through the existing Core UI executor.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "heading",
+      "start_line": 9,
+      "end_line": 9,
+      "raw": "## Model contract\n",
+      "level": 2,
+      "title": "Model contract"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 15,
+      "raw": "The neutral default is opaque white. `state()` returns current/previous RGBA,\nuppercase six-digit RGB HEX, hue in degrees, saturation/brightness in [0,1] and\na revision. `set_color` tracks the initial previous color until an explicit\n`set_previous_color`; `edit_color` preserves that comparison color. `accept`\ncopies current to previous; `cancel` edits back to previous.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 16,
+      "end_line": 16,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 17,
+      "end_line": 21,
+      "raw": "`edit_hsv` takes degrees/unit/unit and clamps finite values. Achromatic RGB edits\npreserve the selected hue. `channel_value` and `edit_channel` use degrees for hue,\n0..255 for RGB, and percentages for saturation, brightness, CMYK, alpha and\nsubtractive grayscale. CMYK preserves latent ink choices at full black. Alpha\nediting preserves latent HSV and CMYK. Ramps are opaque except the alpha ramp.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 28,
+      "raw": "`edit_hex` accepts optional `#`, surrounding ASCII whitespace and six or eight\nhexadecimal digits. Six preserve alpha; eight mean **RRGGBBAA**. Invalid text\nreturns false without changing revision or color. Nonfinite channels and invalid\nencoded colors return errors. Reads and edits reject foreign threads. Revision\nfollows channel recalculation, including latent changes; updating only the previous\ncolor does not increment it.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 37,
+      "raw": "`observe(shared_ptr<const ColorChangePort>)` connects an explicit Core receiver\nweakly. Close/drop the port to detach. Registration is idempotent per port and\nbounded to 256 live receivers. Notifications contain flags and revision; receivers\nselect the values they need. Delivery is synchronous on the owner. Registration\nduring delivery starts with the next change; mutation from a receiver is busy.\nNotification failure is reported after commit and must not cause a repeated edit.\nThere is no frame polling, global event bus or arbitrary C++ assignment tracking.\nCallers retain the model throughout an active call.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "## Self-rendered fields\n",
+      "level": 2,
+      "title": "Self-rendered fields"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 45,
+      "raw": "`WidgetBuilder::color_surface` accepts a shared model, `ColorField`, dimensions\nand an optional edited callback. Domains match the LVRS wheel/triangle, HS, SV,\nspectrum, hue rail and brightness rail. Spectrum preserves the .43/.45 overlay\nstops; wheel drags project to the nearest triangle edge. Pointer capture, clamping,\ndirection/Shift keys, disabled state and UI ownership are handled in C++.\n"
+    },
+    {
+      "id": "b000018",
+      "kind": "blank",
+      "start_line": 46,
+      "end_line": 46,
+      "raw": "\n"
+    },
+    {
+      "id": "b000019",
+      "kind": "paragraph",
+      "start_line": 47,
+      "end_line": 50,
+      "raw": "`set_color_model`, `color_model` and `set_color_field` explicitly replace/query\nnative connections. Replacement detaches the old receiver and cancels its drag.\nUnmounting revokes the weak connection; an edited callback can remove its own\ntree. State is committed before the callback. Fields share the exact same model.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 52,
+      "end_line": 58,
+      "raw": "Backgrounds are immutable cached RGBA images: wheel/SV depend on hue, HS on\nbrightness, and spectrum/rails have no changing color dependency. Selection marks\nuse separate shared images. Cursor changes reuse the background. Keys include\nnative backing scale and pixel dimensions, capped at 2048 per dimension; logical\ndimensions are 12..1024. Cache misses rasterize on the CPU before the existing\nnative GPU compositor. This is not a procedural GPU shader or atlas. Snapshots\nexpose `color_domain_rasterizations` for verification.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 59,
+      "end_line": 59,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 60,
+      "end_line": 67,
+      "raw": "LVRS supplies its original unmodified embedded 448x448 Figma wheel PNG; standalone\niiGUI has an analytic ring. `png_image` uses the already pinned PlutoVG/STB memory\ndecoder. Header/dimensions are bounded before decode (8 MiB input, 2048x2048),\noutput is straight RGBA8, and no path or network resource is loaded. A private\nPNG-only build of the pinned STB header preserves straight-alpha RGB and bounds\nall codec allocations/reallocations to 96 MiB per call, including zlib expansion\nbeyond a misleading image header. Input and final RGBA storage are separate from\nthat codec budget. The STB MIT notice is included in the installed licenses.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 68,
+      "end_line": 68,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 69,
+      "end_line": 73,
+      "raw": "macOS uses the same one-NSView input/presentation surface. Virtual color elements\nexpose current HEX, focus and rail increment/decrement. Native pointer events and\nkeys enter the common state machine. Native touch and Windows/Linux widget\nadapters remain incomplete. Full ColorPicker composition, recent swatches,\neyedropper and all original input styles remain separate work.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 74,
+      "end_line": 74,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 75,
+      "end_line": 78,
+      "raw": "`iiGUI.colors_*` verifies conversions, latent channels, HEX/alpha, owner/receiver\nlifetimes, PNG bounds, six domains, cache dependencies, Cocoa pointer/AX events,\nself-unmount and actual Metal pixels. LVRS NativeColorGallery exercises the same\npublic model/fields as an installed consumer with source/compiler offline.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 79,
+      "end_line": 79,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "heading",
+      "start_line": 80,
+      "end_line": 80,
+      "raw": "## Current-color action button\n",
+      "level": 2,
+      "title": "Current-color action button"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 81,
+      "end_line": 81,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 82,
+      "end_line": 87,
+      "raw": "`WidgetBuilder::color_button` makes an own-rendered button using a nonnull\n`ColorPickerModel`, optional ring image, 8..256 natural size and ordinary\n`ControlEvents`. A visible ring requires an image. It retains standard button\npointer/keyboard/accessibility activation and capture cancellation. It does not\nconstruct a picker or popup. LVRS supplies the separate original button PNG and\nits 22/28/36 sizes; a shared model reflects edits without reconstructing the button.\n"
+    },
+    {
+      "id": "b000032",
+      "kind": "blank",
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "\n"
+    },
+    {
+      "id": "b000033",
+      "kind": "paragraph",
+      "start_line": 89,
+      "end_line": 95,
+      "raw": "The preview composites the state background, normal/focused border, ring and\nalpha color circle into one cached image. Disabled opacity applies to that whole\nimage. It preserves a centered circular well in rectangular allocations. Small\nsurfaces use 4x sampling, bounded to 2048 pixels per side; GPU composition uses the\nexisting image path. Equal visual keys reuse the image. Snapshot diagnostics\nexpose `color_button_rasterizations`. This is cached CPU rasterization followed by\nnative GPU drawing, not a procedural GPU shader.\n"
+    },
+    {
+      "id": "b000034",
+      "kind": "blank",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "\n"
+    },
+    {
+      "id": "b000035",
+      "kind": "paragraph",
+      "start_line": 97,
+      "end_line": 102,
+      "raw": "`Widget::set_color_model`, `set_color_button_size` and `set_show_hue_ring` change\nthe same native button. Its receiver is weak and tied to the widget generation;\nreplacement detaches the old model and teardown retires the observer/model. No\npending callback owns a retired tree. `iiGUI.color_buttons_*` tests actual Metal\npixels, hover/pressed/focus/disabled states, lifecycle, model replacement and reuse.\nState transitions and spring press/rebound animation remain incomplete.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Native color model and fields",
+      "anchor": "native-color-model-and-fields",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000005",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Model contract",
+      "anchor": "model-contract",
+      "start_line": 9
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Self-rendered fields",
+      "anchor": "self-rendered-fields",
+      "start_line": 39
+    },
+    {
+      "block_id": "b000029",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "Current-color action button",
+      "anchor": "current-color-action-button",
+      "start_line": 80
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000013",
+        "line": 35,
+        "text": "Notification failure is reported after commit and must not cause a repeated edit.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

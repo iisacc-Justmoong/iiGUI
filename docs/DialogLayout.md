@@ -9,6 +9,12 @@ an explicit `height` wins. `vertical_offset` shifts the centered frame. Minimum
 dimensions can intentionally overflow a smaller window. This preserves the
 authored dialog policy rather than silently shrinking a minimum size.
 
+내장 콘텐츠의 최상위 뷰가 시트나 팝업인 경우에도 호스트 창 크기가 바뀌면 열린
+팝업의 배치와 스크롤 뷰포트를 새 창 크기에 맞게 다시 계산한다. 사용자 스크롤은
+해당 뷰포트에만 전달하며 본문 전체 높이를 보존한다.
+헤드리스 시트 회귀 검사는 내장 콘텐츠의 최상위 시트에서 반복 행을 갱신한 뒤
+창을 축소하고 스크롤 입력을 전달한다. 실제 창이나 기기 입력 검증은 별도다.
+
 `cylinder` resolves the surface radius to half its smaller dimension. A custom
 `backdrop_color` supplies the dim layer. These remain C++ GPU panels on the
 existing surface; no OS dialog, panel, popover or control is created.

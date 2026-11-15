@@ -36,7 +36,7 @@ struct SheetInput final {
     friend bool operator==(const SheetInput&, const SheetInput&) = default;
 };
 
-struct NativeSheetCallbacks final { std::function<void()> opened, closed; };
+struct NativeSheetCallbacks final { std::function<void()> opened, closed, canceled; };
 using SheetContentFactory = std::function<ii::core::Result<void>(ii::gui::WidgetBuilder&, ii::gui::Widget)>;
 // The app can supply a themed close control; iiGUI owns the sheet itself.
 using SheetCloseFactory = std::function<ii::core::Result<ii::gui::Widget>(
@@ -171,7 +171,7 @@ class NativeSheet final {
             auto result = state->drag.end(event.y);
             if (!result) return ii::core::fail(ii::core::ErrorCode::invalid_argument, "Invalid Sheet drag position");
             if (auto updated = state->root.set_popover_options(host_options(state)); !updated) return std::unexpected(updated.error());
-            if (*result == SheetDragResult::dismiss) if (auto closed = state->root.close_popup(); !closed) return std::unexpected(closed.error());
+            if (*result == SheetDragResult::dismiss) if (auto closed = state->root.cancel_popup(); !closed) return std::unexpected(closed.error());
             return true;
         }
         if (event.kind == ii::gui::WidgetInputKind::focus_lost
@@ -207,7 +207,8 @@ public:
                 };
             };
             auto root = builder.popover(parent, id, host_options(state),
-                {.opened = event(&NativeSheetCallbacks::opened, true), .closed = event(&NativeSheetCallbacks::closed, false)});
+                {.opened = event(&NativeSheetCallbacks::opened, true), .closed = event(&NativeSheetCallbacks::closed, false),
+                 .canceled = event(&NativeSheetCallbacks::canceled, false)});
             if (!root) return std::unexpected(root.error()); state->root = *root;
             auto chrome = builder.vstack(*root, name("chrome"), {.spacing = 0, .alignment = ii::gui::StackAlignment::stretch});
             if (!chrome) return std::unexpected(chrome.error()); state->chrome = *chrome;
@@ -231,7 +232,7 @@ public:
             if (!title) return std::unexpected(title.error()); state->title = *title;
             if (auto flex = title->set_flex(1); !flex) return std::unexpected(flex.error());
             auto close_action = [weak] {
-                if (auto state = weak.lock(); state && state->live) (void)state->root.close_popup();
+                if (auto state = weak.lock(); state && state->live) (void)state->root.cancel_popup();
             };
             ii::core::Result<ii::gui::Widget> close = [&]() -> ii::core::Result<ii::gui::Widget> {
                 if (close_factory) return close_factory(builder, *row, name("close"), close_action);

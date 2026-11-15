@@ -54,6 +54,7 @@ class BasicNativeInputField final {
         bool wrapping_fallback=false;
         std::optional<ii::core::Error> layout_failure;
         std::optional<double> reported_content_height;
+        std::optional<bool> reported_wrapping_fallback;
         std::optional<double> preferred_x;
         std::optional<Click> press,last_click;
         std::optional<TextInputRange> word_drag;
@@ -85,6 +86,17 @@ class BasicNativeInputField final {
 
     [[nodiscard]] static ii::core::Result<void> publish_content_height(const std::shared_ptr<State>& state){
         if(state->retired)return ii::core::fail(ii::core::ErrorCode::closed,"Input field has retired");Activity activity(state);
+        // Older host policies need not provide this optional notification.
+        if constexpr(requires { state->callbacks.wrapping_fallback_changed; }) {
+            if(state->callbacks.wrapping_fallback_changed &&
+               (!state->reported_wrapping_fallback || *state->reported_wrapping_fallback!=state->wrapping_fallback)) {
+                const auto fallback=state->wrapping_fallback;
+                state->reported_wrapping_fallback=fallback;
+                try { auto callback=state->callbacks.wrapping_fallback_changed; callback(fallback); }
+                catch(...) { return ii::core::fail(ii::core::ErrorCode::failed,"Input wrapping callback failed",std::current_exception()); }
+                if(state->retired||!state->root.snapshot())return {};
+            }
+        }
         if(!state->callbacks.content_height_changed)return {};
         if(auto active=state->root.snapshot();!active)return std::unexpected(active.error());
         const auto height=state->layout.height();

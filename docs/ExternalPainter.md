@@ -24,8 +24,11 @@ target_link_libraries(example PRIVATE iiGUI::iiGUI)
 사용한다. `STYLE_FILE`, `STYLE_MODES`, `INCLUDES`를 선택적으로 전달할 수
 있다. 컴파일에 실패하면 이전 결과는 유지되며 출력이 같으면 기존 파일의
 수정 시각을 보존한다. 모든 LVUI 컴포넌트가 현재 별도의 LVUI 네이티브
-어댑터 없이 생성되는 것은 아니다. 이 경로의 통합 검사는 단순한 Window,
-VStack, Label 조합을 대상으로 한다.
+어댑터 없이 생성되는 것은 아니다. 기본 AOT 검사는 단순한 Window, VStack,
+Label 조합을 사용한다. 별도의 SDK 소비자 검사에서는 라이선스, 계정, 사진,
+에이전트 질문 LVUI를 각각 `PaintView`와 가짜 프레임 장치에 연결해 상태
+변경과 입력 전달, 명시적인 그리기 요청, 종료 후 수명 해제를 검사한다. 이
+검사에는 운영체제 표면이나 실제 GPU 출력이 포함되지 않는다.
 `--view-factory`를 사용하는 위 CMake 경로는 `Host::mount_widgets` 대신
 팩토리를 생성한다. 단일 장면 `Application`은 `make_application_owner`,
 `activate`, `build_with_application`, `retire`를 외부 호스트가 명시적으로

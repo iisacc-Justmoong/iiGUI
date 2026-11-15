@@ -10,11 +10,11 @@
   },
   "source": {
     "path": "docs/DialogLayout.md",
-    "sha256": "50d31d5f24b79251b858fa3242c3f1909aaa0b63df3721561d15abc7112aa572",
-    "bytes": 2410,
-    "line_count": 38,
+    "sha256": "1b913871bf24df3b9615fbb68e6367e3b15031df9f2455a76e19b2e1325db176",
+    "bytes": 2922,
+    "line_count": 44,
     "encoding": "utf-8",
-    "language": "en"
+    "language": "ko"
   },
   "document": {
     "title": "Centered dialog layout and cancellation",
@@ -56,63 +56,77 @@
       "id": "b000005",
       "kind": "paragraph",
       "start_line": 12,
-      "end_line": 14,
-      "raw": "`cylinder` resolves the surface radius to half its smaller dimension. A custom\n`backdrop_color` supplies the dim layer. These remain C++ GPU panels on the\nexisting surface; no OS dialog, panel, popover or control is created.\n"
+      "end_line": 16,
+      "raw": "내장 콘텐츠의 최상위 뷰가 시트나 팝업인 경우에도 호스트 창 크기가 바뀌면 열린\n팝업의 배치와 스크롤 뷰포트를 새 창 크기에 맞게 다시 계산한다. 사용자 스크롤은\n해당 뷰포트에만 전달하며 본문 전체 높이를 보존한다.\n헤드리스 시트 회귀 검사는 내장 콘텐츠의 최상위 시트에서 반복 행을 갱신한 뒤\n창을 축소하고 스크롤 입력을 전달한다. 실제 창이나 기기 입력 검증은 별도다.\n"
     },
     {
       "id": "b000006",
       "kind": "blank",
-      "start_line": 15,
-      "end_line": 15,
+      "start_line": 17,
+      "end_line": 17,
       "raw": "\n"
     },
     {
       "id": "b000007",
       "kind": "paragraph",
-      "start_line": 16,
-      "end_line": 21,
-      "raw": "`StackOptions::alignment` selects center, leading, trailing or stretch on the\ncross axis. Existing stacks default to center. `Widget::set_flex(weight)` gives\na horizontal child a relative share of available main-axis space; zero uses its\nnatural width. A spacer still consumes extra main-axis space. Width-dependent\nmeasurement propagates wrapped label heights through nested stacks, and a stable\nlayout caches measurements until its constraints or content change.\n"
+      "start_line": 18,
+      "end_line": 20,
+      "raw": "`cylinder` resolves the surface radius to half its smaller dimension. A custom\n`backdrop_color` supplies the dim layer. These remain C++ GPU panels on the\nexisting surface; no OS dialog, panel, popover or control is created.\n"
     },
     {
       "id": "b000008",
       "kind": "blank",
-      "start_line": 22,
-      "end_line": 22,
+      "start_line": 21,
+      "end_line": 21,
       "raw": "\n"
     },
     {
       "id": "b000009",
       "kind": "paragraph",
-      "start_line": 23,
-      "end_line": 26,
-      "raw": "Buttons can override height and corner radius through optional construction\nfields. Image views can add padding, a rounded background and a border; these\nare GPU geometry around the immutable image. Default options preserve existing\nwidget appearance.\n"
+      "start_line": 22,
+      "end_line": 27,
+      "raw": "`StackOptions::alignment` selects center, leading, trailing or stretch on the\ncross axis. Existing stacks default to center. `Widget::set_flex(weight)` gives\na horizontal child a relative share of available main-axis space; zero uses its\nnatural width. A spacer still consumes extra main-axis space. Width-dependent\nmeasurement propagates wrapped label heights through nested stacks, and a stable\nlayout caches measurements until its constraints or content change.\n"
     },
     {
       "id": "b000010",
       "kind": "blank",
-      "start_line": 27,
-      "end_line": 27,
+      "start_line": 28,
+      "end_line": 28,
       "raw": "\n"
     },
     {
       "id": "b000011",
       "kind": "paragraph",
-      "start_line": 28,
-      "end_line": 34,
-      "raw": "`close_popup()` is a programmatic close. `cancel_popup()`, outside dismissal,\nEscape and a native accessibility cancellation are user cancellation paths.\n`PopoverEvents::canceled` runs after content retirement and `closed`, once for\nthe actual open activation. Closing an already closed popup emits neither event.\nRemoving or hiding its owner uses ordinary teardown without a cancellation.\nActive callback captures can retire after their own invocation returns; see\n[content ownership](PopupContent.md). Child Escape handlers still have priority.\n"
+      "start_line": 29,
+      "end_line": 32,
+      "raw": "Buttons can override height and corner radius through optional construction\nfields. Image views can add padding, a rounded background and a border; these\nare GPU geometry around the immutable image. Default options preserve existing\nwidget appearance.\n"
     },
     {
       "id": "b000012",
       "kind": "blank",
-      "start_line": 35,
-      "end_line": 35,
+      "start_line": 33,
+      "end_line": 33,
       "raw": "\n"
     },
     {
       "id": "b000013",
       "kind": "paragraph",
-      "start_line": 36,
-      "end_line": 38,
+      "start_line": 34,
+      "end_line": 40,
+      "raw": "`close_popup()` is a programmatic close. `cancel_popup()`, outside dismissal,\nEscape and a native accessibility cancellation are user cancellation paths.\n`PopoverEvents::canceled` runs after content retirement and `closed`, once for\nthe actual open activation. Closing an already closed popup emits neither event.\nRemoving or hiding its owner uses ordinary teardown without a cancellation.\nActive callback captures can retire after their own invocation returns; see\n[content ownership](PopupContent.md). Child Escape handlers still have priority.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 44,
       "raw": "`tests/dialog_layout.cpp` verifies centered placement, resize without recreation,\nheader flex sizing, wrapped height and close/cancel distinction. LVRS's Modal\ntests additionally verify action ordering, fresh content and actual Metal pixels.\n"
     }
   ],
@@ -131,11 +145,11 @@
     "commands": [],
     "links": [
       {
-        "block_id": "b000011",
+        "block_id": "b000013",
         "label": "content ownership",
         "target": "PopupContent.md",
         "kind": "relative",
-        "line": 34
+        "line": 40
       }
     ],
     "tables": []

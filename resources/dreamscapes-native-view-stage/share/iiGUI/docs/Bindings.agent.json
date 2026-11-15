@@ -1,0 +1,128 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:a1bc8b438f41d7164613d386e7c458234388f6c1afae93310c06ec47492ea8af",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/Bindings.md",
+    "sha256": "75a86b95c13995c3bb27c587219b5cc5d02a0ca17c738f343ac84fa27a02c210",
+    "bytes": 991,
+    "line_count": 13,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "컴파일된 속성 바인딩",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 컴파일된 속성 바인딩\n",
+      "level": 1,
+      "title": "컴파일된 속성 바인딩"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`BindingScope`는 `ii::core::Observable<T>`의 값과 변경을 C++ 위젯에 연결한다.\n문자, 활성 상태, 체크 상태, 수치, 현재 인덱스 갱신을 직접 호출한다. 임의 속성 이름을\n찾는 레지스트리나 런타임 표현식 해석을 사용하지 않는다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 9,
+      "raw": "위젯 팩토리는 `BindingScope`를 `WidgetBuilder::retain()`으로 소유한다. 팝업의 열림 단위\n콘텐츠도 각각의 바인딩 스코프를 가진다. 해제한 콘텐츠의 구독은 종료되며 부모 C++\n백엔드를 다시 생성하지 않는다. 모든 값 접근과 전달은 Core 속성의 소유 스레드에서 수행한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 10,
+      "end_line": 10,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 11,
+      "end_line": 13,
+      "raw": "초기 값 적용이 실패하면 마운트를 거절한다. 이후 잘못된 값에 대한 위젯 오류는 관측자 예외로\n전달한다. 이미 닫힌 위젯 세대는 갱신하지 않는다. 초기 값과 이후 통지가 같은 setter를 사용하므로\n활성/선택/입력 정책을 우회하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "컴파일된 속성 바인딩",
+      "anchor": "컴파일된-속성-바인딩",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 5,
+        "text": "찾는 레지스트리나 런타임 표현식 해석을 사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 9,
+        "text": "백엔드를 다시 생성하지 않는다. 모든 값 접근과 전달은 Core 속성의 소유 스레드에서 수행한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 12,
+        "text": "전달한다. 이미 닫힌 위젯 세대는 갱신하지 않는다. 초기 값과 이후 통지가 같은 setter를 사용하므로",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 13,
+        "text": "활성/선택/입력 정책을 우회하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

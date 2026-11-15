@@ -48,6 +48,17 @@ float4 text_fragment(float4 position : SV_POSITION) : SV_TARGET {
     float4 color=glyphs.Load(int3(pixel,0));
     return float4(color.rgb*color.a,color.a);
 }
+// The retained scene is premultiplied in linear light and stored through an
+// sRGB view. DWM expects the UNORM swapchain bytes premultiplied in sRGB.
+float4 composition_fragment(float4 position : SV_POSITION) : SV_TARGET {
+    float4 value=glyphs.Load(int3(int2(position.xy),0));
+    float alpha=saturate(value.a);if(alpha<=0)return 0;
+    float3 straight=saturate(value.rgb/alpha);
+    float3 low=straight*12.92;
+    float3 high=1.055*pow(straight,1.0/2.4)-0.055;
+    float3 encoded=lerp(low,high,step(float3(0.0031308,0.0031308,0.0031308),straight));
+    return float4(encoded*alpha,alpha);
+}
 
 Texture2D<float4> shape_image : register(t2);
 Texture2D<float4> underlay_image : register(t3);
@@ -102,14 +113,14 @@ struct PlatformCanvas::Impl final {
     HINSTANCE instance=GetModuleHandleW(nullptr);
     std::wstring class_name;
     bool registered=false;
-    bool external_swapchain=false;
+    bool external_swapchain=false,composition_output=false;
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
     ComPtr<IDXGISwapChain> swapchain;
     ComPtr<ID3D11VertexShader> vertex;
     ComPtr<ID3D11PixelShader> fragment;
     ComPtr<ID3D11VertexShader> text_vertex;
-    ComPtr<ID3D11PixelShader> text_fragment, effect_fragment;
+    ComPtr<ID3D11PixelShader> text_fragment, effect_fragment, composition_fragment;
     ComPtr<ID3D11SamplerState> effect_sampler;
     ComPtr<ID3D11Texture2D> content_snapshot, current_snapshot;
     ComPtr<ID3D11ShaderResourceView> content_view, current_view;
@@ -118,6 +129,7 @@ struct PlatformCanvas::Impl final {
     ComPtr<ID3D11RasterizerState> rasterizer;
     ComPtr<ID3D11Texture2D> texture;
     ComPtr<ID3D11RenderTargetView> target;
+    ComPtr<ID3D11ShaderResourceView> composition_source;
     struct Layer final { ComPtr<ID3D11ShaderResourceView> foreground; ForegroundKey key;PixelClip region{};ComPtr<ID3D11Buffer> panels;ComPtr<ID3D11ShaderResourceView> panel_view;PanelKey geometry; };
     std::vector<Layer> layers;
     struct SceneTarget final {
@@ -152,7 +164,8 @@ struct PlatformCanvas::Impl final {
         if (message==WM_PAINT) { PAINTSTRUCT p{}; BeginPaint(window,&p); EndPaint(window,&p); return 0; }
         return DefWindowProcW(window,message,w,l);
     }
-    void initialize(HWND parent,Acceleration,IDXGISwapChain* external=nullptr) {
+    void initialize(HWND parent,Acceleration,IDXGISwapChain* external=nullptr,bool premultiplied_srgb=false) {
+        composition_output=premultiplied_srgb;
         const D3D_FEATURE_LEVEL levels[]{D3D_FEATURE_LEVEL_11_0};
         D3D_FEATURE_LEVEL level{};
         HRESULT result=S_OK;
@@ -210,6 +223,10 @@ struct PlatformCanvas::Impl final {
         auto tvs=compile("text_vertex","vs_5_0"), tps=compile("text_fragment","ps_5_0");
         checked(device->CreateVertexShader(tvs->GetBufferPointer(),tvs->GetBufferSize(),nullptr,&text_vertex),"Cannot create D3D11 text vertex pipeline");
         checked(device->CreatePixelShader(tps->GetBufferPointer(),tps->GetBufferSize(),nullptr,&text_fragment),"Cannot create D3D11 text pixel pipeline");
+        if(composition_output){
+            auto shader_code=compile("composition_fragment","ps_5_0");
+            checked(device->CreatePixelShader(shader_code->GetBufferPointer(),shader_code->GetBufferSize(),nullptr,&composition_fragment),"Cannot create transparent composition pixel pipeline");
+        }
         auto effect=compile("effect_fragment","ps_5_0");
         checked(device->CreatePixelShader(effect->GetBufferPointer(),effect->GetBufferSize(),nullptr,&effect_fragment),"Cannot create D3D11 material pipeline");
         D3D11_SAMPLER_DESC sampler{};sampler.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -364,7 +381,7 @@ struct PlatformCanvas::Impl final {
         if(resized){
             ID3D11ShaderResourceView* empty[5]{};context->PSSetShaderResources(1,5,empty);
             context->OMSetRenderTargets(0,nullptr,nullptr);
-            target.Reset();texture.Reset();
+            target.Reset();composition_source.Reset();texture.Reset();
             for(auto& scene:scene_targets){scene.render.Reset();scene.sampled.Reset();scene.texture.Reset();}
             content_snapshot.Reset();current_snapshot.Reset();content_view.Reset();current_view.Reset();
             if(!external_swapchain)
@@ -372,11 +389,16 @@ struct PlatformCanvas::Impl final {
             D3D11_TEXTURE2D_DESC desc{};desc.Width=width;desc.Height=height;
             desc.MipLevels=desc.ArraySize=1;desc.SampleDesc.Count=1;
             desc.Format=DXGI_FORMAT_R8G8B8A8_TYPELESS;desc.Usage=D3D11_USAGE_DEFAULT;
-            desc.BindFlags=D3D11_BIND_RENDER_TARGET;
+            desc.BindFlags=D3D11_BIND_RENDER_TARGET|(composition_output?D3D11_BIND_SHADER_RESOURCE:0);
             checked(device->CreateTexture2D(&desc,nullptr,&texture),"Cannot allocate D3D11 canvas attachment");
             D3D11_RENDER_TARGET_VIEW_DESC rtv{};rtv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
             rtv.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
             checked(device->CreateRenderTargetView(texture.Get(),&rtv,&target),"Cannot create D3D11 sRGB view");
+            if(composition_output){
+                D3D11_SHADER_RESOURCE_VIEW_DESC srv{};srv.Format=DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                srv.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;srv.Texture2D.MipLevels=1;
+                checked(device->CreateShaderResourceView(texture.Get(),&srv,&composition_source),"Cannot sample the transparent composition scene");
+            }
             statistics.pixel_width=width;statistics.pixel_height=height;
         }
         if(changed){
@@ -424,7 +446,18 @@ struct PlatformCanvas::Impl final {
         CanvasFrame retained_frame=frame;
         check_cancelled();
         checked(swapchain->GetBuffer(0,IID_PPV_ARGS(&back)),"Cannot access D3D11 presentation buffer");
-        context->CopyResource(back.Get(),texture.Get());
+        if(composition_output){
+            ComPtr<ID3D11RenderTargetView> output;
+            checked(device->CreateRenderTargetView(back.Get(),nullptr,&output),"Cannot create transparent swapchain target");
+            auto* render=output.Get();context->OMSetRenderTargets(1,&render,nullptr);
+            context->OMSetBlendState(nullptr,nullptr,0xffffffff);
+            const D3D11_VIEWPORT viewport{0,0,float(width),float(height),0,1};context->RSSetViewports(1,&viewport);
+            const D3D11_RECT clip{0,0,LONG(width),LONG(height)};context->RSSetState(rasterizer.Get());context->RSSetScissorRects(1,&clip);
+            context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            context->VSSetShader(text_vertex.Get(),nullptr,0);context->PSSetShader(composition_fragment.Get(),nullptr,0);
+            auto* scene=composition_source.Get();context->PSSetShaderResources(1,1,&scene);context->Draw(6,0);
+            ID3D11ShaderResourceView* empty=nullptr;context->PSSetShaderResources(1,1,&empty);context->OMSetRenderTargets(0,nullptr,nullptr);
+        }else context->CopyResource(back.Get(),texture.Get());
         check_cancelled();
         checked(swapchain->Present(1,0),"Cannot present D3D11 canvas (device may have been removed)");
         ++statistics.presentations;previous=std::move(retained_frame);previous_scale=scale;committed=true;
@@ -449,7 +482,7 @@ PlatformCanvas::PlatformCanvas(void* parent,void*,Acceleration policy) : impl_(s
     impl_->initialize(static_cast<HWND>(parent),policy);
 }
 PlatformCanvas::PlatformCanvas(ExternalDirect3DSwapChain target,Acceleration policy) : impl_(std::make_unique<Impl>()) {
-    impl_->initialize(nullptr,policy,static_cast<IDXGISwapChain*>(target.swapchain));
+    impl_->initialize(nullptr,policy,static_cast<IDXGISwapChain*>(target.swapchain),target.premultiplied_srgb);
 }
 PlatformCanvas::~PlatformCanvas()=default;
 void PlatformCanvas::draw(const CanvasFrame& f,double s,double) { impl_->draw(f,s); }

@@ -160,12 +160,20 @@ public:
     [[nodiscard]] core::Result<void> run(HostCallbacks callbacks = {});
     // Attach a separate iiGUI window to an already-running native event loop.
     // This does not replace the application's delegate or menu. Currently
-    // supported on macOS only; close the Host before the external loop exits.
+    // supported on macOS and Windows; close the Host before the external loop
+    // exits and retain it until the deferred closed callback. The callback
+    // may release the host after the host has finished its own cleanup.
     [[nodiscard]] core::Result<void> show_external(HostCallbacks callbacks = {});
-    // Attach the widget surface to a borrowed native parent. On macOS the
-    // argument is a live NSView belonging to the already-running application.
-    // The owner must retain the parent until the deferred closed callback.
+    // Attach a widget surface to a borrowed native parent: a live NSView on
+    // macOS, a live UIView on iOS, or an HWND owned by the current process and
+    // thread on Windows. On iOS the application owns the document picker.
+    // Parent destruction initiates close; the owner retains this Host and its
+    // event loop until the deferred closed callback. Windows requires a free
+    // topmost DirectComposition target.
     [[nodiscard]] core::Result<void> attach_external(void* native_parent, HostCallbacks callbacks = {});
+    // Notify an attached host after the borrowed parent's bounds change.
+    // Unchanged bounds do not request another frame or resize notification.
+    [[nodiscard]] core::Result<void> external_parent_resized();
     // Nonblocking secondary window. It shares the parent's Core pump and closes
     // with its parent; callbacks/UiExecutor retire independently of that parent.
     [[nodiscard]] core::Result<void> show(Host& parent,HostCallbacks callbacks = {});

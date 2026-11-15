@@ -1,0 +1,170 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:d0f51d068db9e4923b4be55b70e34eeb009acae4aa5d46e6cbc05b4304f74992",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/WidgetOpacity.md",
+    "sha256": "03a1e8aecae867ff53c579a39aeddfae0afd9235817ef7476f1ee9318a86cb0e",
+    "bytes": 2869,
+    "line_count": 33,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "위젯 트리의 네이티브 투명도",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 위젯 트리의 네이티브 투명도\n",
+      "level": 1,
+      "title": "위젯 트리의 네이티브 투명도"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "`Widget::set_opacity(double)`는 모든 네이티브 위젯에 공통으로 적용하는 표시 속성이다.\n기본값은 1이며 유한한 0부터 1까지의 값을 받는다. 잘못된 값은 `invalid_argument`로\n거절하고 이전 값을 유지한다. 소유 스레드와 세대 종료 검사는 기존 Widget 계약을 따른다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "`WidgetSnapshot::opacity`는 해당 위젯에 직접 지정한 값이고 `effective_opacity`는 일반\n부모와 소유 콘텐츠의 부모를 따라 곱한 값이다. 개별 색상·이미지의 alpha는 바꾸지 않는다.\n작성한 투명도와 팝업 전환 애니메이션은 별도의 값이며, 실제 표시에서는 두 값을 곱한다.\n스냅샷의 effective 값에는 일시적인 전환 진행률을 포함하지 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 16,
+      "raw": "일반 자식, content host, 가상화된 자식 세대, 사용자 paint provider, 텍스트·이미지·패널·\n그림자·재질, 스크롤 표시자와 팝업의 게시 레이어에 같은 투명도 곱을 전달한다.\n클립이나 투명도가 다른 형제는 레이어 배치를 분리하고, 이후 형제와 부모의 표시자를\n그릴 때 원래 값을 복원한다. 팝업은 클립·좌표 변환에서 분리되어도 소유 트리의 투명도를\n상속한다. 단순 팝업 앵커 연결은 부모 관계를 만들지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 17,
+      "end_line": 17,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 18,
+      "end_line": 22,
+      "raw": "0은 그리기만 생략한다. 레이아웃·보임·enabled·포커스·입력·접근성 노출은 바꾸지 않는다.\n입력도 막으려면 enabled 또는 visible을 명시적으로 변경해야 한다. 투명도 갱신은 콘텐츠를\n다시 생성하거나 모델·파일 상태·실행 명령을 변경하지 않으며 측정을 무효화하지 않는다.\n동일한 값을 다시 지정하면 표시 무효화도 생략한다. 별도 오프스크린 그룹 합성 효과는\n이 계약에 포함하지 않는다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 24,
+      "end_line": 29,
+      "raw": "내부 `WidgetState::drawing_snapshot(Size)`는 OS 창을 만들지 않고 현재 C++ 그리기 결과를\n검사하는 접점이다. 소유 스레드에서 `(0, 8192]`의 유한한 크기를 요구한다. 실제 프레임과\n동일한 배치·paint provider를 사용하며 잘못된 그리기 결과를 오류로 반환한다. GPU 픽셀이나\n운영체제별 표현의 일치를 보증하는 접점은 아니다.\n창 없는 중첩 콘텐츠의 팝업도 최상위 논리 viewport를 사용하므로 작은 소유 슬롯의 높이에\n맞춰 메뉴 항목이 잘리지 않는다. 실제 표면이 있으면 기존 표면 크기를 그대로 사용한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 33,
+      "raw": "회귀 검사는 `tests/widget_opacity.cpp`의 값·상속·소유 콘텐츠·형제 배치·사용자 그리기·\n입력 유지·팝업·유효성·퇴역 9개와 LVUI의 생성 C++를 연결하는 8개 사례로 구성한다.\n실행 결과와 정적 컴파일 증거는 해당 작업의 검증 기록으로 구분한다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "위젯 트리의 네이티브 투명도",
+      "anchor": "위젯-트리의-네이티브-투명도",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "스냅샷의 effective 값에는 일시적인 전환 진행률을 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 19,
+        "text": "입력도 막으려면 enabled 또는 visible을 명시적으로 변경해야 한다. 투명도 갱신은 콘텐츠를",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 20,
+        "text": "다시 생성하거나 모델·파일 상태·실행 명령을 변경하지 않으며 측정을 무효화하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 22,
+        "text": "이 계약에 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

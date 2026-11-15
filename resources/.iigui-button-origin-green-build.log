@@ -1,0 +1,185 @@
+[0/2] Re-checking globbed directories...
+[1/2] Re-running CMake...
+-- Using plutovg submodule.
+-- Configuring done (34.7s)
+-- Generating done (6.8s)
+-- Build files have been written to: /Volumes/Storage/Workspace/SDK/iiGUI/build
+[0/4] Re-checking globbed directories...
+[1/15] Building CXX object CMakeFiles/iiGUI.dir/src/Widgets/ColorButton.cpp.o
+[2/15] Building CXX object CMakeFiles/iiGUI.dir/src/Widgets/NativeWidgets.cpp.o
+[3/15] Building CXX object CMakeFiles/iiGUI.dir/src/Widgets/ColorSurface.cpp.o
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/ColorSurface.cpp:104:183: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+  104 |     if(wheel)images.push_back({{r.x+(r.width-232*scale)/2+4*scale,r.y+(r.height-232*scale)/2+4*scale,224*scale,224*scale},options.hue_ring?options.hue_ring:analytic_ring(),{},opacity});
+      |                                                                                                                                                                                       ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/ColorSurface.cpp:105:47: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+  105 |     images.push_back({target,domain,{},opacity});
+      |                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/ColorSurface.cpp:106:169: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+  106 |     auto cursor=[&](double x,double y,double diameter){images.push_back({{float(x-diameter/2),float(y-diameter/2),float(diameter),float(diameter)},selector(),{},opacity});};
+      |                                                                                                                                                                         ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/ColorSurface.cpp:111:207: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+  111 |     }else if(rail){const auto p=field==ColorField::hue_rail?state.hue/360:1-state.brightness;const auto y=r.y+3.5+p*std::max(0.0,r.height-7.0);images.push_back({{r.x,float(y-4),r.width,8},thumb(),{},opacity});}
+      |                                                                                                                                                                                                               ^
+4 warnings generated.
+[4/15] Building CXX object CMakeFiles/iiGUI.dir/src/Core/Application.cpp.o
+[5/15] Building OBJCXX object CMakeFiles/iiGUI.dir/src/Widgets/NativeWidgetsMac.mm.o
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/NativeWidgetsMac.mm:304:81: warning: use of GNU ?: conditional expression extension, omitting middle operand [-Wgnu-conditional-omitted-operand]
+  304 |         value.text=event.charactersIgnoringModifiers.lowercaseString.UTF8String?:"";auto action=send;if(action)action(std::move(value));
+      |                                                                                 ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/NativeWidgetsMac.mm:310:77: warning: use of GNU ?: conditional expression extension, omitting middle operand [-Wgnu-conditional-omitted-operand]
+  310 |     value.text=event.charactersIgnoringModifiers.lowercaseString.UTF8String?:"";if(action)action(std::move(value));
+      |                                                                             ^
+2 warnings generated.
+[6/15] Building CXX object CMakeFiles/iiGUI.dir/src/Widgets/WidgetState.cpp.o
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3554:223: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3554 |         if(n.color_button){target.images.push_back({r,n.color_button->paint({r.width,r.height},enabled&&impl_->hovered==i,enabled&&impl_->pressed==i,enabled&&impl_->focused==i,impl_->appearance.primary),{},enabled?1.f:.32f});return;}
+      |                                                                                                                                                                                                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:42: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasLayer>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                          ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3487:64: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3487 |             if(o.icon) layer.images.push_back({slot,o.icon,{},1});
+      |                                                                ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3555:26: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasLayer>' requested here
+ 3555 |         if(n.menu_item) {draw_menu_item(target,i);return;}
+      |                          ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:42: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasLayer>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                          ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3502:91: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3502 |             if(image) layer.images.push_back({bounds,image,{},inactive || enabled?1.f:.45f});
+      |                                                                                           ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3529:135: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3529 |             target.images.push_back({{r.x+(r.width-16)/2,r.y+(r.height-16)/2,16,16},o.icon,Color{shade,shade,shade,1},enabled?1.f:.38f});
+      |                                                                                                                                       ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3572:13: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasLayer>' requested here
+ 3572 |             draw_stepper(target,{r.x+r.width-19,r.y+(r.height-18)/2,18,18},{.tone=n.combo.tone,.arrow=n.combo.arrow,.icon=n.combo.indicator},enabled,false,false);
+      |             ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:42: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasLayer>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                          ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3581:108: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3581 |             target.images.push_back({{r.x+12,r.y+(r.height-icon)/2,icon,icon},n.tab.icon,{},enabled?1.f:.3f});
+      |                                                                                                            ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:42: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasLayer>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                          ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3610:98: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3610 |                 target.images.push_back({image_rect,n.button.background_image,{},enabled?1.f:.32f});
+      |                                                                                                  ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3619:114: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3619 |                 if(icon)target.images.push_back({{left,r.y+(r.height-icon)/2,icon,icon},o.icon,{},enabled?1.f:.3f});
+      |                                                                                                                  ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3621:195: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3621 |                 if(indicator)target.images.push_back({{left+main+(main?gap:0),r.y+(r.height-indicator)/2,indicator,indicator},!enabled&&o.disabled_indicator?o.disabled_indicator:o.indicator,{},1});
+      |                                                                                                                                                                                                   ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3627:113: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3627 |                 target.images.push_back({{left,r.y+(r.height-icon)/2,icon,icon},n.button.icon,{},enabled?1.f:.3f});
+      |                                                                                                                 ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3631:176: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3631 |                 target.images.push_back({{r.x+r.width-18,r.y+(r.height-16)/2,16,16},!enabled && n.button.disabled_indicator?n.button.disabled_indicator:n.button.indicator,{},1});
+      |                                                                                                                                                                                ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3662:123: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3662 |             if(n.slider.background_image)target.images.push_back({track_rect,n.slider.background_image,{},enabled?1.f:.32f});
+      |                                                                                                                           ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3665:119: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3665 |             if(n.slider.background_image)target.images.push_back({thumb_rect,slider_thumb_image(),{},enabled?1.f:1.f/3});
+      |                                                                                                                       ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3554:223: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3554 |         if(n.color_button){target.images.push_back({r,n.color_button->paint({r.width,r.height},enabled&&impl_->hovered==i,enabled&&impl_->pressed==i,enabled&&impl_->focused==i,impl_->appearance.primary),{},enabled?1.f:.32f});return;}
+      |                                                                                                                                                                                                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:79: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasFrame>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3487:64: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3487 |             if(o.icon) layer.images.push_back({slot,o.icon,{},1});
+      |                                                                ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3555:26: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasFrame>' requested here
+ 3555 |         if(n.menu_item) {draw_menu_item(target,i);return;}
+      |                          ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:79: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasFrame>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3502:91: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3502 |             if(image) layer.images.push_back({bounds,image,{},inactive || enabled?1.f:.45f});
+      |                                                                                           ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3529:135: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3529 |             target.images.push_back({{r.x+(r.width-16)/2,r.y+(r.height-16)/2,16,16},o.icon,Color{shade,shade,shade,1},enabled?1.f:.38f});
+      |                                                                                                                                       ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3572:13: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasFrame>' requested here
+ 3572 |             draw_stepper(target,{r.x+r.width-19,r.y+(r.height-18)/2,18,18},{.tone=n.combo.tone,.arrow=n.combo.arrow,.icon=n.combo.indicator},enabled,false,false);
+      |             ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:79: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasFrame>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3581:108: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3581 |             target.images.push_back({{r.x+12,r.y+(r.height-icon)/2,icon,icon},n.tab.icon,{},enabled?1.f:.3f});
+      |                                                                                                            ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3739:79: note: in instantiation of function template specialization 'ii::gui::detail::WidgetState::frame(Size, std::size_t *, const CaptureFilter *, bool, SceneBuild *)::(anonymous class)::operator()<ii::gui::CanvasFrame>' requested here
+ 3739 |         }else if(draw){if(batch)draw_node(f.overlays[*batch],i);else draw_node(f,i);}
+      |                                                                               ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3610:98: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3610 |                 target.images.push_back({image_rect,n.button.background_image,{},enabled?1.f:.32f});
+      |                                                                                                  ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3619:114: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3619 |                 if(icon)target.images.push_back({{left,r.y+(r.height-icon)/2,icon,icon},o.icon,{},enabled?1.f:.3f});
+      |                                                                                                                  ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3621:195: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3621 |                 if(indicator)target.images.push_back({{left+main+(main?gap:0),r.y+(r.height-indicator)/2,indicator,indicator},!enabled&&o.disabled_indicator?o.disabled_indicator:o.indicator,{},1});
+      |                                                                                                                                                                                                   ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3627:113: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3627 |                 target.images.push_back({{left,r.y+(r.height-icon)/2,icon,icon},n.button.icon,{},enabled?1.f:.3f});
+      |                                                                                                                 ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3631:176: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3631 |                 target.images.push_back({{r.x+r.width-18,r.y+(r.height-16)/2,16,16},!enabled && n.button.disabled_indicator?n.button.disabled_indicator:n.button.indicator,{},1});
+      |                                                                                                                                                                                ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3662:123: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3662 |             if(n.slider.background_image)target.images.push_back({track_rect,n.slider.background_image,{},enabled?1.f:.32f});
+      |                                                                                                                           ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Widgets/WidgetState.cpp:3665:119: warning: missing field 'gradient' initializer [-Wmissing-field-initializers]
+ 3665 |             if(n.slider.background_image)target.images.push_back({thumb_rect,slider_thumb_image(),{},enabled?1.f:1.f/3});
+      |                                                                                                                       ^
+24 warnings generated.
+[7/15] Building OBJCXX object CMakeFiles/iiGUI.dir/src/Platform/Host.mm.o
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:42:23: warning: 'CADisplayLink' is only available on macOS 14.0 or newer [-Wunguarded-availability-new]
+   42 | - (void)displayFrame:(CADisplayLink*)sender;
+      |                       ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/QuartzCore.framework/Headers/CADisplayLink.h:21:12: note: 'CADisplayLink' has been marked as being introduced in macOS 14.0 here, but the deployment target is macOS 12.0.0
+   21 | @interface CADisplayLink : NSObject
+      |            ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:42:1: note: annotate 'displayFrame:' with an availability attribute to silence this warning
+   42 | - (void)displayFrame:(CADisplayLink*)sender;
+      | ^                                          
+      |                                             API_AVAILABLE(macos(14.0))
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:52:23: warning: 'CADisplayLink' is only available on macOS 14.0 or newer [-Wunguarded-availability-new]
+   52 | - (void)displayFrame:(CADisplayLink*)sender {
+      |                       ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/QuartzCore.framework/Headers/CADisplayLink.h:21:12: note: 'CADisplayLink' has been marked as being introduced in macOS 14.0 here, but the deployment target is macOS 12.0.0
+   21 | @interface CADisplayLink : NSObject
+      |            ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:52:1: note: annotate 'displayFrame:' with an availability attribute to silence this warning
+   52 | - (void)displayFrame:(CADisplayLink*)sender {
+      | ^
+      |                                              API_AVAILABLE(macos(14.0))
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:176:5: warning: 'CADisplayLink' is only available on macOS 14.0 or newer [-Wunguarded-availability-new]
+  176 |     CADisplayLink* display_link = nil;
+      |     ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/QuartzCore.framework/Headers/CADisplayLink.h:21:12: note: 'CADisplayLink' has been marked as being introduced in macOS 14.0 here, but the deployment target is macOS 12.0.0
+   21 | @interface CADisplayLink : NSObject
+      |            ^
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:132:14: note: annotate 'Impl' with an availability attribute to silence this warning
+  132 | struct Host::Impl {
+      |              ^
+      |        API_AVAILABLE(macos(14.0))
+/Volumes/Storage/Workspace/SDK/iiGUI/src/Platform/Host.mm:578:26: warning: 'allowedFileTypes' is deprecated: first deprecated in macOS 12.0 - Use -allowedContentTypes instead [-Wdeprecated-declarations]
+  578 |     if(types.count)panel.allowedFileTypes=types;
+      |                          ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSSavePanel.h:289:49: note: 'allowedFileTypes' has been explicitly marked deprecated here
+  289 | @property (nullable, copy) NSArray<NSString *> *allowedFileTypes API_DEPRECATED("Use -allowedContentTypes instead", macos(10.3,12.0));
+      |                                                 ^
+4 warnings generated.
+[8/15] Building CXX object CMakeFiles/iiGUI.dir/src/Widgets/NativeView.cpp.o
+[9/15] Building CXX object CMakeFiles/iiGUI.dir/src/Widgets/WidgetInteraction.cpp.o
+[10/15] Building CXX object CMakeFiles/iiGUIInteractionHandlerTests.dir/tests/interaction_handler.cpp.o
+[11/15] Linking CXX static library libiiGUI.a
+[12/15] Linking CXX executable iiGUIInteractionHandlerTests

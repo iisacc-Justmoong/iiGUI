@@ -25,7 +25,7 @@ source = (root / "src/Graphics/CanvasWindows.cpp").read_text(encoding="utf-8")
 shader = source.split('R"hlsl(', 1)[1].split(')hlsl"', 1)[0]
 entries = (("vert", "vertex_main"), ("frag", "fragment_main"),
            ("vert", "text_vertex"), ("frag", "text_fragment"),
-           ("frag", "effect_fragment"))
+           ("frag", "effect_fragment"), ("frag", "composition_fragment"))
 with tempfile.TemporaryDirectory(prefix=".direct3d-shader-", dir=root / "resources") as directory:
     temporary = Path(directory)
     hlsl = temporary / "canvas.hlsl"

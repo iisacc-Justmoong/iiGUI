@@ -1,0 +1,142 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:2b41b6fd935d801c31e8e59b7bf6d41329d5ad736fc3200e7e9119e54cc881fe",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/ClipboardCapacity.md",
+    "sha256": "efc561ca3aa9462adc8ebda0336a195f0ca86b87b0cca9c95df023b9d19f87f8",
+    "bytes": 1876,
+    "line_count": 23,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "클립보드 텍스트 용량",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 클립보드 텍스트 용량\n",
+      "level": 1,
+      "title": "클립보드 텍스트 용량"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "`iiGUI::write_clipboard`와 `read_clipboard`는 1 MiB를 넘는 유효한 UTF-8 텍스트도\n처리해야 한다. Dreamscapes 실패 보고서가 사용하는 최대 64 MiB까지 원문을 자르지 않고\n전달하며, 그보다 큰 값이나 NUL·잘못된 UTF-8은 네이티브 클립보드를 수정하기 전에\n거절한다. 파일·URL·이미지의 기존 검증은 유지한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 13,
+      "raw": "각 플랫폼의 읽기 한도는 공통 텍스트 용량과 일치해야 한다. Web은 읽을 때 최대 용량을\n미리 할당하지 않으며, Wayland 전송은 실제로 진행되는 동안 기다리고 중단된 전송은\n기한으로 종료한다. 플랫폼 권한과 운영체제의 별도 제한은 성공으로 위장하지 않는다.\nmacOS 검사는 사용자의 일반 클립보드가 아닌 고유한 테스트 페이스트보드를 사용한다.\nAndroid 클립보드의 JNI UTF-16 조회에도 공통 용량을 적용한 뒤 UTF-8 바이트 한도를\n검사한다. 다른 JNI 문자열 조회에는 기존 한도를 유지한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 14,
+      "end_line": 14,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 15,
+      "end_line": 17,
+      "raw": "공개 상수 `maximum_clipboard_text_bytes`는 UTF-8 바이트 기준 64 MiB이다. 시스템\n클립보드가 더 작은 제한이나 권한을 적용하면 해당 실패를 그대로 반환한다. 입력\n텍스트를 검증하기 전에 기존 클립보드를 비우지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 23,
+      "raw": "`iiGUI.clipboard_capacity`는 2 MiB 초과와 64 MiB 경계, 잘못된 UTF-8과 NUL을\n검사한다. `iiGUI.clipboard_capacity_mac`은 독립 페이스트보드에서 대용량 다국어\n왕복과 거절 후 보존을 검사한다. Web 경로는 Node의 메모리 전용 클립보드 모의에서\n2 MiB 왕복과 거절 후 보존을 검사했다. iOS 및 Android 경로는 객체 컴파일만 확인했으며,\nWindows·Linux와 실제 브라우저·모바일 장치의 클립보드 실행 검증은 포함하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "클립보드 텍스트 용량",
+      "anchor": "클립보드-텍스트-용량",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000003",
+        "line": 4,
+        "text": "처리해야 한다. Dreamscapes 실패 보고서가 사용하는 최대 64 MiB까지 원문을 자르지 않고",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 8,
+        "text": "각 플랫폼의 읽기 한도는 공통 텍스트 용량과 일치해야 한다. Web은 읽을 때 최대 용량을",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "기한으로 종료한다. 플랫폼 권한과 운영체제의 별도 제한은 성공으로 위장하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 23,
+        "text": "Windows·Linux와 실제 브라우저·모바일 장치의 클립보드 실행 검증은 포함하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

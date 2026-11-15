@@ -1,0 +1,11 @@
+import vm NativeNavigationBackend
+import nav lvui.native.CollectionNavigation
+Window {
+    VStack {
+        for (item in vm.items, key: item.id, id: "results", itemHeight: 40,
+             width: 240, height: 160, navigation: nav,
+             activateOnDoubleClick: vm.select_on_click, onActivate: vm.activate) {
+            Label(id: "row", text: item.title)
+        }
+    }
+}

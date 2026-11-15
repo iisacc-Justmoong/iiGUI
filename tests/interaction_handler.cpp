@@ -60,6 +60,28 @@ void committed(){
     check(rejected,"Press origin crossed its owner thread");
     good(f.host.clear_content());check(!f.target.press_origin(),"Retired widget retained a press origin");
 }
+void consumed_hover(){
+    Fixture f; int inputs=0; std::vector<gui::WidgetInteraction> observed;
+    auto port=std::make_shared<gui::WidgetInteractionPort>([&](const auto& value){observed.push_back(value);});
+    good(f.root.observe_interaction(port));
+    good(f.root.set_input_handler([&](const auto& event)->core::Result<bool>{
+        if(event.kind==gui::WidgetInputKind::pointer_move){++inputs;return true;}
+        return false;
+    }));
+    f.flush(); f.move();
+    check(inputs==1&&observed.back().hovered,"Consumed motion did not update the receiving surface hover");
+    const auto count=observed.size();f.move(35,35);
+    check(inputs==2&&observed.size()==count,"Unchanged consumed hover emitted duplicate interaction");
+    f.move(300,120);
+    check(!observed.back().hovered,"Moving away from a consumed surface retained hover");
+    bool nested=true;
+    good(f.root.set_input_handler([&](const auto& event)->core::Result<bool>{
+        if(event.kind==gui::WidgetInputKind::pointer_move && nested){nested=false;f.move(300,120);return true;}
+        return false;
+    }));
+    f.move();
+    check(!nested&&!observed.back().hovered,"Older consumed motion replaced a newer reentrant pointer position");
+}
 void reentrant(){
     std::vector<gui::WidgetInteraction> first,second;Fixture f;
     good(f.target.set_interaction_handler([&](const auto& value){first.push_back(value);if(value.hovered)good(f.target.set_interaction_handler([&](const auto& next){second.push_back(next);}));}));
@@ -138,6 +160,6 @@ void programmatic_focus(){
 }
 int main(int argc,char** argv){try{
     const std::string name=argc>1?argv[1]:"committed";
-    if(name=="committed")committed();else if(name=="reentrant")reentrant();else if(name=="fanout")fanout();else if(name=="retirement")retirement();else if(name=="capacity")capacity();else if(name=="owner")owner();else if(name=="programmatic_focus")programmatic_focus();else throw std::runtime_error("Unknown case");
+    if(name=="committed")committed();else if(name=="consumed_hover")consumed_hover();else if(name=="reentrant")reentrant();else if(name=="fanout")fanout();else if(name=="retirement")retirement();else if(name=="capacity")capacity();else if(name=="owner")owner();else if(name=="programmatic_focus")programmatic_focus();else throw std::runtime_error("Unknown case");
     std::cout<<"INTERACTION_HANDLER_OK "<<name<<'\n';
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

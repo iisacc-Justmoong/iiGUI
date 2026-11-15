@@ -1,0 +1,93 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:6a6c46c3692c9bed57c4219dfe6d6d641b833fa2761f9568c62e7cb2bab9823c",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/TextWrapFallback.md",
+    "sha256": "e27737d7f4c4c099fc6a7fadf6f18cb2f68fd9cd21fa9114e766743ceecdc7bb",
+    "bytes": 927,
+    "line_count": 12,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "텍스트 줄바꿈 대체 상태 알림",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 텍스트 줄바꿈 대체 상태 알림\n",
+      "level": 1,
+      "title": "텍스트 줄바꿈 대체 상태 알림"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "iiGUI의 네이티브 입력 필드는 요청된 자동 줄바꿈을 텍스트 배치 예산 안에서\n수행할 수 없는 경우 줄바꿈 없는 배치로 전환한다. 텍스트와 선택은 그대로 유지한다.\n호스트 정책이 `wrapping_fallback_changed` 콜백을 제공하면 필드 생성 시 현재 상태를\n한 번 알리고, 이후 텍스트·크기·설정 변경으로 상태가 바뀔 때만 다시 알린다.\n자동 줄바꿈을 요청하지 않은 필드는 `false`를 보고한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 9,
+      "end_line": 12,
+      "raw": "알림은 해당 위젯의 소유 스레드에서 배치가 반영된 후 실행한다. 콜백이 위젯을\n퇴역시키거나 설정을 다시 변경할 수 있으며, 퇴역 뒤에는 더 이상 호출하지 않는다.\n콜백이 없는 정책은 그대로 사용할 수 있다. 이 알림은 배치 성공을 보증하거나\n텍스트 크기 제한을 늘리지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "텍스트 줄바꿈 대체 상태 알림",
+      "anchor": "텍스트-줄바꿈-대체-상태-알림",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000005",
+        "line": 10,
+        "text": "퇴역시키거나 설정을 다시 변경할 수 있으며, 퇴역 뒤에는 더 이상 호출하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

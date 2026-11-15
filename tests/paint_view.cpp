@@ -80,6 +80,31 @@ int main() {
               device->presented == 2 && retired == 1 && !label.snapshot(),
               "Closing an admitted paint did not abort and retire its view");
         check(!view->paint({300, 100}) && !view->input({}) && retired == 1, "A closed view accepted work");
+
+        // A layout callback may populate visible content during the first
+        // requested frame; it must reach that frame without a later query.
+        auto initial_device = std::make_shared<Device>();
+        int viewport_changes = 0;
+        auto initial_view = take(PaintView::create(initial_device, [&](WidgetBuilder& builder) -> Result<void> {
+            auto scroll = builder.scroll_view({}, "viewport", {.width=300, .height=100});
+            if (!scroll) return std::unexpected(scroll.error());
+            auto label = builder.label(*scroll, "initial", {.text="Pending"});
+            if (!label) return std::unexpected(label.error());
+            return scroll->set_scroll_handler([&, target=*label](const ScrollViewport& viewport) {
+                if (viewport.bounds.width > 0 && viewport.bounds.height > 0) {
+                    ++viewport_changes;
+                    good(target.set_text("Populated"));
+                }
+            });
+        }));
+        good(initial_view->paint({300, 100}));
+        check(viewport_changes == 1 && std::ranges::find(initial_device->text, "Populated") != initial_device->text.end(),
+              "The first frame omitted content from its viewport callback");
+        initial_device->text.clear();
+        good(initial_view->paint({300, 100}));
+        check(viewport_changes == 1, "An unchanged explicit frame repeated the viewport callback");
+        good(initial_view->close());
+
         bool device_alive_on_retirement = false;
         auto last_device = std::make_shared<Device>();
         std::weak_ptr<Device> weak_device = last_device;

@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.31)
+project(UIKitEmbeddedStateTests LANGUAGES CXX)
+include(CTest)
+add_executable(UIKitEmbeddedStateTests main.cpp)
+target_compile_features(UIKitEmbeddedStateTests PRIVATE cxx_std_23)
+add_test(NAME UIKit.EmbeddedState COMMAND UIKitEmbeddedStateTests)
+set_tests_properties(UIKit.EmbeddedState PROPERTIES TIMEOUT 30)

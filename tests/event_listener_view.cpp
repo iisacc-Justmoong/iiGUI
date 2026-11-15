@@ -278,10 +278,40 @@ void content_sizing(){
     require(implicit.width==100&&implicit.height==0,"Hidden content contributed to intrinsic listener size");
     good(outer.clear_content());tree->close();
 }
+void semantic_click(){
+    using namespace ii::gui;
+    auto tree=std::make_shared<detail::WidgetState>([](ii::runtime::Task task){task();});
+    auto host=take(tree->content_host({},"host",{240,120}));
+    std::optional<NativeEventListener> listener;Widget child;int clicks=0,child_clicks=0;
+    good(host.set_content([&](WidgetBuilder& builder)->ii::core::Result<void>{
+        listener=take(NativeEventListener::create(builder,{},"listener",{240,120},{.clicked=[&]{++clicks;}}));
+        child=take(builder.button(listener->root(),"child",{.text="Child",.height=30,.width=60},[&]{++child_clicks;}));
+        return child.set_frame({150,20,60,30});
+    }));
+    (void)take(tree->drawing_snapshot({240,120}));
+    auto down=[&](double x,double y){good(tree->input({.kind=WidgetInputKind::pointer_down,.x=x,.y=y,.buttons=1}));};
+    auto up=[&](double x,double y){good(tree->input({.kind=WidgetInputKind::pointer_up,.x=x,.y=y}));};
+    down(20,80);up(20,80);require(clicks==1,"Listener did not deliver its surface click");
+    good(tree->input({.kind=WidgetInputKind::pointer_down,.x=20,.y=80,.buttons=2}));up(20,80);
+    require(clicks==1,"A secondary press activated the listener click");
+    down(20,80);up(300,160);require(clicks==1,"An outside release activated the listener click");
+    down(20,80);good(tree->input({.kind=WidgetInputKind::pointer_move,.x=50,.y=80,.buttons=1}));up(50,80);
+    require(clicks==1,"A drag activated the listener click");
+    down(20,80);good(tree->input({.kind=WidgetInputKind::pointer_cancel}));up(20,80);
+    require(clicks==1,"A canceled gesture activated the listener click");
+    down(160,30);up(160,30);
+    require(clicks==1&&child_clicks==1,"Listener intercepted its child control");
+    down(20,80);good(listener->set_callbacks({.clicked=[&]{clicks+=10;}}));up(20,80);
+    require(clicks==1,"An old press reached a replacement callback");
+    down(20,80);up(20,80);require(clicks==11,"Replacement callback did not receive a new click");
+    good(listener->set_callbacks({.clicked=[&]{++clicks;good(host.clear_content());}}));
+    down(20,80);up(20,80);
+    require(clicks==12&&!listener->root().snapshot(),"Reentrant retirement retained a click target");tree->close();
+}
 
 }
 int main(){events();
 #if defined(IIGUI_KEY_CANCEL_API)
 keyboard_cancellation();
 #endif
-reentrant_updates();host_reentrant_input();host_reentrant_release();host_drag_handoff_cancellation();host_input_retirement_and_bounds();content_sizing();}
+reentrant_updates();host_reentrant_input();host_reentrant_release();host_drag_handoff_cancellation();host_input_retirement_and_bounds();content_sizing();semantic_click();}

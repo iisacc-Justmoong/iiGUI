@@ -79,6 +79,8 @@ core::Result<void> Widget::set_selected_index(int i) const { auto s=lock();if(!s
 core::Result<void> Widget::set_menu_state(MenuItemState v) const { auto s=lock();if(!s) return std::unexpected(s.error());return (*s)->menu_state(index_,v); }
 core::Result<void> Widget::set_menu_expanded(bool v) const { auto s=lock();if(!s) return std::unexpected(s.error());return (*s)->menu_expanded(index_,v); }
 core::Result<void> Widget::set_context_menu(Widget p) const { auto s=lock();if(!s) return std::unexpected(s.error());return (*s)->context_menu(index_,p); }
+core::Result<void> Widget::set_touch_context_options(TouchContextOptions v) const { auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->touch_context_options(index_,v); }
+core::Result<TouchContextOptions> Widget::touch_context_options() const { auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->touch_context_options(index_); }
 core::Result<void> Widget::set_color_model(std::shared_ptr<ColorPickerModel> p) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->color_model(index_,std::move(p));}
 core::Result<void> Widget::set_popup_content(WidgetFactory f) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->popup_factory(index_,std::move(f));}
 core::Result<void> Widget::set_popup_content_at(Widget anchor,WidgetFactory f) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->popup_factory(index_,std::move(f),anchor);}
@@ -115,6 +117,7 @@ core::Result<void> Widget::request_frames()const{auto s=lock();if(!s)return std:
 
 core::Result<void> Widget::set_drawing(WidgetDrawing v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->drawing(index_,std::move(v));}
 core::Result<void> Widget::set_input_handler(WidgetInputHandler v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->input_handler(index_,std::move(v));}
+core::Result<void> Widget::set_horizontal_drag_handler(HorizontalDragOptions o,HorizontalDragHandler v) const {auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->horizontal_drag_handler(index_,o,std::move(v));}
 core::Result<void> Widget::set_text_input_provider(std::shared_ptr<const TextInputProvider> v)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_input_provider(index_,std::move(v));}
 core::Result<void> Widget::set_text_geometry_provider(TextGeometryProvider v)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->text_geometry_provider(index_,std::move(v));}
 core::Result<TextInputChange> Widget::begin_text_input_change(bool value,bool system)const{auto s=lock();if(!s)return std::unexpected(s.error());return (*s)->begin_text_input_change(index_,value,system);}

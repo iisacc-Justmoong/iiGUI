@@ -1,0 +1,7 @@
+ApplicationWindow(title: "Hello World") {
+    VStack(id: "root", spacing: 16, padding: 32) {
+        Label(id: "greeting", text: "Hello World", style: .title, fontSize: 32)
+        Label(id: "description", text: "iiSDKCore + LVUI + Vulkan", style: .body, fontSize: 16)
+        Label(id: "status", text: "Native C++23", style: .description, fontSize: 14)
+    }
+}

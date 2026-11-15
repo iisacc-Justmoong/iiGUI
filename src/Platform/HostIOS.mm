@@ -13,6 +13,8 @@
 #include "UIKitSceneRouter.h"
 #include "UIKitWindowGeometry.h"
 #include "UIKitDisplayScale.h"
+#include "UIKitEmbeddedState.h"
+#include "ExternalCloseBarrier.h"
 #include <iiGUI/DesktopCommon.h>
 #include <iiGUI/DispatchState.h>
 #include <iiGUI/CanvasState.h>
@@ -37,7 +39,60 @@ std::string session_identifier(UISceneSession* session) {
     if(!bytes||!bytes.length||bytes.length>4096)throw std::invalid_argument("Invalid UIKit scene session identifier");
     return {static_cast<const char*>(bytes.bytes),bytes.length};
 }
+UIView* first_responder(UIView* view) {
+    if(view.isFirstResponder)return view;
+    for(UIView* child in view.subviews)if(UIView* found=first_responder(child))return found;
+    return nil;
 }
+UIViewController* owning_controller(UIView* view) {
+    UIResponder* current=view;
+    for(unsigned depth=0;current&&depth<256;++depth,current=current.nextResponder)
+        if([current isKindOfClass:UIViewController.class])return (UIViewController*)current;
+    return nil;
+}
+bool visible_view_hierarchy(UIView* view) {
+    for(unsigned depth=0;view&&depth<256;++depth,view=view.superview)
+        if(view.hidden||view.alpha<=0)return false;
+    return true;
+}
+}
+@interface IIGUIIOSEmbeddedView : UIView {
+@public
+    std::function<void()> changed;
+    std::function<void()> detached;
+}
+@end
+@implementation IIGUIIOSEmbeddedView
+- (instancetype)initWithFrame:(CGRect)frame {
+    if((self=[super initWithFrame:frame])){
+        if(@available(iOS 17.0,*))[self registerForTraitChanges:@[UITraitDisplayScale.class] withAction:@selector(iiguiScaleChanged:previous:)];
+    }
+    return self;
+}
+- (void)iiguiScaleChanged:(id<UITraitEnvironment>)environment previous:(UITraitCollection*)previous {
+    if(ii::gui::detail::uikit_display_scale_changed(previous.displayScale,environment.traitCollection.displayScale)){
+        IIGUIIOSEmbeddedView* lifetime __attribute__((objc_precise_lifetime))=self;
+        auto call=lifetime->changed;if(call)call();
+    }
+}
+- (void)layoutSubviews {
+    IIGUIIOSEmbeddedView* lifetime __attribute__((objc_precise_lifetime))=self;
+    [super layoutSubviews];auto call=lifetime->changed;if(call)call();
+}
+- (void)didMoveToWindow {
+    IIGUIIOSEmbeddedView* lifetime __attribute__((objc_precise_lifetime))=self;
+    [super didMoveToWindow];
+    if(!self.window){auto call=lifetime->detached;if(call)call();}
+    else {auto call=lifetime->changed;if(call)call();}
+}
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < 170000
+- (void)traitCollectionDidChange:(UITraitCollection*)previous {
+    [super traitCollectionDidChange:previous];
+    if(@available(iOS 17.0,*))return;
+    [self iiguiScaleChanged:self previous:previous];
+}
+#endif
+@end
 @interface IIGUIIOSController : UIViewController <UIDocumentPickerDelegate> {
 @public
     std::function<void()> resize;
@@ -68,11 +123,25 @@ UIMenu* native_menu(const ii::gui::AppMenuItem& row, ii::gui::UiExecutor ui) {
 }
 }
 @implementation IIGUIIOSController
+- (instancetype)init {
+    if((self=[super init])){
+        if(@available(iOS 17.0,*))[self registerForTraitChanges:@[UITraitDisplayScale.class] withAction:@selector(iiguiScaleChanged:previous:)];
+    }
+    return self;
+}
+- (void)iiguiScaleChanged:(id<UITraitEnvironment>)environment previous:(UITraitCollection*)previous {
+    if(ii::gui::detail::uikit_display_scale_changed(previous.displayScale,environment.traitCollection.displayScale)){
+        auto call=resize;if(call)call();
+    }
+}
 - (void)viewDidLayoutSubviews { [super viewDidLayoutSubviews]; if(resize) resize(); }
+#if __IPHONE_OS_VERSION_MIN_REQUIRED < 170000
 - (void)traitCollectionDidChange:(UITraitCollection*)previous {
     [super traitCollectionDidChange:previous];
-    if(ii::gui::detail::uikit_display_scale_changed(previous.displayScale,self.traitCollection.displayScale) && resize)resize();
+    if(@available(iOS 17.0,*))return;
+    [self iiguiScaleChanged:self previous:previous];
 }
+#endif
 - (void)viewDidAppear:(BOOL)animated { [super viewDidAppear:animated]; if(appeared) appeared(); }
 - (void)displayFrame:(CADisplayLink*)link { if(frame) frame(link); }
 - (void)documentPicker:(UIDocumentPickerViewController*)picker didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls { (void)picker; auto call=picked;picked={};if(call)call(urls); }
@@ -150,15 +219,25 @@ struct Host::Impl final {
     detail::UIKitSceneBinding scene_binding;detail::UIKitSceneRouter scene_router;
     detail::UIKitSceneRouter::Token scene_request=0,initial_request=0;
     detail::HostCallbackGate callback_gate;WindowSnapshot state;HostStats statistics;
+    detail::ExternalCloseBarrier embedded_callback_barrier;
     Phase phase=Phase::created;detail::HostFailure failure;
     const std::thread::id owner=std::this_thread::get_id();
     detail::CanvasState canvas;std::shared_ptr<detail::WidgetState> widgets,legacy;
     Widget legacy_text;bool mounting=false,draining=false,opened=false,appearance_ready=false,secondary=false,active=true;
-    bool application_driver=false,independent_scene=false,close_pending=false;
+    bool application_driver=false,independent_scene=false,close_pending=false,embedded=false;
+    bool embedded_scene_active=false,embedded_application_active=false;
+    bool embedded_cleanup_scheduled=false;
+    runtime::Task embedded_closed;
     Impl* parent=nullptr;std::vector<Impl*> children;
     std::shared_ptr<Lifetime> lifetime=std::make_shared<Lifetime>();
+    detail::UIKitEmbeddedState embedded_state;
     CFRunLoopSourceRef source=nullptr;CFRunLoopTimerRef timer=nullptr;
     UIWindow* window=nil;IIGUIIOSController* controller=nil;UIView* content=nil;
+    __weak UIView* embedded_parent=nil;
+    __weak UIWindow* embedded_owner_window=nil;
+    __weak UIView* embedded_previous_responder=nil;
+    IIGUIIOSEmbeddedView* embedded_view=nil;
+    NSMutableArray* embedded_observers=nil;
     UIWindowScene* initial_scene=nil;UISceneSession* initial_session=nil;UISceneSession* native_session=nil;
     NSString* scene_nonce=nil;
     CADisplayLink* display_link=nil;UIDocumentPickerViewController* picker=nil;
@@ -168,10 +247,25 @@ struct Host::Impl final {
     core::Result<void> ready()const{if(!on_owner())return core::fail(core::ErrorCode::wrong_executor,"UIKit access requires the owner");if(phase!=Phase::running)return core::fail(core::ErrorCode::closed,"GUI window is not open");return {};}
     void remember(std::string text,std::exception_ptr cause={}){NSLog(@"iiGUI UIKit error: %s",text.c_str());if(cause)try{std::rethrow_exception(cause);}catch(const std::exception& e){NSLog(@"iiGUI cause: %s",e.what());}catch(...){}if(!failure)failure=core::Error{core::ErrorCode::failed,std::move(text),cause};}
     void deliver_primary_closed(runtime::Task call)noexcept{if(call)try{call();}catch(...){remember("UIKit close callback failed",std::current_exception());}}
+    // Public operations can invoke application factories and callbacks. They
+    // may enter a foreign nested run loop, just like native callbacks.
+    struct EmbeddedCallbackScope final {
+        Impl* owner;
+        bool active;
+        explicit EmbeddedCallbackScope(Impl* value):owner(value),active(value->embedded){
+            if(active)owner->embedded_callback_barrier.enter();
+        }
+        ~EmbeddedCallbackScope(){
+            if(active&&owner->embedded_callback_barrier.leave())owner->schedule_embedded_cleanup();
+        }
+    };
     template<class F> void guard(F&& f)noexcept{
+        const bool borrowed=embedded;
+        if(borrowed)embedded_callback_barrier.enter();
         callback_gate.enter();
         @try{try{f();}catch(...){remember("UIKit callback failed",std::current_exception());close();}}@catch(NSException* e){remember(native_error(e));close();}
         auto closed=callback_gate.leave();
+        if(borrowed&&embedded_callback_barrier.leave())schedule_embedded_cleanup();
         if(closed)deliver_primary_closed(std::move(closed));
     }
     void setup_source(){
@@ -270,12 +364,37 @@ struct Host::Impl final {
             throw std::logic_error("UIKit independent scene routing and binding disagree");
         child->open(scene);
     }
-    void update_snapshot(){if(content){auto r=content.bounds;state.size={r.size.width,r.size.height};if(window.windowScene)if(UIScreen* screen=window.screen)state.backing_scale=screen.scale;state.visible=window.windowScene&&!window.hidden&&phase==Phase::running;}}
+    UIWindow* current_window()const{return embedded?embedded_parent.window:window;}
+    void update_snapshot(){if(content){auto r=content.bounds;state.size={r.size.width,r.size.height};UIWindow* owner=current_window();if(owner.windowScene)if(UIScreen* screen=owner.screen)state.backing_scale=screen.scale;state.visible=owner.windowScene&&!owner.hidden&&phase==Phase::running;}}
+    detail::UIKitEmbeddedMetrics embedded_metrics()const{
+        UIView* host=embedded_parent;UIWindow* owner=host.window;
+        const bool attached=host&&owner&&owner==embedded_owner_window&&owner.windowScene&&embedded_view&&
+            embedded_view.superview==host&&embedded_view.window==owner;
+        const auto bounds=host.bounds;
+        return {.width=double(bounds.size.width),.height=double(bounds.size.height),
+            .scale=owner?double(owner.screen.scale):1.,.attached=attached,
+            .sceneActive=embedded_scene_active&&owner&&!owner.hidden,.applicationActive=embedded_application_active};
+    }
+    bool synchronize_embedded(){
+        if(!embedded||phase!=Phase::running)return false;
+        const auto metrics=embedded_metrics();auto change=embedded_state.update(metrics);
+        if(!change)throw std::runtime_error("Invalid embedded UIKit geometry or lifecycle");
+        if(change->detached){close();return false;}
+        const CGRect desired=embedded_parent.bounds;
+        if(!CGRectEqualToRect(embedded_view.frame,desired))embedded_view.frame=desired;
+        state.size={metrics.width,metrics.height};state.backing_scale=metrics.scale;
+        state.visible=metrics.attached&&embedded_parent.window.windowScene&&!embedded_parent.window.hidden;
+        if(change->geometry){canvas.dirty=true;gate->signal();if(opened&&callbacks.resized){auto callback=callbacks.resized;callback(state.size);}}
+        if(phase!=Phase::running)return false;
+        if(change->activity)activation(change->active);
+        return phase==Phase::running;
+    }
     runtime::FrameLoop* frames(){return options.frame_loop?options.frame_loop:motion_frames.get();}
     detail::WidgetFrameHooks frame_hooks(){return {
         .frames=[this]()->core::Result<runtime::FrameLoop*>{if(!frames())motion_frames=std::make_unique<runtime::FrameLoop>(dispatch->loop);return frames();},
         .activity=[this](bool value){frame_demand.motion(value);refresh_frames();},
-        .preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations};}
+        .preferences=motion_preferences,.renderer=options.renderer,.events=[this]()->core::Result<runtime::EventLoop*>{return &dispatch->loop;},.presentations=presentations,
+        .transparent_background=embedded};}
     void clear_legacy(){if(legacy){legacy->close();legacy.reset();legacy_text={};}}
     core::Result<void> show_legacy_text(){if(!legacy){auto next=std::make_shared<detail::WidgetState>([this](runtime::Task t){guard([&]{if(phase==Phase::running)t();});},WidgetAppearance{},frame_hooks());auto root=next->add(WidgetKind::vertical_stack,{},"iiGUI.legacy.root",{.padding=28},{},{},{});if(!root)return std::unexpected(root.error());auto label=next->add(WidgetKind::label,*root,"iiGUI.legacy.text",{},{.text=state.text,.font_size=17},{},{});if(!label)return std::unexpected(label.error());if(auto r=next->attach((__bridge void*)content, detail::make_native_widget_surface);!r)return r;legacy_text=*label;legacy=std::move(next);}return legacy_text.set_text(state.text);}
     void stop_frames(){if(display_link){[display_link invalidate];display_link=nil;if(widgets)widgets->set_frame_paced(false);if(legacy)legacy->set_frame_paced(false);}display_origin.reset();statistics.display_synced=false;}
@@ -369,6 +488,56 @@ struct Host::Impl final {
         activation(false);
         if(phase==Phase::running&&scene_binding.revision()==revision)detach_scene_windows(scene_binding,revision);
     }
+    void open_embedded(UIView* host){
+        embedded=true;embedded_parent=host;embedded_owner_window=host.window;
+        embedded_previous_responder=first_responder(host.window);
+        controller=[IIGUIIOSController new];
+        controller->frame=[this](CADisplayLink* value){frame(value);};
+        embedded_view=[[IIGUIIOSEmbeddedView alloc] initWithFrame:host.bounds];
+        embedded_view.autoresizingMask=UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
+        embedded_view.backgroundColor=UIColor.clearColor;embedded_view.opaque=NO;
+        content=embedded_view;[host addSubview:embedded_view];
+        UIWindow* owner=host.window;
+        embedded_scene_active=owner.windowScene.activationState==UISceneActivationStateForegroundActive;
+        embedded_application_active=UIApplication.sharedApplication.applicationState==UIApplicationStateActive;
+        const auto metrics=embedded_metrics();
+        if(!embedded_state.attach(metrics))throw std::runtime_error("Cannot attach an invalid UIKit parent surface");
+        state.size={metrics.width,metrics.height};state.backing_scale=metrics.scale;
+        state.visible=metrics.attached&&!owner.hidden;
+        const std::weak_ptr<Lifetime> weak=lifetime;
+        embedded_view->changed=[weak]{if(auto life=weak.lock();life&&life->owner){auto* self=life->owner;self->guard([&]{(void)self->synchronize_embedded();});}};
+        embedded_view->detached=[weak]{if(auto life=weak.lock();life&&life->owner){auto* self=life->owner;self->guard([&]{(void)self->synchronize_embedded();});}};
+        embedded_observers=[NSMutableArray new];auto center=NSNotificationCenter.defaultCenter;
+        NSArray<NSNotificationName>* names=@[UIApplicationDidBecomeActiveNotification,UIApplicationWillResignActiveNotification,
+            UISceneDidActivateNotification,UISceneWillDeactivateNotification,UISceneDidDisconnectNotification,
+            UIWindowDidBecomeHiddenNotification,UIWindowDidBecomeVisibleNotification];
+        for(NSNotificationName name in names){
+            id token=[center addObserverForName:name object:nil queue:nil usingBlock:^(NSNotification* notification){
+                if(auto life=weak.lock();life&&life->owner){auto* self=life->owner;self->guard([&]{
+                    if(!self->embedded||self->phase!=Phase::running)return;
+                    UIWindow* current=self->current_window();if(!current||!current.windowScene){self->close();return;}
+                    if([notification.name isEqualToString:UIApplicationDidBecomeActiveNotification])self->embedded_application_active=true;
+                    else if([notification.name isEqualToString:UIApplicationWillResignActiveNotification])self->embedded_application_active=false;
+                    else if([notification.name isEqualToString:UISceneDidActivateNotification]){
+                        if(notification.object!=current.windowScene)return;
+                        self->embedded_scene_active=true;
+                    }else if([notification.name isEqualToString:UISceneWillDeactivateNotification]){
+                        if(notification.object!=current.windowScene)return;
+                        self->embedded_scene_active=false;
+                    }else if([notification.name isEqualToString:UISceneDidDisconnectNotification]){
+                        if(notification.object!=current.windowScene)return;
+                        self->close();return;
+                    }else if(notification.object!=current)return;
+                    (void)self->synchronize_embedded();
+                });}
+            }];
+            if(!token)throw std::runtime_error("Cannot observe the embedded UIKit surface");
+            [embedded_observers addObject:token];
+        }
+        setup_source();phase=Phase::running;appearance_ready=true;
+        active=metrics.sceneActive&&metrics.applicationActive;
+        refresh_frames();gate->signal();
+    }
     void open(UIWindowScene* scene){
         if(phase==Phase::running&&window){const auto revision=scene_binding.revision();reattach_scene_windows(scene,scene_binding,revision);if(phase==Phase::running&&scene_binding.revision()==revision&&scene_binding.accepts((__bridge const void*)scene))activation(scene.activationState==UISceneActivationStateForegroundActive);return;}
         controller=[IIGUIIOSController new];controller.view.backgroundColor=UIColor.blackColor;
@@ -395,7 +564,36 @@ struct Host::Impl final {
         }[window makeKeyAndVisible];[controller.view layoutIfNeeded];update_snapshot();refresh_frames();gate->signal();
         if(independent_scene&&parent)parent->update_driver_activity();
     }
-    void cleanup(){scene_binding.reset();scene_router.clear();scene_request=0;lifetime->owner=nullptr;initial_scene=nil;initial_session=nil;native_session=nil;gate->detach();if(timer){CFRunLoopTimerInvalidate(timer);CFRelease(timer);timer=nullptr;}if(source){CFRunLoopSourceInvalidate(source);CFRelease(source);source=nullptr;}if(controller){controller->resize={};controller->appeared={};controller->frame={};controller->picked={};}for(NSURL* url in scopes)[url stopAccessingSecurityScopedResource];[scopes removeAllObjects];picker=nil;content=nil;window=nil;controller=nil;if(parent){std::erase(parent->children,this);parent=nullptr;}}
+    void cleanup(){
+        scene_binding.reset();scene_router.clear();scene_request=0;lifetime->owner=nullptr;
+        initial_scene=nil;initial_session=nil;native_session=nil;gate->detach();
+        if(timer){CFRunLoopTimerInvalidate(timer);CFRelease(timer);timer=nullptr;}
+        if(source){CFRunLoopSourceInvalidate(source);CFRelease(source);source=nullptr;}
+        for(id token in embedded_observers)[NSNotificationCenter.defaultCenter removeObserver:token];
+        [embedded_observers removeAllObjects];embedded_observers=nil;
+        if(embedded_view){embedded_view->changed={};embedded_view->detached={};[embedded_view removeFromSuperview];embedded_view=nil;}
+        embedded_parent=nil;embedded_owner_window=nil;embedded_previous_responder=nil;(void)embedded_state.close();
+        if(controller){controller->resize={};controller->appeared={};controller->frame={};controller->picked={};}
+        for(NSURL* url in scopes)[url stopAccessingSecurityScopedResource];
+        [scopes removeAllObjects];picker=nil;content=nil;window=nil;controller=nil;callbacks={};
+        if(parent){std::erase(parent->children,this);parent=nullptr;}
+    }
+    void schedule_embedded_cleanup(){
+        if(embedded_cleanup_scheduled)return;
+        embedded_cleanup_scheduled=true;
+        const std::weak_ptr<Lifetime> weak=lifetime;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if(auto life=weak.lock();life&&life->owner){
+                auto* self=life->owner;self->embedded_cleanup_scheduled=false;
+                if(!self->embedded_callback_barrier.admit())return;
+                auto closed=std::move(self->embedded_closed);
+                auto handler=self->failure.handler_snapshot();
+                self->cleanup();self->phase=Phase::closed;
+                try {if(closed)closed();}
+                catch(...){try{if(handler)handler({core::ErrorCode::failed,"UIKit external host close callback failed",std::current_exception()});}catch(...){}}
+            }
+        });
+    }
     void close()noexcept{
         if(phase!=Phase::running&&phase!=Phase::pending)return;
         phase=Phase::closing;activity.close();foreground.close();pending_files.clear();dispatch->retire();
@@ -407,8 +605,15 @@ struct Host::Impl final {
         auto list=children;
         for(auto* child:list)if(std::find(children.begin(),children.end(),child)!=children.end())child->close();
         children.clear();stop_frames();
+        UIView* prior=embedded_previous_responder;
+        UIView* focused=embedded?first_responder(current_window()):nil;
+        const bool restore_focus=prior&&prior.window==current_window()&&focused&&[focused isDescendantOfView:embedded_view];
         canvas.clear();clear_legacy();if(widgets){widgets->close();widgets.reset();}
-        [picker dismissViewControllerAnimated:NO completion:nil];window.hidden=YES;state.visible=false;state.closed=true;presentations->close();phase=Phase::closed;
+        if(restore_focus)[prior becomeFirstResponder];
+        [picker dismissViewControllerAnimated:NO completion:nil];if(!embedded)window.hidden=YES;
+        state.visible=false;state.closed=true;presentations->close();
+        if(embedded){embedded_closed=std::move(callbacks.closed);dispatch->loop.request_stop();schedule_embedded_cleanup();return;}
+        phase=Phase::closed;
         auto call=std::move(callbacks.closed);auto endpoint=owner?owner->dispatch:nullptr;cleanup();
         if(owner&&independent_scene)owner->update_driver_activity();
         if(secondary){
@@ -430,7 +635,7 @@ core::Result<std::shared_ptr<PresentationSource>> Host::presentation_source() co
     return std::static_pointer_cast<PresentationSource>(impl_->presentations);
 }
 Host::Host(HostOptions o):impl_(std::make_unique<Impl>(std::move(o))){}
-Host::~Host(){if(!is_ui_thread())std::terminate();if(impl_->phase==Impl::Phase::running||impl_->phase==Impl::Phase::pending)impl_->close();impl_->lifetime->owner=nullptr;impl_->presentations->close();impl_->dispatch->retire();impl_->gate->detach();}
+Host::~Host(){if(!is_ui_thread()||(impl_->embedded&&(impl_->phase==Impl::Phase::running||impl_->phase==Impl::Phase::closing)))std::terminate();if(impl_->phase==Impl::Phase::running||impl_->phase==Impl::Phase::pending)impl_->close();impl_->lifetime->owner=nullptr;impl_->presentations->close();impl_->dispatch->retire();impl_->gate->detach();}
 UiExecutor Host::executor()const noexcept{return UiExecutor(impl_->dispatch);}
 bool Host::is_ui_thread()const noexcept{return impl_->on_owner();}
 core::Result<void> Host::set_application_driver(bool enabled){
@@ -541,7 +746,36 @@ core::Result<void> Host::run(HostCallbacks callbacks){
     return {};
 }
 core::Result<void> Host::show_external(HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External event-loop hosting is not implemented on UIKit");}
-core::Result<void> Host::attach_external(void*,HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on UIKit");}
+core::Result<void> Host::attach_external(void* native_parent,HostCallbacks callbacks){
+    if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External surface requires the main thread");
+    if(impl_->phase!=Impl::Phase::created)return core::fail(core::ErrorCode::busy,"External host is single use");
+    if(!native_parent)return core::fail(core::ErrorCode::invalid_argument,"External parent view is required");
+    if(impl_->application_driver||impl_->options.event_loop||impl_->options.frame_loop)
+        return core::fail(core::ErrorCode::invalid_argument,"External surface requires its own event pump");
+    if(impl_->options.renderer==Renderer::vulkan)
+        return core::fail(core::ErrorCode::unsupported,"Embedded surfaces require the transparent native renderer");
+    if(impl_->activity.has_handler()||impl_->foreground.has_handler())
+        return core::fail(core::ErrorCode::invalid_argument,"The external application owns lifecycle notifications");
+    @try{
+        UIView* parent=(__bridge UIView*)native_parent;
+        if(![parent isKindOfClass:UIView.class]||!parent.window.windowScene)
+            return core::fail(core::ErrorCode::invalid_argument,"External parent must be a view attached to a window scene");
+        impl_->options.renderer=Renderer::native;impl_->callbacks=std::move(callbacks);
+        try{impl_->open_embedded(parent);}
+        catch(...){impl_->callbacks.closed={};impl_->stop_frames();impl_->dispatch->retire();impl_->cleanup();impl_->phase=Impl::Phase::closed;return core::fail(core::ErrorCode::failed,"Cannot attach external UIKit surface",std::current_exception());}
+    }@catch(NSException* error){
+        const auto message=native_error(error);impl_->callbacks.closed={};impl_->stop_frames();impl_->dispatch->retire();impl_->cleanup();impl_->phase=Impl::Phase::closed;
+        return core::fail(core::ErrorCode::failed,message);
+    }
+    return {};
+}
+core::Result<void> Host::external_parent_resized(){
+    if(auto ready=impl_->ready();!ready)return ready;
+    if(!impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"An attached external surface is required");
+    bool alive=false;impl_->guard([&]{alive=impl_->synchronize_embedded();});
+    if(!alive){if(impl_->failure)return std::unexpected(*impl_->failure);return core::fail(core::ErrorCode::closed,"External parent view is detached");}
+    return {};
+}
 core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
     if(!is_ui_thread()||!parent.is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"UIKit child requires main thread");
     if(this==&parent||impl_->application_driver)return core::fail(core::ErrorCode::invalid_argument,"An application driver cannot be a secondary window");
@@ -591,12 +825,84 @@ core::Result<void> Host::show(Host& parent,HostCallbacks callbacks){
         return core::fail(core::ErrorCode::failed,native_error(error));
     }
 }
-core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogCompletion completion){if(auto r=impl_->ready();!r)return r;if(!completion||!detail::valid_dialog(options))return core::fail(core::ErrorCode::invalid_argument,"Invalid document picker options");if(impl_->picker)return core::fail(core::ErrorCode::busy,"Document picker is open");NSMutableArray<UTType*>* types=[NSMutableArray new];if(options.mode==FileDialogMode::directory||options.mode==FileDialogMode::save)[types addObject:UTTypeFolder];else{for(const auto& filter:options.filters)for(const auto& ext:filter.extensions){auto type=[UTType typeWithFilenameExtension:native(ext)];if(type)[types addObject:type];}if(!types.count)[types addObject:UTTypeData];}auto picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:options.mode==FileDialogMode::open];picker.allowsMultipleSelection=options.multiple;picker.delegate=impl_->controller;picker.title=native(options.title);impl_->picker=picker;auto weak=std::weak_ptr(impl_->dispatch);auto host=impl_.get();auto ui=executor();impl_->controller->picked=[weak,host,ui,completion,options](NSArray<NSURL*>* urls){auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;FileDialogSelection result;result.canceled=urls==nil;for(NSURL* url in urls){if([url startAccessingSecurityScopedResource])[host->scopes addObject:url];auto selected=options.mode==FileDialogMode::save?[url URLByAppendingPathComponent:native(options.filename)]:url;result.paths.emplace_back(selected.path.UTF8String);}host->picker=nil;(void)ui.post([completion,result=std::move(result)]()mutable{completion(std::move(result));});};[impl_->controller presentViewController:picker animated:YES completion:nil];return {};}
-core::Result<void> Host::window_action(WindowAction action){if(auto r=impl_->ready();!r)return r;if(action==WindowAction::raise||action==WindowAction::restore){[impl_->window makeKeyAndVisible];return {};}if(unsigned(action)>unsigned(WindowAction::toggle_maximize))return core::fail(core::ErrorCode::invalid_argument,"Invalid UIKit window action");return core::fail(core::ErrorCode::unsupported,"UIKit scene geometry is managed by iPadOS");}
-core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> menu){if(auto r=impl_->ready();!r)return r;if(!detail::valid_menu(menu))return core::fail(core::ErrorCode::invalid_argument,"Invalid application menu");impl_->menu=std::move(menu);impl_->controller->menu_rows=impl_->menu;impl_->controller->menu_ui=executor();[UIMenuSystem.mainSystem setNeedsRebuild];return {};}
-core::Result<void> Host::set_title(std::string_view text){if(auto r=impl_->ready();!r)return r;if(!detail::valid_title(text))return core::fail(core::ErrorCode::invalid_argument,"Invalid title");impl_->state.title=text;impl_->controller.title=native(text);return {};}
+core::Result<void> Host::choose_file(FileDialogOptions options,FileDialogCompletion completion){
+    if(auto r=impl_->ready();!r)return r;
+    if(!completion||!detail::valid_dialog(options))return core::fail(core::ErrorCode::invalid_argument,"Invalid document picker options");
+    if(impl_->picker)return core::fail(core::ErrorCode::busy,"Document picker is open");
+    if(impl_->embedded){
+        if(options.mode!=FileDialogMode::open)
+            return core::fail(core::ErrorCode::unsupported,"The owning application must choose folders or save destinations");
+        Impl::EmbeddedCallbackScope scope{impl_.get()};
+        @try {
+            try {
+                if(!impl_->synchronize_embedded())return core::fail(core::ErrorCode::closed,"External parent view is detached");
+                UIView* parent=impl_->embedded_parent;
+                UIWindow* window=parent.window;
+                UIViewController* presenter=owning_controller(parent);
+                const bool attached=presenter&&window&&presenter.viewIfLoaded.window==window&&visible_view_hierarchy(parent);
+                const bool modal=presenter&&presenter.presentedViewController;
+                const bool transitioning=presenter&&(presenter.isBeingPresented||presenter.isBeingDismissed||presenter.transitionCoordinator);
+                switch(impl_->embedded_state.pickerAdmission(attached,modal,transitioning)){
+                case detail::UIKitPickerAdmission::unavailable:
+                    return core::fail(core::ErrorCode::unsupported,"No attached owner can present the document picker");
+                case detail::UIKitPickerAdmission::busy:
+                    return core::fail(core::ErrorCode::busy,"The owning application cannot present a document picker now");
+                case detail::UIKitPickerAdmission::ready:break;
+                }
+                NSMutableArray<UTType*>* types=[NSMutableArray new];
+                for(const auto& filter:options.filters)for(const auto& ext:filter.extensions){
+                    auto type=[UTType typeWithFilenameExtension:native(ext)];if(type)[types addObject:type];
+                }
+                if(!types.count)[types addObject:UTTypeData];
+                auto picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:YES];
+                if(!picker)return core::fail(core::ErrorCode::failed,"Cannot create the document picker");
+                picker.allowsMultipleSelection=options.multiple;picker.delegate=impl_->controller;picker.title=native(options.title);
+                impl_->picker=picker;
+                const std::weak_ptr<Impl::Lifetime> weak=impl_->lifetime;const auto ui=executor();
+                impl_->controller->picked=[weak,ui,completion=std::move(completion)](NSArray<NSURL*>* urls)mutable{
+                    auto lifetime=weak.lock();if(!lifetime||!lifetime->owner)return;
+                    auto* host=lifetime->owner;
+                    host->guard([&]{
+                        if(host->phase!=Impl::Phase::running||!host->picker)return;
+                        host->picker=nil;
+                        core::Result<FileDialogSelection> result=FileDialogSelection{.canceled=urls==nil};
+                        for(NSURL* url in urls){
+                            NSData* path=url.isFileURL?[url.path dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:NO]:nil;
+                            if(!path||!path.length){result=core::fail(core::ErrorCode::invalid_argument,"Document picker returned an invalid local path");break;}
+                            std::string value(static_cast<const char*>(path.bytes),path.length);
+                            if(!detail::valid_title(value)){result=core::fail(core::ErrorCode::invalid_argument,"Document picker returned an invalid local path");break;}
+                            result->paths.push_back(std::move(value));
+                        }
+                        auto submitted=ui.post([completion=std::move(completion),result=std::move(result)]()mutable{completion(std::move(result));});
+                        if(!submitted&&host->phase==Impl::Phase::running){host->remember("Cannot deliver document picker result");host->close();}
+                    });
+                };
+                [presenter presentViewController:picker animated:YES completion:nil];
+                return {};
+            }catch(...){
+                impl_->controller->picked={};impl_->picker=nil;
+                return core::fail(core::ErrorCode::failed,"Cannot present the document picker",std::current_exception());
+            }
+        }@catch(NSException* error){
+            impl_->controller->picked={};impl_->picker=nil;
+            return core::fail(core::ErrorCode::failed,native_error(error));
+        }
+    }
+    NSMutableArray<UTType*>* types=[NSMutableArray new];
+    if(options.mode==FileDialogMode::directory||options.mode==FileDialogMode::save)[types addObject:UTTypeFolder];
+    else{for(const auto& filter:options.filters)for(const auto& ext:filter.extensions){auto type=[UTType typeWithFilenameExtension:native(ext)];if(type)[types addObject:type];}if(!types.count)[types addObject:UTTypeData];}
+    auto picker=[[UIDocumentPickerViewController alloc] initForOpeningContentTypes:types asCopy:options.mode==FileDialogMode::open];
+    picker.allowsMultipleSelection=options.multiple;picker.delegate=impl_->controller;picker.title=native(options.title);impl_->picker=picker;
+    auto weak=std::weak_ptr(impl_->dispatch);auto host=impl_.get();auto ui=executor();
+    impl_->controller->picked=[weak,host,ui,completion,options](NSArray<NSURL*>* urls){auto endpoint=weak.lock();if(!endpoint||!endpoint->accepting.load())return;FileDialogSelection result;result.canceled=urls==nil;for(NSURL* url in urls){if([url startAccessingSecurityScopedResource])[host->scopes addObject:url];auto selected=options.mode==FileDialogMode::save?[url URLByAppendingPathComponent:native(options.filename)]:url;result.paths.emplace_back(selected.path.UTF8String);}host->picker=nil;(void)ui.post([completion,result=std::move(result)]()mutable{completion(std::move(result));});};
+    [impl_->controller presentViewController:picker animated:YES completion:nil];return {};
+}
+core::Result<void> Host::window_action(WindowAction action){if(auto r=impl_->ready();!r)return r;if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");if(action==WindowAction::raise||action==WindowAction::restore){[impl_->window makeKeyAndVisible];return {};}if(unsigned(action)>unsigned(WindowAction::toggle_maximize))return core::fail(core::ErrorCode::invalid_argument,"Invalid UIKit window action");return core::fail(core::ErrorCode::unsupported,"UIKit scene geometry is managed by iPadOS");}
+core::Result<void> Host::set_app_menu(std::vector<AppMenuItem> menu){if(auto r=impl_->ready();!r)return r;if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its menu");if(!detail::valid_menu(menu))return core::fail(core::ErrorCode::invalid_argument,"Invalid application menu");impl_->menu=std::move(menu);impl_->controller->menu_rows=impl_->menu;impl_->controller->menu_ui=executor();[UIMenuSystem.mainSystem setNeedsRebuild];return {};}
+core::Result<void> Host::set_title(std::string_view text){if(auto r=impl_->ready();!r)return r;if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");if(!detail::valid_title(text))return core::fail(core::ErrorCode::invalid_argument,"Invalid title");impl_->state.title=text;impl_->controller.title=native(text);return {};}
 core::Result<void> Host::set_text(std::string_view text) {
     if (auto ready = impl_->ready(); !ready) return ready;
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     if (impl_->widgets) return core::fail(core::ErrorCode::busy, "Use the mounted widget's text property");
     if (!detail::valid_title(text) || text.size()>65536) return core::fail(core::ErrorCode::invalid_argument, "Display text must be valid UTF-8 without NUL, up to 64 KiB");
     std::string value(text);
@@ -605,9 +911,10 @@ core::Result<void> Host::set_text(std::string_view text) {
     if (auto result=impl_->show_legacy_text(); !result) { impl_->state.text=std::move(previous); return result; }
     return {};
 }
-core::Result<void> Host::set_content_size(Size size){if(auto r=impl_->ready();!r)return r;if(!detail::valid_size(size))return core::fail(core::ErrorCode::invalid_argument,"Invalid content size");if(!impl_->secondary||impl_->independent_scene)return core::fail(core::ErrorCode::unsupported,"UIKit scene size belongs to the operating system");auto r=impl_->window.frame;r.size=CGSizeMake(size.width,size.height);impl_->window.frame=r;if(!impl_->window.windowScene)impl_->disconnected_size=size;[impl_->controller.view layoutIfNeeded];impl_->update_snapshot();return {};}
+core::Result<void> Host::set_content_size(Size size){if(auto r=impl_->ready();!r)return r;if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");if(!detail::valid_size(size))return core::fail(core::ErrorCode::invalid_argument,"Invalid content size");if(!impl_->secondary||impl_->independent_scene)return core::fail(core::ErrorCode::unsupported,"UIKit scene size belongs to the operating system");auto r=impl_->window.frame;r.size=CGSizeMake(size.width,size.height);impl_->window.frame=r;if(!impl_->window.windowScene)impl_->disconnected_size=size;[impl_->controller.view layoutIfNeeded];impl_->update_snapshot();return {};}
 core::Result<void> Host::set_window_geometry(const WindowGeometry& update){
     if(auto r=impl_->ready();!r)return r;
+    if(impl_->embedded)return core::fail(core::ErrorCode::invalid_argument,"The owning application controls its window");
     impl_->update_snapshot();
     auto next=resolve_window_geometry({impl_->state.title,impl_->state.size,impl_->options.minimum_size},update);
     if(!next)return std::unexpected(next.error());
@@ -620,6 +927,7 @@ core::Result<void> Host::request_close(){
     if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"UIKit close requires the host owner");
     if(impl_->phase!=Impl::Phase::running&&impl_->phase!=Impl::Phase::pending)return core::fail(core::ErrorCode::closed,"GUI window is not open");
     if(impl_->close_pending)return {};
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     @try {
         try {
             if(impl_->callbacks.close_requested&&!impl_->callbacks.close_requested())return {};
@@ -635,6 +943,8 @@ core::Result<void> Host::request_close(){
 core::Result<void> Host::set_canvas(CanvasFrame frame) {
     if(frame.renderer==Renderer::automatic)frame.renderer=impl_->options.renderer;
     if (auto ready = impl_->ready(); !ready) return ready;
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
+    if(impl_->embedded&&frame.renderer!=Renderer::native)return core::fail(core::ErrorCode::unsupported,"Embedded surfaces require the transparent native renderer");
     if (impl_->mounting) return core::fail(core::ErrorCode::busy, "A widget factory is active");
     auto result = impl_->canvas.set(std::move(frame), (__bridge void*)impl_->content,
                                    nullptr, impl_->state.backing_scale,impl_->presentations);
@@ -652,6 +962,7 @@ core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory, const Widge
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
     if (!factory) return core::fail(core::ErrorCode::invalid_argument, "Native widget factory is empty");
     if (impl_->mounting) return core::fail(core::ErrorCode::busy, "A widget factory is already active");
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     struct Reset final { bool& value; ~Reset() { value = false; } } reset{impl_->mounting};
     impl_->mounting = true;
     @try {
@@ -686,6 +997,7 @@ core::Result<WidgetMount> Host::mount_widgets(WidgetFactory factory, const Widge
 core::Result<void> Host::unmount_widgets() {
     if (auto ready = impl_->ready(); !ready) return ready;
     if (impl_->mounting) return core::fail(core::ErrorCode::busy, "A widget factory is active");
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     if (impl_->widgets) { impl_->widgets->close(); impl_->widgets.reset(); }
     return {};
 }
@@ -698,17 +1010,20 @@ core::Result<void> Host::unmount_widgets(const WidgetMount& expected) {
 }
 core::Result<void> Host::clear_canvas() {
     if (auto ready = impl_->ready(); !ready) return ready;
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     impl_->canvas.clear();
     return {};
 }
 core::Result<GraphicsInfo> Host::graphics_info() const {
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     if (impl_->widgets) return impl_->widgets->graphics_info();
     if (impl_->legacy) return impl_->legacy->graphics_info();
     return impl_->canvas.info();
 }
 core::Result<PixelBuffer> Host::capture_canvas() {
     if (auto ready = impl_->ready(); !ready) return std::unexpected(ready.error());
+    Impl::EmbeddedCallbackScope scope{impl_.get()};
     if (impl_->widgets) return impl_->widgets->capture();
     if (impl_->legacy) return impl_->legacy->capture();
     return impl_->canvas.capture(impl_->state.backing_scale, impl_->state.size.height);
@@ -725,7 +1040,7 @@ core::Result<WindowSnapshot> Host::snapshot() const {
 }
 core::Result<DisplayPixels> Host::display_pixels() const {
     if (auto ready=impl_->ready(); !ready) return std::unexpected(ready.error());
-    UIWindowScene* scene=impl_->window.windowScene;
+    UIWindowScene* scene=impl_->current_window().windowScene;
     UIScreen* screen=scene.screen;
     if (!scene || !screen) return core::fail(core::ErrorCode::busy,"The window display is not yet available");
     // A scene can occupy only part of the screen (for example in Split View),

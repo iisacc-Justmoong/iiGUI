@@ -174,6 +174,7 @@ core::Result<void> Host::run(HostCallbacks callbacks){if(!is_ui_thread())return 
 }
 core::Result<void> Host::show_external(HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External event-loop hosting is not implemented on Web");}
 core::Result<void> Host::attach_external(void*,HostCallbacks){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Web");}
+core::Result<void> Host::external_parent_resized(){if(!is_ui_thread())return core::fail(core::ErrorCode::wrong_executor,"External host requires its owner thread");return core::fail(core::ErrorCode::unsupported,"External surface hosting is not implemented on Web");}
 core::Result<void> Host::show(Host&,HostCallbacks){return core::fail(core::ErrorCode::unsupported,"Browser host owns one canvas; use iiGUI popovers");}
 core::Result<void> Host::choose_file(FileDialogOptions,FileDialogCompletion){return core::fail(core::ErrorCode::unsupported,"Browser file handles require a separate FileProvider adapter");}
 core::Result<void> Host::window_action(WindowAction){return core::fail(core::ErrorCode::unsupported,"Browser owns top-level window geometry");}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "app": {
+    "name": "HelloWorld",
+    "source": ".",
+    "depends": ["LVUI", "iiGUI"],
+    "cache": {"BUILD_TESTING": "ON"},
+    "targets": ["HelloWorld"]
+  },
+  "sdkRoot": "../../..",
+  "sdks": [
+    {"name": "iiSDKCore", "source": "../../../iiSDKCore", "cache": {"BUILD_SHARED_LIBS": "OFF", "BUILD_TESTING": "OFF", "IISDKCORE_BUILD_EXAMPLES": "OFF"}},
+    {"name": "iiColorManager", "source": "../../../iiColorManager", "cache": {"BUILD_SHARED_LIBS": "OFF", "BUILD_TESTING": "OFF"}},
+    {"name": "LVUI", "source": "../../../LVUI", "depends": ["iiSDKCore", "iiColorManager"], "cache": {"BUILD_TESTING": "OFF"}},
+    {"name": "iiGUI", "source": "../..", "depends": ["iiSDKCore"], "cache": {"BUILD_SHARED_LIBS": "OFF", "BUILD_TESTING": "OFF", "IIGUI_BUILD_EXAMPLES": "OFF"}}
+  ],
+  "buildRoot": "../../build/aot-desktop",
+  "cmake": "cmake",
+  "configuration": "Release",
+  "jobs": 4,
+  "parallelKits": 1,
+  "timeoutSeconds": 1800,
+  "kits": [
+    {"id": "windows", "platform": "windows", "cache": {"CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON", "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON", "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON", "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON"}},
+    {"id": "linux", "platform": "linux", "cache": {"CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON", "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON", "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON", "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON"}},
+    {"id": "macos", "platform": "macos", "cache": {"CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON", "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON", "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON", "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON"}}
+  ]
+}

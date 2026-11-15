@@ -7,5 +7,7 @@ int main(){
     ii::gui::Host host({.title="Installed host contract"});
     if(!host.is_ui_thread()||!capabilities.clipboard_text||!capabilities.external_urls)return 1;
     const auto snapshot=host.snapshot();if(snapshot||snapshot.error().code!=ii::core::ErrorCode::closed)return 2;
+    const auto resize=host.external_parent_resized();
+    if(resize || (resize.error().code!=ii::core::ErrorCode::closed && resize.error().code!=ii::core::ErrorCode::unsupported))return 3;
     std::cout<<"INSTALLED_HOST_CONTRACT_OK backend="<<int(capabilities.backend)<<'\n';
 }

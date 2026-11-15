@@ -1,0 +1,7 @@
+PREPARE SDK/iiGUI
+SYNC SDK/iiGUI documents=75
+{
+  "projects": 1,
+  "writes": 2,
+  "relocations": {}
+}

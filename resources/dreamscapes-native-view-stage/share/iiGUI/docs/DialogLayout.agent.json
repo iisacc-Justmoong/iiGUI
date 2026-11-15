@@ -1,0 +1,149 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:4ec0d7ac431e4ec17a143ca751cce76f9f5ecc2d5bc52a5a4294624a08e93838",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/DialogLayout.md",
+    "sha256": "50d31d5f24b79251b858fa3242c3f1909aaa0b63df3721561d15abc7112aa572",
+    "bytes": 2410,
+    "line_count": 38,
+    "encoding": "utf-8",
+    "language": "en"
+  },
+  "document": {
+    "title": "Centered dialog layout and cancellation",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# Centered dialog layout and cancellation\n",
+      "level": 1,
+      "title": "Centered dialog layout and cancellation"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 10,
+      "raw": "`PopoverPlacement::centered` places an own-rendered popup in its host window.\nThe existing anchored mode retains its positioning and viewport clamping.\nCentered width is `min(maximum_width, max(minimum_width, min(width, viewport_width - 2*margins)))`.\n`width` is the preferred outer width, or the natural width when zero. Height\nuses the content measured at the chosen width, padding and `minimum_height`;\nan explicit `height` wins. `vertical_offset` shifts the centered frame. Minimum\ndimensions can intentionally overflow a smaller window. This preserves the\nauthored dialog policy rather than silently shrinking a minimum size.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 14,
+      "raw": "`cylinder` resolves the surface radius to half its smaller dimension. A custom\n`backdrop_color` supplies the dim layer. These remain C++ GPU panels on the\nexisting surface; no OS dialog, panel, popover or control is created.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 15,
+      "end_line": 15,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 16,
+      "end_line": 21,
+      "raw": "`StackOptions::alignment` selects center, leading, trailing or stretch on the\ncross axis. Existing stacks default to center. `Widget::set_flex(weight)` gives\na horizontal child a relative share of available main-axis space; zero uses its\nnatural width. A spacer still consumes extra main-axis space. Width-dependent\nmeasurement propagates wrapped label heights through nested stacks, and a stable\nlayout caches measurements until its constraints or content change.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 22,
+      "end_line": 22,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 23,
+      "end_line": 26,
+      "raw": "Buttons can override height and corner radius through optional construction\nfields. Image views can add padding, a rounded background and a border; these\nare GPU geometry around the immutable image. Default options preserve existing\nwidget appearance.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 27,
+      "end_line": 27,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 28,
+      "end_line": 34,
+      "raw": "`close_popup()` is a programmatic close. `cancel_popup()`, outside dismissal,\nEscape and a native accessibility cancellation are user cancellation paths.\n`PopoverEvents::canceled` runs after content retirement and `closed`, once for\nthe actual open activation. Closing an already closed popup emits neither event.\nRemoving or hiding its owner uses ordinary teardown without a cancellation.\nActive callback captures can retire after their own invocation returns; see\n[content ownership](PopupContent.md). Child Escape handlers still have priority.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 36,
+      "end_line": 38,
+      "raw": "`tests/dialog_layout.cpp` verifies centered placement, resize without recreation,\nheader flex sizing, wrapped height and close/cancel distinction. LVRS's Modal\ntests additionally verify action ordering, fresh content and actual Metal pixels.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "Centered dialog layout and cancellation",
+      "anchor": "centered-dialog-layout-and-cancellation",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000011",
+        "label": "content ownership",
+        "target": "PopupContent.md",
+        "kind": "relative",
+        "line": 34
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

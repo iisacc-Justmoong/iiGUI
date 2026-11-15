@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "app": {
+    "name": "HelloHosts",
+    "source": ".",
+    "depends": [
+      "LVUI",
+      "iiGUI"
+    ],
+    "cache": {
+      "BUILD_TESTING": "OFF"
+    },
+    "targets": [
+      "HelloHosts"
+    ]
+  },
+  "sdkRoot": "../../..",
+  "sdks": [
+    {
+      "name": "iiSDKCore",
+      "source": "../../../iiSDKCore",
+      "cache": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "BUILD_TESTING": "OFF",
+        "IISDKCORE_BUILD_EXAMPLES": "OFF"
+      }
+    },
+    {
+      "name": "iiColorManager",
+      "source": "../../../iiColorManager",
+      "cache": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "LVUI",
+      "source": "../../../LVUI",
+      "depends": [
+        "iiSDKCore",
+        "iiColorManager"
+      ],
+      "cache": {
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "iiGUI",
+      "source": "../..",
+      "depends": [
+        "iiSDKCore"
+      ],
+      "cache": {
+        "BUILD_SHARED_LIBS": "OFF",
+        "BUILD_TESTING": "OFF",
+        "IIGUI_BUILD_EXAMPLES": "OFF"
+      }
+    }
+  ],
+  "buildRoot": "../../build/hosts",
+  "cmake": "cmake",
+  "configuration": "Release",
+  "jobs": 4,
+  "parallelKits": 1,
+  "timeoutSeconds": 1800,
+  "kits": [
+    {
+      "id": "web",
+      "platform": "wasm",
+      "cache": {
+        "CMAKE_DISABLE_FIND_PACKAGE_Qt5": "ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_Qt6": "ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative": "ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO": "ON",
+        "IISDKCORE_WASM_THREADS": "ON",
+        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
+        "CMAKE_FIND_ROOT_PATH_MODE_PACKAGE": "BOTH"
+      }
+    }
+  ]
+}

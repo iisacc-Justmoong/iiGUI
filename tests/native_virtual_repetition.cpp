@@ -27,13 +27,19 @@ void viewport(){
     auto initial=take(f.scroll.snapshot());
     check(initial.bounds.width==480&&initial.bounds.height==170&&initial.content_height==30050,"Generated viewport lost its specified dimensions or full logical range");
     check(take(f.list.keyed_content_keys()).size()==9&&NativeRowActivation::constructions==9,"Initial virtualization constructed the whole model or speculative row backends");
+    check(!f.scope->backend_0.visible_events.empty()&&f.scope->backend_0.visible_events.back()==std::vector<std::string>({"0","1","2","3","4","5"}),
+          "Visible notifications included overscan or omitted on-screen cells");
     const auto revision=f.scope->backend_0.items.revision();
     auto action=f.item("3","hit");const auto identity=take(action.snapshot()).id;good(action.activate());
     good(f.scroll.set_scroll_offset(90));
+    check(f.scope->backend_0.visible_events.back()==std::vector<std::string>({"3","4","5","6","7","8"}),
+          "Scrolling did not publish the new visible keys");
     check(take(f.list.keyed_content_keys()).size()==12&&take(action.snapshot()).id==identity&&take(action.snapshot()).text=="1",
           "Scrolling lost overlapping row identity or local state");
     const auto epoch=take(f.list.snapshot()).content_generation;const auto created=NativeRowActivation::constructions;
+    const auto notifications=f.scope->backend_0.visible_events.size();
     good(f.scroll.set_scroll_offset(91));
+    check(f.scope->backend_0.visible_events.size()==notifications,"Unchanged visible keys caused another notification");
     check(take(f.list.snapshot()).content_generation==epoch&&NativeRowActivation::constructions==created,
           "One pixel of scrolling rebuilt the native collection wrapper or row backends");
     check(take(f.item("3","row").snapshot()).bounds.y==-1&&f.scope->backend_0.items.revision()==revision&&f.scope->revision_0.get()==0,
@@ -81,7 +87,10 @@ void lifetime(){
     std::weak_ptr<Fixture::View::Scope> retired=f.scope;
     auto external=f.scope->backend_0.items.get();
     good(f.scroll.set_scroll_offset(29900));
-    f.state->close();f.scope.reset();
+    f.state->close();
+    check(!f.scope->backend_0.visible_events.empty()&&f.scope->backend_0.visible_events.back().empty(),
+          "Retiring a viewport did not release its visible-key subscription");
+    f.scope.reset();
     check(retired.expired()&&NativeRowActivation::constructions==NativeRowActivation::destructions&&!f.scroll.snapshot(),
           "Viewport subscriptions retained the retired owner or an offscreen backend");
 }
@@ -122,10 +131,28 @@ void autoheight(){
     check(take(f.scroll.snapshot()).bounds.height==170&&take(f.list.keyed_content_keys()).size()==9,
           "Restoring an explicit height retained the automatic flex allocation");
 }
+void visible_failure(){
+    Fixture f;
+    f.scope->backend_0.reject_next_visible=true;
+    (void)f.scroll.set_scroll_offset(90);
+    good(f.scroll.set_scroll_offset(91));
+    check(f.scope->backend_0.visible_events.back()==std::vector<std::string>({"3","4","5","6","7","8"}),
+          "A failed visible notification was not retried after another viewport event");
+}
+void reveal_request(){
+    Fixture f;f.scope->backend_0.reveal_key.set("900");
+    check(take(f.scroll.snapshot()).scroll_offset>26000&&take(f.list.keyed_content_item("900")).snapshot().has_value(),
+          "An explicit reveal did not bring the requested row into view");
+    good(f.scroll.set_scroll_offset(0));
+    check(take(f.scroll.snapshot()).scroll_offset==0,"A handled reveal kept overriding the user's scroll");
+    f.scope->backend_0.reveal_revision.set(1);
+    check(take(f.scroll.snapshot()).scroll_offset>26000&&take(f.list.keyed_content_item("900")).snapshot().has_value(),
+          "An explicit repeated reveal was not delivered");
+}
 }
 int main(int argc,char** argv){try{
     const std::string name=argc>1?argv[1]:"viewport";
-    if(name=="viewport")viewport();else if(name=="anchor")anchor();else if(name=="resize")resize();else if(name=="rollback")rollback();else if(name=="lifetime")lifetime();else if(name=="horizontal")horizontal();else if(name=="empty")empty();else if(name=="reentry")reentry();else if(name=="autoheight")autoheight();
+    if(name=="viewport")viewport();else if(name=="anchor")anchor();else if(name=="resize")resize();else if(name=="rollback")rollback();else if(name=="lifetime")lifetime();else if(name=="horizontal")horizontal();else if(name=="empty")empty();else if(name=="reentry")reentry();else if(name=="autoheight")autoheight();else if(name=="visible_failure")visible_failure();else if(name=="reveal_request")reveal_request();
     else throw std::runtime_error("Unknown native virtual repetition test");
     std::cout<<"Native virtual repetition "<<name<<" passed without a window\n";
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

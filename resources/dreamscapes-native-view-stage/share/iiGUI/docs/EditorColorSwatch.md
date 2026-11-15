@@ -1,0 +1,9 @@
+# 편집기 원형 색상 버튼
+
+`ColorButtonOptions::circular`을 true로 지정하면 사각형 바탕과 색상환 대신 흰색 2px 테두리의 원형 현재 색상을 그린다. 기본값 false는 기존 모습을 유지한다. 같은 ColorPickerModel과 네이티브 버튼 입력·접근성·비활성화 계약을 사용하며 색상 변경은 캐시 키에 반영된다. `tests/color_buttons.cpp`의 rendering 검사는 원형 모서리, 테두리, 중앙색과 모델 변경을 실제 캡처에서 확인한다.
+
+`Widget::set_button_icon`은 일반 버튼의 이미지와 아이콘 이름을 교체한다. 위젯 ID, 이벤트, 포커스를 유지하며 색상 버튼·빈 이미지·잘못된 문자열은 거부한다. 도형 메뉴의 현재 선택 아이콘과 같이 실행 중 변화하는 도구에 사용한다. rendering 검사에서 교체 뒤의 이름·입력과 잘못된 호출 거부를 검증한다.
+
+원형 버튼의 border_opacity는 0..1을 받는다. 기본 1은 기존 흰 테두리를 유지하며 낮은 값은 Vincent 도구 막대의 은은한 원형 테두리를 그린다. 키보드 포커스 테두리는 선명하게 유지한다. 아이콘 버튼도 명시한 horizontal_padding을 크기 계산에 반영하며 기본값 2는 기존 외형을 유지한다. rendering 검사가 18px 아이콘 버튼 너비와 테두리 불투명도를 검증한다.
+
+SliderOptions.height는 기본 32를 유지하며, 명시한 높이가 손잡이와 트랙보다 작으면 거부한다. 작은 편집기 팝업에서는 thumb_diameter=12, track_height=4, height=12를 사용한다. rendering 검사는 배치 높이와 잘못된 범위 거부를 함께 확인한다.

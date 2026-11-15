@@ -1,0 +1,201 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:7e67321cafd56cfd66560876d3cf971fbcc216b9dd6364d709fadf4f397588aa",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/ContainerLayout.md",
+    "sha256": "2d38d3c17815990a9b024ca8b74e1eae9e4bad6ee4f58e2fad0a7ee5be724679",
+    "bytes": 3414,
+    "line_count": 41,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "네이티브 컨테이너의 자연 크기와 기본 콘텐츠 슬롯",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 네이티브 컨테이너의 자연 크기와 기본 콘텐츠 슬롯\n",
+      "level": 1,
+      "title": "네이티브 컨테이너의 자연 크기와 기본 콘텐츠 슬롯"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "StackOptions의 minimum_width·minimum_height는 자연 크기의 하한이다. 명시적인\nextent/frame은 자연 크기보다 우선하며 실제 부모의 가용 폭에 맞춰 제한한다.\nintrinsic_width는 세로 스택의 자식 stretch를 유지하면서 컨테이너 자체가 자동으로\n부모 폭 전체를 요구하지 않도록 한다. 기본값은 기존 동작을 보존한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 12,
+      "raw": "insets는 실제 콘텐츠 여백, implicit_insets는 자연 크기를 계산할 때 더하는 여백이다.\n후자가 없으면 기존 padding/insets를 사용한다. 툴바처럼 기본 implicit 높이에 고정\n여백을 더하면서 실제 자식 여백은 compact 상태에 따라 바꾸는 구성에 사용한다.\nmeasure_hidden_children은 숨긴 자식도 자연 크기에 포함한다. Item 같은 본문 슬롯의\n크기 계산에 쓰며 숨긴 자식을 그리거나 입력 대상으로 만들지는 않는다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 13,
+      "end_line": 13,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 14,
+      "end_line": 18,
+      "raw": "WidgetBuilder::set_default_content(host, slot)는 이후 host에 추가하는 일반 자식을\n같은 세대의 slot으로 구성한다. 실제 트리를 다시 부모 지정하거나 복제하지 않는다.\nslot은 host의 엄격한 자손인 일반 컨테이너여야 하며 순환·자기 참조·다른 세대를\n거절한다. 중첩 슬롯은 최종 슬롯까지 따른다. 팝업은 원래 host 소유권을 유지한다.\n이 계약은 구성 단계에서만 설정할 수 있다. 별도의 소스 인터프리터는 사용하지 않는다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 19,
+      "end_line": 19,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 20,
+      "end_line": 22,
+      "raw": "일반 컨테이너에도 enabled를 적용하고 비활성화할 때 하위 눌림·캡처·포커스를 취소한다.\n자식의 요청한 enabled 값은 바꾸지 않아 부모를 다시 켜면 기존 개별 정책을 유지한다.\n취소 콜백에서 트리가 종료되면 이후 접근은 closed이다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 23,
+      "end_line": 23,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 24,
+      "end_line": 28,
+      "raw": "ButtonStyle은 선택적 text_role·font_size와 고정 line_height를 받는다. 텍스트는 기존\n네이티브 글꼴 셰이핑 경로로 그린다. set_button_options는 일반 버튼의 텍스트·스타일·\n크기·아이콘·활성 정책을 교체하면서 action·control events와 위젯 정체성을 보존한다.\n색상 모델 버튼에는 이 API를 적용하지 않는다. 유효성 실패는 기존 옵션을 유지한다.\n동일한 StackOptions·LabelOptions 교체는 불필요한 측정 무효화를 억제한다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 29,
+      "end_line": 29,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 30,
+      "end_line": 32,
+      "raw": "tests/container_layout.cpp에 자연/명시 크기·실제/implicit 여백·intrinsic 폭·숨김 측정·\n슬롯/중첩/검증·버튼 교체·하위 취소와 수명 사례 11개를 등록한다. 현재는 컴파일·링크와\n정적 검사만 수행한다. 앱·테스트·self-test 실행은 전체 작업의 최종 일괄 단계로 미룬다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "heading",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "## 버튼의 비대칭 콘텐츠 배치\n",
+      "level": 2,
+      "title": "버튼의 비대칭 콘텐츠 배치"
+    },
+    {
+      "id": "b000016",
+      "kind": "blank",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "\n"
+    },
+    {
+      "id": "b000017",
+      "kind": "paragraph",
+      "start_line": 36,
+      "end_line": 41,
+      "raw": "ButtonOptions의 left_padding·right_padding·content_spacing·indicator_size는 아이콘과\n텍스트·메뉴 표시자의 명시 배치 계약이다. 생략하면 기존 버튼 배치를 유지한다.\n음수 간격은 -256까지 허용하며, 푸터 메뉴처럼 18+18-2와 좌우 4/2 여백을 합친\n자연 폭 40을 구현한다. width는 선택적인 양수 명시 폭이고 생략하면 자연 폭이다.\n옵션 교체는 동일 버튼의 입력 콜백·정체성을 유지한다. tests/button_layout.cpp에\n자연 폭·간격·명시 폭·유효성·픽셀 배치 사례 5개를 추가하며 실행은 최종 단계로 미룬다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "네이티브 컨테이너의 자연 크기와 기본 콘텐츠 슬롯",
+      "anchor": "네이티브-컨테이너의-자연-크기와-기본-콘텐츠-슬롯",
+      "start_line": 1
+    },
+    {
+      "block_id": "b000015",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "버튼의 비대칭 콘텐츠 배치",
+      "anchor": "버튼의-비대칭-콘텐츠-배치",
+      "start_line": 34
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 15,
+        "text": "같은 세대의 slot으로 구성한다. 실제 트리를 다시 부모 지정하거나 복제하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 18,
+        "text": "이 계약은 구성 단계에서만 설정할 수 있다. 별도의 소스 인터프리터는 사용하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 27,
+        "text": "색상 모델 버튼에는 이 API를 적용하지 않는다. 유효성 실패는 기존 옵션을 유지한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

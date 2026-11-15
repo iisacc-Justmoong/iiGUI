@@ -210,6 +210,8 @@ struct WidgetState::Impl final {
         mutable std::shared_ptr<const WidgetDrawing> paint_cache;
         WidgetFrameHandler frame_handler;bool frame_active=false;std::uint64_t frame_revision=0;
         WidgetInputHandler input_handler;
+        struct HorizontalDragRegistration final {HorizontalDragOptions options;HorizontalDragHandler handler;};
+        std::unique_ptr<HorizontalDragRegistration> horizontal_drag;
         WidgetInteractionHandler interaction_handler;
         std::optional<WidgetInteraction> delivered_interaction;
         std::shared_ptr<const TextInputProvider> text_input;
@@ -233,6 +235,7 @@ struct WidgetState::Impl final {
         }
         int menu_index=-1;
         std::size_t context_menu=absent;
+        TouchContextOptions touch_context_options;
         std::size_t activation_owner=absent;
         bool enabled=true,checked=false,metrics_dirty=true;
         Size measured;
@@ -253,7 +256,7 @@ struct WidgetState::Impl final {
     static void configure_popup(Popup& p,PopoverOptions o){p.popover=o;p.layout_failure.reset();p.options.left_padding=p.options.right_padding=o.padding;p.options.top_padding=p.options.bottom_padding=o.padding;p.options.edge_margin=o.margins;p.options.corner_radius=o.corner_radius;p.options.opacity=o.surface_opacity;p.options.background=o.surface_color.value_or(WidgetColor{20./255,20./255,20./255,1});p.options.dismiss_on_outside_press=o.dismiss_on_outside_press;p.options.dismiss_on_context_request=o.dismiss_on_context_request.value_or(o.dismiss_on_outside_press);}
     const std::thread::id owner=std::this_thread::get_id();
     bool active=true,building=true,layout_dirty=true,published=false,publishing=false;
-    struct Domain final {std::size_t nodes=0,allowance=0;std::weak_ptr<WidgetState> staged;std::uint64_t pointer_epoch=0;bool providing_popup_layout=false,painting=false;};
+    struct Domain final {std::size_t nodes=0,allowance=0;std::weak_ptr<WidgetState> staged;std::uint64_t pointer_epoch=0,press_epoch=0;bool providing_popup_layout=false,painting=false;};
     std::shared_ptr<Domain> domain=std::make_shared<Domain>();
     bool content_transition=false;
     std::weak_ptr<WidgetState> embedding_owner;
@@ -295,10 +298,31 @@ struct WidgetState::Impl final {
     double touch_event_origin=0,touch_frame_origin=0;
     bool touch_tracking=false,touch_has_pan=false;
     std::uint64_t touch_revision=0;
+    runtime::TaskToken touch_context_deadline;
+    WidgetPoint touch_context_origin{};
+    double touch_context_tolerance=0;
+    std::uint64_t touch_context_device=0,touch_context_revision=0;
+    std::size_t touch_context_target=absent;
+    bool touch_context_pending=false;
+    void cancel_touch_context(){
+        ++touch_context_revision;touch_context_pending=false;touch_context_target=absent;
+        (void)touch_context_deadline.cancel();touch_context_deadline={};
+    }
     struct MotionReceiver final {std::weak_ptr<MotionPreferences> model;std::shared_ptr<MotionChangePort> port;};
     std::vector<MotionReceiver> motion_receivers;
     bool consume_release=false;
     std::size_t input_capture=absent;
+    struct HorizontalGesture final {
+        std::size_t target=absent;
+        WidgetPoint origin;
+        double start_x=0,start_y=0,last_x=0;
+        PointerDevice device=PointerDevice::mouse;
+        std::uint64_t device_id=0;
+        bool active=false;
+    };
+    std::optional<HorizontalGesture> horizontal_gesture;
+    std::uint64_t horizontal_revision=0;
+    std::size_t horizontal_handlers=0;
     std::vector<std::size_t> input_hover_path;
     struct InteractionWatch final {std::size_t node;std::weak_ptr<const WidgetInteractionPort> port;std::optional<WidgetInteraction> delivered;};
     std::vector<std::shared_ptr<InteractionWatch>> interaction_watches;
@@ -377,7 +401,7 @@ struct WidgetState::Impl final {
         return modal_host()!=absent;
     }
     bool captures_input()const{
-        if(pressed!=absent||input_capture!=absent)return true;
+        if(pressed!=absent||input_capture!=absent||horizontal_gesture)return true;
         for(auto i:ordered_hosts())if(auto child=nodes[i].content->view;child&&child->impl_->captures_input())return true;
         for(auto i:popups)if(auto child=nodes[i].popup->content_view;child&&child->impl_->captures_input())return true;return false;
     }
@@ -1154,8 +1178,10 @@ core::Result<void> WidgetState::ensure_frame_tick(){
 core::Result<std::shared_ptr<MotionPreferences>> WidgetState::motion_preferences(){if(auto r=ready();!r)return std::unexpected(r.error());if(!impl_->frame_hooks.preferences)impl_->frame_hooks.preferences=std::make_shared<MotionPreferences>();return impl_->frame_hooks.preferences;}
 core::Result<std::reference_wrapper<runtime::EventLoop>> WidgetState::event_loop(){
     if(auto r=ready();!r)return std::unexpected(r.error());
-    if(!impl_->frame_hooks.events)return core::fail(core::ErrorCode::unsupported,"This native host has no Core event loop");
-    auto loop=impl_->frame_hooks.events();if(!loop)return std::unexpected(loop.error());
+    auto events=impl_->frame_hooks.events;
+    if(!events)return core::fail(core::ErrorCode::unsupported,"This native host has no Core event loop");
+    auto loop=events();if(!loop)return std::unexpected(loop.error());
+    if(auto live=ready();!live)return std::unexpected(live.error());
     if(!*loop)return core::fail(core::ErrorCode::closed,"The native host event loop has closed");return std::ref(**loop);
 }
 core::Result<void> WidgetState::text_input_provider(std::size_t i,std::shared_ptr<const TextInputProvider> provider){
@@ -2001,6 +2027,7 @@ void WidgetState::close() noexcept {
     if (!impl_->active) return;
     if (impl_->owner!=std::this_thread::get_id()) std::terminate();
     [[maybe_unused]] const auto retiring_owner = weak_from_this().lock();
+    impl_->cancel_touch_context();impl_->horizontal_gesture.reset();++impl_->horizontal_revision;
     auto input_cancel=impl_->cancel_input_capture();auto invoke=impl_->invoke;impl_->active=false;
     impl_->font_subscription.reset();
     impl_->publication_hooks.clear();
@@ -2472,7 +2499,14 @@ core::Result<CanvasFrame> WidgetState::drawing_snapshot(Size size){
     if(auto result=ready();!result)return std::unexpected(result.error());
     if(!std::isfinite(size.width)||!std::isfinite(size.height)||size.width<=0||size.height<=0||size.width>8192||size.height>8192)
         return core::fail(core::ErrorCode::invalid_argument,"Drawing viewport must be finite and within (0, 8192]");
-    try{return frame(size);}
+    try{
+        // Layout may reveal virtual content or fire size observers which add
+        // drawing nodes. Settle those bounded event-driven updates before the
+        // first paint, rather than requiring an unrelated input or query.
+        impl_->layout(size);
+        if(auto result=flush_viewports();!result)return std::unexpected(result.error());
+        return frame(size);
+    }
     catch(const std::exception& error){return core::fail(core::ErrorCode::failed,error.what(),std::current_exception());}
 }
 core::Result<void> WidgetState::fixed_frame(std::size_t i,Rect r) {
@@ -2497,7 +2531,10 @@ core::Result<void> WidgetState::flex(std::size_t i,double value) {
 core::Result<void> WidgetState::visibility(std::size_t i,bool shown) {
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Widget was not found");
-    auto& n=impl_->nodes[i];if(n.shown==shown)return {};n.shown=shown;impl_->invalidate(true,i);
+    auto& n=impl_->nodes[i];if(n.shown==shown)return {};
+    if(!shown&&impl_->touch_context_pending&&impl_->descendant(impl_->touch_context_target,i))impl_->cancel_touch_context();
+    if(!shown&&impl_->horizontal_gesture&&impl_->descendant(impl_->horizontal_gesture->target,i)){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;}
+    n.shown=shown;impl_->invalidate(true,i);
     auto input_cancel=!shown&&impl_->input_capture!=absent&&impl_->descendant(impl_->input_capture,i)?impl_->cancel_input_capture():runtime::Task{};
     auto blur=!shown && impl_->focused!=absent && impl_->descendant(impl_->focused,i)?impl_->change_focus(absent):runtime::Task{};
     auto canceled=!shown && impl_->pressed!=absent && impl_->descendant(impl_->pressed,i)?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
@@ -2722,6 +2759,19 @@ core::Result<void> WidgetState::input_handler(std::size_t i,WidgetInputHandler h
     auto canceled=impl_->input_capture==i?impl_->cancel_input_capture():runtime::Task{};
     std::erase(impl_->input_hover_path,i);impl_->nodes[i].input_handler=std::move(handler);impl_->accessibility_changed();
     if(canceled){auto invoke=impl_->invoke;invoke(std::move(canceled));}return {};
+}
+core::Result<void> WidgetState::horizontal_drag_handler(std::size_t i,HorizontalDragOptions options,HorizontalDragHandler handler){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size()||(!stack_kind(impl_->nodes[i].kind)&&!impl_->nodes[i].content&&!impl_->nodes[i].action_surface)||
+       !std::isfinite(options.threshold)||options.threshold<=0||options.threshold>1024)
+        return core::fail(core::ErrorCode::invalid_argument,"Horizontal drag requires a container and a finite movement threshold");
+    std::unique_ptr<Impl::Node::HorizontalDragRegistration> registration;
+    try{if(handler)registration=std::make_unique<Impl::Node::HorizontalDragRegistration>(options,std::move(handler));}
+    catch(const std::bad_alloc&){return core::fail(core::ErrorCode::full,"Cannot register horizontal drag handler");}
+    if(impl_->horizontal_gesture&&impl_->horizontal_gesture->target==i){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;}
+    auto& current=impl_->nodes[i].horizontal_drag;
+    if(bool(current)!=bool(registration)){if(registration)++impl_->horizontal_handlers;else --impl_->horizontal_handlers;}
+    current=std::move(registration);return {};
 }
 core::Result<void> WidgetState::stack_options(std::size_t i,StackOptions o){if(auto r=ready();!r)return r;if(i>=impl_->nodes.size()||(impl_->nodes[i].kind!=WidgetKind::vertical_stack&&impl_->nodes[i].kind!=WidgetKind::horizontal_stack&&impl_->nodes[i].kind!=WidgetKind::overlay_stack)||!valid_stack(o))return core::fail(core::ErrorCode::invalid_argument,"Stack options require a valid ordinary stack");if(impl_->nodes[i].stack==o)return {};impl_->nodes[i].stack=std::move(o);impl_->invalidate(true,i);return {};}
 core::Result<StackLayoutOptions> WidgetState::stack_layout(std::size_t i) {
@@ -2991,6 +3041,8 @@ core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
     const bool requested=value;if(n.action_surface)value=value&&n.action_surface->interaction_enabled;
     value=value && (n.kind!=WidgetKind::button || n.button.tone!=ButtonTone::disabled) && (n.kind!=WidgetKind::stepper || n.stepper.tone!=ButtonTone::disabled);
     const auto affected=[&](std::size_t target){return target!=absent&&impl_->descendant(target,i);};
+    if(!value&&impl_->touch_context_pending&&affected(impl_->touch_context_target))impl_->cancel_touch_context();
+    if(!value&&impl_->horizontal_gesture&&affected(impl_->horizontal_gesture->target)){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;}
     auto canceled=!value&&affected(impl_->pressed)?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
     auto capture=!value&&affected(impl_->input_capture)?impl_->cancel_input_capture():runtime::Task{};
     const bool enabled_changed=n.enabled!=value;
@@ -3432,10 +3484,25 @@ core::Result<void> WidgetState::menu_expanded(std::size_t i,bool expanded) {
 core::Result<void> WidgetState::context_menu(std::size_t i,Widget popup) {
     if(auto r=ready();!r) return r;
     if(i>=impl_->nodes.size()) return core::fail(core::ErrorCode::invalid_argument,"Context menu owner was not found");
+    if(impl_->touch_context_pending&&impl_->touch_context_target==i)impl_->cancel_touch_context();
     if(popup.owner_==std::thread::id{}) {impl_->nodes[i].context_menu=absent;return {};}
     if(popup.state_.lock().get()!=this || popup.index_>=impl_->nodes.size() || !impl_->nodes[popup.index_].popup)
         return core::fail(core::ErrorCode::invalid_argument,"Context menu must be a popup in this generation");
     impl_->nodes[i].context_menu=popup.index_;return {};
+}
+core::Result<void> WidgetState::touch_context_options(std::size_t i,TouchContextOptions value){
+    if(auto r=ready();!r)return r;
+    if(i>=impl_->nodes.size()||value.delay<std::chrono::milliseconds::zero()||value.delay>std::chrono::minutes(5)||
+       !std::isfinite(value.movement_tolerance)||value.movement_tolerance<0||value.movement_tolerance>8192)
+        return core::fail(core::ErrorCode::invalid_argument,"Invalid touch context options");
+    if(impl_->nodes[i].touch_context_options==value)return {};
+    if(impl_->touch_context_pending&&impl_->touch_context_target==i)impl_->cancel_touch_context();
+    impl_->nodes[i].touch_context_options=value;return {};
+}
+core::Result<TouchContextOptions> WidgetState::touch_context_options(std::size_t i)const{
+    if(auto r=ready();!r)return std::unexpected(r.error());
+    if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Touch context target was not found");
+    return impl_->nodes[i].touch_context_options;
 }
 core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
     const bool pointer=event.kind==WidgetInputKind::pointer_down||event.kind==WidgetInputKind::pointer_move||event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::pointer_leave;
@@ -3471,6 +3538,7 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
         local.native_navigation_active=event.native_navigation_active||context.navigation;
         local.native_content_control_active=event.native_content_control_active||context.content_control;
         const auto previous_focus=impl_->focused;
+        const auto pointer_position=impl_->pointer_position;
         // Capture provisionally so a nested release (even outside this host)
         // reaches the press recipient before the outer callback returns.
         const bool press=event.kind==WidgetInputKind::pointer_down;
@@ -3487,7 +3555,16 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
         if(!result){rollback_capture();return std::unexpected(result.error());}
         // A nested release, cancellation, or newer press supersedes this one.
         if(press&&impl_->domain->pointer_epoch!=pointer_epoch)return true;
-        if(*result){if(press&&impl_->input_capture==index&&impl_->nodes[index].input_handler&&impl_->nodes[index].enabled&&impl_->logical_visible(index)&&!impl_->blocked(index)){
+        if(*result){
+            if(event.kind==WidgetInputKind::pointer_move&&impl_->pointer_position==pointer_position&&index<impl_->nodes.size()&&
+               impl_->nodes[index].input_handler&&impl_->nodes[index].enabled&&impl_->logical_visible(index)&&!impl_->blocked(index)){
+                // A consuming surface still owns hover; do not mark a child it
+                // intercepted, or overwrite a newer reentrant pointer move.
+                const auto hit=impl_->hit(event.x,event.y);
+                const auto hovered=hit!=absent&&impl_->descendant(hit,index)?index:absent;
+                if(impl_->hovered!=hovered){impl_->hovered=hovered;impl_->invalidate();}
+            }
+            if(press&&impl_->input_capture==index&&impl_->nodes[index].input_handler&&impl_->nodes[index].enabled&&impl_->logical_visible(index)&&!impl_->blocked(index)){
             impl_->pressed=absent;bool auto_focus=true;
             if(impl_->nodes[index].text_input){auto state=text_input_state(index);if(!state){rollback_capture();return std::unexpected(state.error());}auto_focus=state->auto_focus_on_press;}
             if(impl_->domain->pointer_epoch!=pointer_epoch||impl_->input_capture!=index)return true;
@@ -3551,12 +3628,51 @@ void WidgetState::advance_touch_motion(runtime::Clock::time_point now){
 }
 core::Result<void> WidgetState::input(const WidgetInput& incoming){
     if(auto r=ready();!r)return r;
+    using Kind=WidgetInputKind;
     if(incoming.kind==WidgetInputKind::focus_lost){if(auto r=touch_cancel();!r)return r;}
     else if(impl_->touch_motion.active()&&(incoming.kind==WidgetInputKind::pointer_down||incoming.kind==WidgetInputKind::scroll||incoming.kind==WidgetInputKind::key_down)){
         ++impl_->touch_revision;impl_->touch_motion.cancel();impl_->motion_activity();
     }
-    const auto revision=impl_->touch_revision;
+    const auto revision=impl_->touch_revision;const auto pointer_epoch=impl_->domain->pointer_epoch;
     auto result=input_impl(incoming);if(!result||!impl_->active)return result;
+    if(incoming.kind==Kind::pointer_down&&incoming.device==PointerDevice::touch&&
+       impl_->domain->pointer_epoch==pointer_epoch+1){
+        impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
+        auto target=impl_->hit(incoming.x,incoming.y);
+        for(;target!=absent;target=impl_->nodes[target].parent){
+            const auto& node=impl_->nodes[target];
+            if(node.context_menu!=absent&&node.touch_context_options.enabled&&node.enabled&&impl_->logical_visible(target)&&!impl_->blocked(target))break;
+        }
+        if(target!=absent){
+            auto events=event_loop();
+            if(events&&impl_->active&&impl_->domain->pointer_epoch==pointer_epoch+1&&target<impl_->nodes.size()&&
+               impl_->nodes[target].context_menu!=absent&&impl_->nodes[target].touch_context_options.enabled&&impl_->nodes[target].enabled&&
+               impl_->logical_visible(target)&&!impl_->blocked(target)){
+                const auto generation=++impl_->touch_context_revision;const auto popup=impl_->nodes[target].context_menu;
+                const auto options=impl_->nodes[target].touch_context_options;
+                const auto id=impl_->nodes[target].id;const auto x=incoming.x,y=incoming.y;const auto device=incoming.device_id;
+                std::weak_ptr<WidgetState> weak=weak_from_this();
+                auto submitted=events->get().after(options.delay,[weak,generation,target,popup,id,x,y,device]{
+                    auto self=weak.lock();if(!self||!self->impl_->active)return;
+                    auto& state=*self->impl_;
+                    if(!state.touch_context_pending||state.touch_context_revision!=generation)return;
+                    state.touch_context_pending=false;state.touch_context_target=absent;state.touch_context_deadline={};
+                    state.layout(state.surface?state.surface->size():state.viewport);
+                    if(target>=state.nodes.size()||state.nodes[target].id!=id||state.nodes[target].context_menu!=popup||
+                       !state.nodes[target].enabled||!state.logical_visible(target)||state.blocked(target)||
+                       !contains(state.visual_bounds(target),x,y))return;
+                    const auto clip=state.clip_rect(target);if(clip&&!contains(*clip,x,y))return;
+                    const auto hit=state.hit(x,y);if(hit==absent||!state.descendant(hit,target))return;
+                    auto canceled=self->input({.kind=Kind::pointer_cancel,.x=x,.y=y,.device=PointerDevice::touch,.device_id=device});
+                    if(!canceled||!state.active)return;
+                    state.consume_release=true;
+                    (void)self->input({.kind=Kind::context_request,.x=x,.y=y,.target=id,.device=PointerDevice::touch,.device_id=device});
+                });
+                if(submitted){impl_->touch_context_origin={incoming.x,incoming.y};impl_->touch_context_device=device;
+                    impl_->touch_context_tolerance=options.movement_tolerance;impl_->touch_context_target=target;impl_->touch_context_pending=true;impl_->touch_context_deadline=submitted.token;}
+            }
+        }
+    }
     if(impl_->touch_revision==revision&&impl_->touch_tracking&&incoming.kind==WidgetInputKind::scroll&&incoming.device==PointerDevice::touch&&
        incoming.precise_scroll&&!incoming.control&&!incoming.meta&&(incoming.scroll_x!=0||incoming.scroll_y!=0)&&
        impl_->touch_velocity.add({incoming.scroll_x,incoming.scroll_y},incoming.timestamp)){
@@ -3579,7 +3695,73 @@ core::Result<void> WidgetState::replace_accessibility_text(std::string_view id,c
     auto result=owner->input_impl(event,nullptr,false,true);
     if(!result||!owner->impl_->active)return result;return owner->flush_interactions();
 }
-core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInput* scroll_remainder,bool scroll_normalized,bool accessibility_text) {
+core::Result<bool> WidgetState::route_horizontal_drag(const WidgetInput& event){
+    using Kind=WidgetInputKind;
+    if(!impl_->horizontal_handlers&&!impl_->horizontal_gesture)return false;
+    if(event.kind==Kind::pointer_down){
+        ++impl_->horizontal_revision;impl_->horizontal_gesture.reset();
+        if((event.buttons!=0&&(event.buttons&1)==0)||impl_->modal_host()!=absent)return false;
+        auto target=impl_->hit(event.x,event.y);const auto scope=impl_->input_popup();
+        for(;target!=absent;target=impl_->nodes[target].parent){
+            const auto& node=impl_->nodes[target];
+            if(node.horizontal_drag&&impl_->effective_enabled(target)&&impl_->logical_visible(target)&&
+               !impl_->blocked(target)&&impl_->owning_popup(target)==scope){
+                const auto point=impl_->logical_point(target,event.x,event.y);
+                impl_->horizontal_gesture=Impl::HorizontalGesture{target,{point.width-node.bounds.x,point.height-node.bounds.y},
+                    event.x,event.y,event.x,event.device,event.device_id,false};
+                break;
+            }
+        }
+        return false;
+    }
+    if(event.kind==Kind::focus_lost){++impl_->horizontal_revision;impl_->horizontal_gesture.reset();return false;}
+    if(!impl_->horizontal_gesture)return false;
+    auto& gesture=*impl_->horizontal_gesture;
+    if(event.kind==Kind::scroll){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;return false;}
+    if(event.device!=gesture.device||event.device_id!=gesture.device_id)return false;
+    if(event.kind==Kind::pointer_cancel||event.kind==Kind::pointer_up){
+        const bool captured=gesture.active;impl_->horizontal_gesture.reset();++impl_->horizontal_revision;return captured;
+    }
+    if(event.kind!=Kind::pointer_move)return false;
+    const auto target=gesture.target;
+    if(target>=impl_->nodes.size()||!impl_->nodes[target].horizontal_drag||!impl_->effective_enabled(target)||
+       !impl_->logical_visible(target)||impl_->blocked(target)||impl_->modal_host()!=absent){
+        impl_->horizontal_gesture.reset();++impl_->horizontal_revision;return false;
+    }
+    bool first=false;
+    if(!gesture.active){
+        const auto dx=event.x-gesture.start_x,dy=event.y-gesture.start_y;
+        const auto threshold=impl_->nodes[target].horizontal_drag->options.threshold;
+        if(std::hypot(dx,dy)<threshold)return false;
+        if(std::abs(dy)>std::abs(dx)){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;return false;}
+        // The leaf may own a press, capture and long-press deadline. Cancel it
+        // before taking capture, but never replace a reentrant new sequence.
+        const auto revision=impl_->horizontal_revision,press_epoch=impl_->domain->press_epoch;
+        auto canceled=event;canceled.kind=Kind::pointer_cancel;
+        if(auto r=input_impl(canceled,nullptr,false,false,true);!r)return std::unexpected(r.error());
+        if(!impl_->active||impl_->horizontal_revision!=revision||impl_->domain->press_epoch!=press_epoch||
+           !impl_->horizontal_gesture||impl_->horizontal_gesture->target!=target)return true;
+        if(target>=impl_->nodes.size()||!impl_->nodes[target].horizontal_drag||!impl_->effective_enabled(target)||
+           !impl_->logical_visible(target)||impl_->blocked(target)){
+            impl_->horizontal_gesture.reset();++impl_->horizontal_revision;return true;
+        }
+        impl_->horizontal_gesture->active=true;first=true;
+    }
+    const auto delta=event.x-impl_->horizontal_gesture->last_x;
+    const auto origin=impl_->horizontal_gesture->origin;
+    const auto total=event.x-impl_->horizontal_gesture->start_x;
+    impl_->horizontal_gesture->last_x=event.x;
+    if(!std::isfinite(delta)||!std::isfinite(total)){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;return core::fail(core::ErrorCode::out_of_range,"Horizontal drag displacement overflow");}
+    if(delta==0)return true;
+    auto handler=impl_->nodes[target].horizontal_drag->handler;const auto revision=impl_->horizontal_revision;
+    core::Result<void> result;bool completed=false;auto invoke=impl_->invoke;
+    try{invoke([&]{result=handler({delta,origin,total,first});completed=true;});}
+    catch(...){if(impl_->active&&impl_->horizontal_revision==revision){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;}return core::fail(core::ErrorCode::failed,"Horizontal drag handler failed",std::current_exception());}
+    if(!impl_->active||!completed)return true;
+    if(!result){if(impl_->horizontal_revision==revision){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;}return std::unexpected(result.error());}
+    return true;
+}
+core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInput* scroll_remainder,bool scroll_normalized,bool accessibility_text,bool synthetic_drag_cancel) {
     auto event=incoming;
     if (auto r=ready();!r) return r;
     if (static_cast<unsigned>(event.kind)>static_cast<unsigned>(WidgetInputKind::pointer_cancel) || static_cast<unsigned>(event.key)>static_cast<unsigned>(WidgetKey::redo) || !std::isfinite(event.x) || !std::isfinite(event.y) || !std::isfinite(event.scroll_y) || !std::isfinite(event.scroll_x) || !valid_title(event.text) || event.text.size()>65536 || unsigned(event.device)>unsigned(PointerDevice::touch) || !std::isfinite(event.pressure) || event.pressure<0 || event.pressure>1 || !std::isfinite(event.tilt_x) || std::abs(event.tilt_x)>90 || !std::isfinite(event.tilt_y) || std::abs(event.tilt_y)>90 || !std::isfinite(event.rotation) || !std::isfinite(event.timestamp) || event.timestamp<0) return core::fail(core::ErrorCode::invalid_argument,"Invalid widget input");
@@ -3611,6 +3793,13 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
         return core::fail(core::ErrorCode::invalid_argument,"A text revision guard requires targeted text-service input");
     if(event.local_position&&(!std::isfinite(event.local_position->x)||!std::isfinite(event.local_position->y)))
         return core::fail(core::ErrorCode::invalid_argument,"Invalid local widget input position");
+    // Scroll can be routed to an embedded child through input_impl directly.
+    // Cancel there as well as for ordinary owner-thread input delivery.
+    if(impl_->touch_context_pending&&(event.kind==WidgetInputKind::pointer_down||event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::pointer_cancel||
+       event.kind==WidgetInputKind::focus_lost||event.kind==WidgetInputKind::scroll||
+       (event.kind==WidgetInputKind::pointer_move&&event.device_id==impl_->touch_context_device&&
+        std::hypot(event.x-impl_->touch_context_origin.x,event.y-impl_->touch_context_origin.y)>impl_->touch_context_tolerance)))
+        impl_->cancel_touch_context();
     const bool pointer_event=event.kind==WidgetInputKind::pointer_move||event.kind==WidgetInputKind::pointer_down||
         event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::scroll;
     if(pointer_event||event.kind==WidgetInputKind::pointer_leave||event.kind==WidgetInputKind::focus_lost){
@@ -3621,6 +3810,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
     if(event.content&&!valid_clipboard(*event.content))return core::fail(core::ErrorCode::invalid_argument,"Invalid drop payload");
     if(event.kind==WidgetInputKind::pointer_down||event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::pointer_cancel||event.kind==WidgetInputKind::focus_lost)
         ++impl_->domain->pointer_epoch;
+    if(event.kind==WidgetInputKind::pointer_down)++impl_->domain->press_epoch;
     std::optional<TextRange> committed_selection,committed_marked;bool committed_selection_reversed=false;
     if(!event.target.empty())if(auto virtual_node=virtual_target(event.target);virtual_node){
         if(event.kind!=WidgetInputKind::activate&&event.kind!=WidgetInputKind::focus)
@@ -3675,6 +3865,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
             if(event.kind==WidgetInputKind::pointer_down&&!impl_->popup_contains(top,event.x,event.y)&&popup.popover->dismiss_on_outside_press){auto r=close_popup(top,true);if(!r||!impl_->active)return r;}
         }
     }
+    if(!accessibility_text&&!synthetic_drag_cancel){auto drag=route_horizontal_drag(event);if(!drag)return std::unexpected(drag.error());if(*drag)return {};}
     bool routed=false,handler_checked=false;if(!accessibility_text)if(auto r=route_content(event,routed,handler_checked,scroll_normalized);!r)return r;
     if(routed){if(event.kind==WidgetInputKind::scroll)event.scroll_x=event.scroll_y=0;return {};}
     if(!impl_->active)return {};
@@ -3989,11 +4180,15 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
             }
         }
         if(event.kind==WidgetInputKind::scroll){if(inside&&options.clip_content){auto& popup=*impl_->nodes[top].popup;const auto dy=event.device==PointerDevice::touch?-event.scroll_y:event.scroll_y;popup.scroll=std::clamp(popup.scroll+dy,0.0,std::max(0.0,popup.content_height-popup.content.height));impl_->invalidate(true);}event.scroll_x=event.scroll_y=0;return {};}
-        const auto owner=impl_->focused==absent?absent:impl_->owning_popup(impl_->focused);
+        auto owner=impl_->focused==absent?absent:impl_->owning_popup(impl_->focused);
+        // A modal popup keeps handling Escape and Tab even if its focused child
+        // was removed or hidden by a reactive view update.
+        if(owner==absent&&options.modal)owner=top;
         if(event.kind==WidgetInputKind::key_down&&owner!=absent&&impl_->nodes[owner].popup->popover){
             if(event.key==WidgetKey::escape){bool handled=false;for(auto p=impl_->focused;p!=absent;p=impl_->nodes[p].parent)if(impl_->nodes[p].escape){handled=true;break;}
                 if(!handled){if(impl_->nodes[owner].popup->popover->dismiss_on_escape)return close_popup(owner,true);return {};}}
-            if(event.key==WidgetKey::tab)return focus_content(impl_->next_content(owner,impl_->focused,event.shift?-1:1),event.shift?-1:1);
+            if(event.key==WidgetKey::tab){const auto next=impl_->next_content(owner,impl_->focused,event.shift?-1:1);
+                return next==absent?core::Result<void>{}:focus_content(next,event.shift?-1:1);}
         }
     }
     if(!impl_->popups.empty()&&!impl_->nodes[impl_->popups.back()].popup->popover) {

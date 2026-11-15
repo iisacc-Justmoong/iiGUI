@@ -1,0 +1,187 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:eb615a9a176812bcc96197a4296a47a901f321704a6e566fd274a6f547e08fc6",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/StackLayout.md",
+    "sha256": "9425a188039a0b00f155dd8bc4c873777d644e238e02a9b1c73672b859a3b282",
+    "bytes": 2896,
+    "line_count": 42,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "유지되는 스택의 배치 변경",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 유지되는 스택의 배치 변경\n",
+      "level": 1,
+      "title": "유지되는 스택의 배치 변경"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 7,
+      "raw": "`WidgetLayout.h`는 `Insets`, `StackAlignment`, `StackAlignmentAxes`, `StackOptions`,\n`StackLayoutOptions`와 값 검증을 제공한다. 기존 NativeWidgets 소비자는 같은 타입을\n전이적으로 받는다. 수직 스택은 가로 정렬, 수평 스택은 세로 정렬, 겹침 스택은 두 축을\n각각 사용한다. 축별 값이 없으면 기존 `alignment` 값을 사용한다. 겹침 스택의 trailing도\n실제 오른쪽·아래쪽 위치에 반영한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 8,
+      "end_line": 8,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "fenced_code",
+      "start_line": 9,
+      "end_line": 17,
+      "raw": "```cpp\nauto options = widget.stack_layout();\nif (!options) return std::unexpected(options.error());\noptions->stack.spacing = 8;\noptions->stack.insets = ii::gui::Insets{4, 6, 4, 6};\noptions->extent = {240, 160};\noptions->flex = 1;\nreturn widget.set_stack_layout(*options);\n```\n",
+      "language": "cpp",
+      "code": "auto options = widget.stack_layout();\nif (!options) return std::unexpected(options.error());\noptions->stack.spacing = 8;\noptions->stack.insets = ii::gui::Insets{4, 6, 4, 6};\noptions->extent = {240, 160};\noptions->flex = 1;\nreturn widget.set_stack_layout(*options);\n",
+      "closed": true
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 24,
+      "raw": "조회와 변경은 소유 실행 영역의 활성 ordinary stack에만 허용한다. 수직·수평·겹침\n스택이 대상이며 절대 좌표 스택·스크롤·일반 컨트롤에는 기존 전용 API를 사용한다.\n옵션·크기·flex를 전부 검증한 뒤 동일 노드에 적용한다. 실패한 입력은 일부 필드도\n변경하지 않으며 같은 값은 배치를 무효화하지 않는다. 자식·이벤트·그리기 제공자·편집\n상태·포커스를 교체하지 않는다. 닫힌 세대는 `closed`, 다른 실행 영역은\n`wrong_executor`를 반환한다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 25,
+      "end_line": 25,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 26,
+      "end_line": 29,
+      "raw": "간격·공통 패딩은 0~32767, 변별·암묵적 여백과 최소 크기는 0~8192, extent는\n0~32767, flex는 0~4096 범위의 유한 값이다. extent의 0인 축은 기존 자연 크기 계약을\n유지한다. 명시적 extent·부모 가용 크기·최소 자연 크기의 우선순위도 기존 계약을 따른다.\n잘못된 축 enum을 허용하지 않는다. 기존 개별 배치 setter도 유지한다.\n"
+    },
+    {
+      "id": "b000010",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000011",
+      "kind": "paragraph",
+      "start_line": 31,
+      "end_line": 33,
+      "raw": "변경한 노드와 조상의 측정 캐시를 무효화하고 기존 배치·측정 통지를 사용한다. LVUI는\n한 바인딩에서 전체 배치 값을 계산하며 정적 입력은 AOT에서 확정한다. 뷰가 파일 상태를\n소유하거나 원본 목록을 재발행하는 경로를 추가하지 않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 36,
+      "raw": "공개 헤더 ABI 입력에 `WidgetLayout.h`를 포함한다. 이 헤더들과 기존 ABI 대상 헤더가\n바뀌면 CMake를 다시 구성하도록 추적하여 설치 패키지의 식별자를 현재 소스와 맞춘다.\n"
+    },
+    {
+      "id": "b000014",
+      "kind": "blank",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "\n"
+    },
+    {
+      "id": "b000015",
+      "kind": "paragraph",
+      "start_line": 38,
+      "end_line": 42,
+      "raw": "`tests/native_layout.cpp`는 값·잘못된 전체 입력의 롤백·실행 영역·실제 배치·측정·입력\n보존·실패 복구·퇴역과 LVUI 생성 위젯을 검사한다. `tests/layout_install.py`는\n`build/` 안에 LVUI·iiGUI를 설치하고 경로를 옮겨 공개 헤더·API·동적 AOT 팩터리를\n컴파일·링크한다. 실행은 값과 종료된 위젯의 접수 거부만 수행한다. OS 창·GPU 표면을\n만들지 않는다. 원본 LVRS의 자식별 정렬·앵커·motion·전체 플랫폼과 접근성은 별도 검증이다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "유지되는 스택의 배치 변경",
+      "anchor": "유지되는-스택의-배치-변경",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 22,
+        "text": "변경하지 않으며 같은 값은 배치를 무효화하지 않는다. 자식·이벤트·그리기 제공자·편집",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000007",
+        "line": 23,
+        "text": "상태·포커스를 교체하지 않는다. 닫힌 세대는 `closed`, 다른 실행 영역은",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 29,
+        "text": "잘못된 축 enum을 허용하지 않는다. 기존 개별 배치 setter도 유지한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000011",
+        "line": 33,
+        "text": "소유하거나 원본 목록을 재발행하는 경로를 추가하지 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "workspace-docs",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

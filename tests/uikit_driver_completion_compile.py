@@ -48,11 +48,15 @@ def main():
         host=Path(output)/"HostIOS.o"
         subprocess.run([*command,"-fobjc-arc","-c",str(root/"src/Platform/HostIOS.mm"),"-o",str(host)],
                        text=True,env=env,check=True)
+        legacy_command=command.copy()
+        legacy_command[legacy_command.index("arm64-apple-ios18.0")]="arm64-apple-ios16.0"
+        subprocess.run([*legacy_command,"-fobjc-arc","-c",str(root/"src/Platform/HostIOS.mm"),
+                        "-o",str(Path(output)/"HostIOS16.o")],text=True,env=env,check=True)
         host_symbols=subprocess.check_output(["xcrun","nm",str(host)],text=True,env=env)
         for symbol in ("UIKitWindowGeometry", "UIKitSceneRouter"):
             if symbol not in host_symbols:
                 raise RuntimeError("UIKit host did not compile " + symbol)
-    print("UIKit adapter and host compiled for iPhoneOS; old Core rejected; no app executed")
+    print("UIKit adapter and host compiled for iPhoneOS 16 and 18; old Core rejected; no app executed")
 
 
 if __name__=="__main__":
