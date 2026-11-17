@@ -70,7 +70,7 @@ bool validate_canvas(const CanvasFrame& frame, bool allow_transparent_background
         for(const auto& text:ts) {
             bytes+=text.text.size();
             if(text.clip){const auto r=*text.clip;if(!std::isfinite(r.x)||!std::isfinite(r.y)||!std::isfinite(r.width)||!std::isfinite(r.height)||std::abs(r.x)>32767||std::abs(r.y)>32767||r.width<0||r.height<0||r.width>8192||r.height>8192)return false;}
-            if(!rect(text.bounds) || !color(text.color) || !std::isfinite(text.font_size) || text.font_size<1 || text.font_size>256 || !std::isfinite(text.line_height) || text.line_height<0 || text.line_height>8192 ||
+            if(!rect(text.bounds) || !color(text.color) || !std::isfinite(text.font_size) || text.font_size<1 || text.font_size>256 || !std::isfinite(text.line_height) || text.line_height<0 || text.line_height>8192 || !std::isfinite(text.letter_spacing) || std::abs(text.letter_spacing)>256 ||
                 (text.font_weight!=400 && text.font_weight!=500 && text.font_weight!=600 && text.font_weight!=700) ||
                 (text.alignment!=TextAlignment::left && text.alignment!=TextAlignment::center && text.alignment!=TextAlignment::right) ||
                 text.text.size()>65536 || bytes>1024*1024 || text.text.find('\0')!=text.text.npos || !core::valid_utf8(text.text) ||

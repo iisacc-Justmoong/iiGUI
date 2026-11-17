@@ -71,6 +71,16 @@ void composition() {
     rendered=gui::detail::rasterize_foreground(frame.viewport,gui::detail::canvas_layers(frame)[0],2);
     check(pixel(rendered,2,2,0)==0 && pixel(rendered,2,2,1)==255 && std::abs(pixel(rendered,2,2,3)-128)<=1,"tint replaces color while preserving coverage and opacity");
     check(pixel(rendered,12,12,3)==0,"image clips to its bounds on a HiDPI surface");
+    std::vector<std::uint8_t> points(3*3*4,0);for(std::size_t i=3;i<points.size();i+=4)points[i]=255;
+    points[(1*3+1)*4]=points[(1*3+1)*4+1]=points[(1*3+1)*4+2]=255;
+    auto detail=gui::rgba_image(3,3,points);good(detail,"minified test image");
+    gui::CanvasFrame reduced{.viewport={0,0,1,1}};reduced.images={{{0,0,1,1},*detail}};
+    auto small=gui::detail::rasterize_foreground(reduced.viewport,gui::detail::canvas_layers(reduced)[0],1);
+    check(pixel(small,0,0)>85&&pixel(small,0,0)<110,"minification filters the full source footprint in linear light");
+    for(std::size_t i=3;i<points.size();i+=4)points[i]=0;points[(1*3+1)*4+3]=255;
+    auto transparent=gui::rgba_image(3,3,points);good(transparent,"transparent minified image");reduced.images[0].image=*transparent;
+    small=gui::detail::rasterize_foreground(reduced.viewport,gui::detail::canvas_layers(reduced)[0],1);
+    check(pixel(small,0,0)>250&&pixel(small,0,0,3)>25&&pixel(small,0,0,3)<32,"minification filters premultiplied transparent pixels");
 }
 void gpu(gui::Renderer renderer) {
     gui::Host host({.title="iiGUI own image/layer/cache verification"});

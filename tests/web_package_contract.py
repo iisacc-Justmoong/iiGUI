@@ -1,4 +1,4 @@
-"""Reject an installed Web Core package that omits its required thread contract.
+"""Reject an installed Web Core package that contradicts the requested thread contract.
 
 Usage: python3 -B tests/web_package_contract.py --prefix WEB_PREFIX --toolchain EMSCRIPTEN_CMAKE --output build/unique-probe
 """
@@ -39,11 +39,12 @@ def main():
         env.pop(key, None)
     result = subprocess.run(["cmake", "-S", str(source), "-B", str(output / "build"), "-G", "Ninja",
                              f"-DCMAKE_TOOLCHAIN_FILE={args.toolchain.resolve()}", f"-DCMAKE_PREFIX_PATH={package}",
-                             "-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH", "-DBUILD_TESTING=OFF", "-DIIGUI_BUILD_EXAMPLES=OFF"],
+                             "-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH", "-DBUILD_TESTING=OFF", "-DIIGUI_BUILD_EXAMPLES=OFF",
+                             "-DIISDKCORE_WASM_THREADS=ON"],
                             env=env, capture_output=True, text=True, timeout=60)
     log = result.stdout + result.stderr
     (output / "configure.log").write_text(log)
-    if not result.returncode or "Core Runtime must export -pthread" not in log:
+    if not result.returncode or "Web Core Runtime and IISDKCORE_WASM_THREADS disagree" not in log:
         raise AssertionError("Incompatible Core package was not rejected by the Web host contract: " + log[-1500:])
     print("WEB_INCOMPATIBLE_CORE_REJECTED")
 

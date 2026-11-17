@@ -595,11 +595,13 @@ class BasicNativeListItemComposite final {
             const auto text=ii::gui::srgb_to_linear(enabled?c.palette.text:c.palette.disabled_text);
             const auto caption=ii::gui::srgb_to_linear(enabled?c.palette.description:c.palette.disabled_text);
             const ii::gui::Rect clip{0,0,float(view.size.width),float(view.size.height)};
-            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body){
+            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body,bool is_description=false){
                 if(value.empty()||bounds.width<=0||bounds.height<=0)return;
+                const auto role=body?TextRole::body:is_description?TextRole::description:TextRole::caption;
+                const auto style=list_item_text_style(view,role,body?TextRoleStyle{13,13,500}:TextRoleStyle{11,11,400});
                 drawing.texts.push_back({.bounds=list_item_rect(bounds),.text=Policy::native_display_text(value),.color=body?text:caption,
-                    .font_size=body?13.f:11.f,.font_weight=body?500u:400u,.alignment=ii::gui::TextAlignment::left,
-                    .font_family=view.font_family,.line_height=body?13.f:11.f,.elide_right=true,.clip=clip});
+                    .font_size=float(style.font_size),.font_weight=style.font_weight,.alignment=ii::gui::TextAlignment::left,
+                    .font_family=view.font_family,.line_height=float(style.line_height),.elide_right=true,.clip=clip});
             };
             if(row.icon&&geometry->leading.width>0&&geometry->leading.height>0)
                 drawing.images.push_back({.bounds=list_item_rect(geometry->leading),.image=row.icon,.opacity=enabled?1.f:.35f});
@@ -607,17 +609,19 @@ class BasicNativeListItemComposite final {
                 drawing.images.push_back({.bounds=list_item_rect(geometry->bookmark),.image=state.bookmark,.opacity=enabled?1.f:.35f});
             const auto& display=row.model.configuration();emit(geometry->label,display.label,true);
             if(geometry->description.width>0&&geometry->description.height>0&&!display.description.empty()){
-                auto layout=NativeTextLayout::create(display.description,{.font_family=view.font_family,.font_size=11,.line_height=11},false,geometry->description.width);
+                const auto style=list_item_text_style(view,TextRole::description,{11,11,400});
+                const auto line_height=style.line_height>0?style.line_height:style.font_size;
+                auto layout=NativeTextLayout::create(display.description,{.font_family=view.font_family,.font_size=style.font_size,.line_height=style.line_height,.font_weight=style.font_weight},false,geometry->description.width);
                 if(layout){
                     const auto lines=std::min<std::size_t>(2,layout->lines().size());
                     for(std::size_t i=0;i<lines;++i){auto line=std::string(layout->display_text(i));
                         if(i==1&&layout->lines().size()>2)line+="…";
-                        auto bounds=geometry->description;bounds.y+=11*double(i);bounds.height=(std::max)(0.,(std::min)(11.,geometry->description.height-11*double(i)));
-                        emit(bounds,line,false);}
-                }else {auto bounds=geometry->description;bounds.height=(std::min)(11.,bounds.height);emit(bounds,display.description,false);}
+                        auto bounds=geometry->description;bounds.y+=line_height*double(i);bounds.height=(std::max)(0.,(std::min)(line_height,geometry->description.height-line_height*double(i)));
+                        emit(bounds,line,false,true);}
+                }else {auto bounds=geometry->description;bounds.height=(std::min)(line_height,bounds.height);emit(bounds,display.description,false,true);}
             }
             const std::array<const std::string*,3> metadata{&state.input.date_text,&state.input.metadata1,&state.input.metadata2};
-            for(std::size_t i=0;i<metadata.size();++i)emit(geometry->metadata[i],*metadata[i],false);
+            for(std::size_t i=0;i<metadata.size();++i)emit(geometry->metadata[i],*metadata[i],false,i==0);
             emit(geometry->status,state.input.status_text,false);return {};
         }catch(...){return ii::core::fail(ii::core::ErrorCode::failed,"Detail item drawing failed",std::current_exception());}
     }
@@ -630,15 +634,17 @@ class BasicNativeListItemComposite final {
             const auto text=ii::gui::srgb_to_linear(enabled?c.palette.text:c.palette.disabled_text);
             const auto caption=ii::gui::srgb_to_linear(enabled?c.palette.description:c.palette.disabled_text);
             const ii::gui::Rect clip{0,0,float(view.size.width),float(view.size.height)};
-            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body){
+            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body,bool is_description=false){
                 if(value.empty()||bounds.width<=0||bounds.height<=0)return;
+                const auto role=body?TextRole::body:is_description?TextRole::description:TextRole::caption;
+                const auto style=list_item_text_style(view,role,body?TextRoleStyle{13,13,500}:TextRoleStyle{11,11,400});
                 drawing.texts.push_back({.bounds=list_item_rect(bounds),.text=Policy::native_display_text(value),.color=body?text:caption,
-                    .font_size=body?13.f:11.f,.font_weight=body?500u:400u,.alignment=ii::gui::TextAlignment::left,
-                    .font_family=view.font_family,.line_height=body?13.f:11.f,.elide_right=true,.clip=clip});
+                    .font_size=float(style.font_size),.font_weight=style.font_weight,.alignment=ii::gui::TextAlignment::left,
+                    .font_family=view.font_family,.line_height=float(style.line_height),.elide_right=true,.clip=clip});
             };
             if(row.icon&&geometry->leading.width>0&&geometry->leading.height>0)
                 drawing.images.push_back({.bounds=list_item_rect(geometry->leading),.image=row.icon,.opacity=enabled?1.f:.35f});
-            const auto& display=row.model.configuration();emit(geometry->label,display.label,true);emit(geometry->description,display.description,false);
+            const auto& display=row.model.configuration();emit(geometry->label,display.label,true);emit(geometry->description,display.description,false,true);
             if(c.variant==ListItemVariant::detail_quantity){emit(geometry->quantity_caption,state.input.quantity_label,false);
                 emit(geometry->status,state.input.option_label,false);}
             else{emit(geometry->mode_caption,state.input.mode_label,false);emit(geometry->scope_caption,state.input.scope_label,false);
@@ -655,23 +661,27 @@ class BasicNativeListItemComposite final {
             const auto text=ii::gui::srgb_to_linear(enabled?c.palette.text:c.palette.disabled_text);
             const auto caption=ii::gui::srgb_to_linear(enabled?c.palette.description:c.palette.disabled_text);
             const ii::gui::Rect clip{0,0,float(view.size.width),float(view.size.height)};
-            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body){
+            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body,bool is_description=false){
                 if(value.empty()||bounds.width<=0||bounds.height<=0)return;
+                const auto role=body?TextRole::body:is_description?TextRole::description:TextRole::caption;
+                const auto style=list_item_text_style(view,role,body?TextRoleStyle{13,13,500}:TextRoleStyle{11,11,400});
                 drawing.texts.push_back({.bounds=list_item_rect(bounds),.text=Policy::native_display_text(value),.color=body?text:caption,
-                    .font_size=body?13.f:11.f,.font_weight=body?500u:400u,.alignment=ii::gui::TextAlignment::left,
-                    .font_family=view.font_family,.line_height=body?13.f:11.f,.elide_right=true,.clip=clip});
+                    .font_size=float(style.font_size),.font_weight=style.font_weight,.alignment=ii::gui::TextAlignment::left,
+                    .font_family=view.font_family,.line_height=float(style.line_height),.elide_right=true,.clip=clip});
             };
             const auto& display=row.model.configuration();emit(geometry->label,display.label,true);
             if(geometry->description.width>0&&geometry->description.height>0&&!display.description.empty()){
-                auto layout=NativeTextLayout::create(display.description,{.font_family=view.font_family,.font_size=11,.line_height=11},false,geometry->description.width);
+                const auto style=list_item_text_style(view,TextRole::description,{11,11,400});
+                const auto line_height=style.line_height>0?style.line_height:style.font_size;
+                auto layout=NativeTextLayout::create(display.description,{.font_family=view.font_family,.font_size=style.font_size,.line_height=style.line_height,.font_weight=style.font_weight},false,geometry->description.width);
                 if(layout){const auto lines=std::min<std::size_t>(2,layout->lines().size());
                     for(std::size_t i=0;i<lines;++i){auto line=std::string(layout->display_text(i));if(i==1&&layout->lines().size()>2)line+="…";
-                        auto bounds=geometry->description;bounds.y+=11*double(i);bounds.height=(std::max)(0.,(std::min)(11.,geometry->description.height-11*double(i)));
-                        emit(bounds,line,false);}
-                }else{auto bounds=geometry->description;bounds.height=(std::min)(11.,bounds.height);emit(bounds,display.description,false);}
+                        auto bounds=geometry->description;bounds.y+=line_height*double(i);bounds.height=(std::max)(0.,(std::min)(line_height,geometry->description.height-line_height*double(i)));
+                        emit(bounds,line,false,true);}
+                }else{auto bounds=geometry->description;bounds.height=(std::min)(line_height,bounds.height);emit(bounds,display.description,false,true);}
             }
             const std::array<const std::string*,3> metadata{&state.input.date_text,&state.input.metadata1,&state.input.metadata2};
-            for(std::size_t i=0;i<metadata.size();++i)emit(geometry->metadata[i],*metadata[i],false);
+            for(std::size_t i=0;i<metadata.size();++i)emit(geometry->metadata[i],*metadata[i],false,i==0);
             emit(geometry->status,state.input.quantity_label,false);return {};
         }catch(...){return ii::core::fail(ii::core::ErrorCode::failed,"Task item drawing failed",std::current_exception());}
     }
@@ -684,11 +694,13 @@ class BasicNativeListItemComposite final {
             const auto text=ii::gui::srgb_to_linear(enabled?c.palette.text:c.palette.disabled_text);
             const auto caption=ii::gui::srgb_to_linear(enabled?c.palette.description:c.palette.disabled_text);
             const ii::gui::Rect clip{0,0,float(view.size.width),float(view.size.height)};
-            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body){
+            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body,bool is_description=false){
                 if(value.empty()||bounds.width<=0||bounds.height<=0)return;
+                const auto role=body?TextRole::body:is_description?TextRole::description:TextRole::caption;
+                const auto style=list_item_text_style(view,role,body?TextRoleStyle{13,13,500}:TextRoleStyle{11,11,400});
                 drawing.texts.push_back({.bounds=list_item_rect(bounds),.text=Policy::native_display_text(value),.color=body?text:caption,
-                    .font_size=body?13.f:11.f,.font_weight=body?500u:400u,.alignment=ii::gui::TextAlignment::left,
-                    .font_family=view.font_family,.line_height=body?13.f:11.f,.elide_right=true,.clip=clip});
+                    .font_size=float(style.font_size),.font_weight=style.font_weight,.alignment=ii::gui::TextAlignment::left,
+                    .font_family=view.font_family,.line_height=float(style.line_height),.elide_right=true,.clip=clip});
             };
             if(!state.custom_preview&&geometry->preview.width>0&&geometry->preview.height>0){
                 const auto color=ii::gui::srgb_to_linear(Policy::panel_surface_alt());
@@ -702,17 +714,19 @@ class BasicNativeListItemComposite final {
                         .image=state.preview,.opacity=enabled?1.f:.35f,.radius=state.input.preview?float((std::min)({double(radius),w/2,h/2})):0.f});}
             }
             const auto& display=row.model.configuration();emit(geometry->label,display.label,true);
-            if(c.variant==ListItemVariant::media)emit(geometry->description,display.description,false);
+            if(c.variant==ListItemVariant::media)emit(geometry->description,display.description,false,true);
             else if(geometry->description.width>0&&geometry->description.height>0&&!display.description.empty()){
-                auto layout=NativeTextLayout::create(display.description,{.font_family=view.font_family,.font_size=11,.line_height=11},false,geometry->description.width);
+                const auto style=list_item_text_style(view,TextRole::description,{11,11,400});
+                const auto line_height=style.line_height>0?style.line_height:style.font_size;
+                auto layout=NativeTextLayout::create(display.description,{.font_family=view.font_family,.font_size=style.font_size,.line_height=style.line_height,.font_weight=style.font_weight},false,geometry->description.width);
                 if(layout){const auto lines=std::min<std::size_t>(2,layout->lines().size());
                     for(std::size_t i=0;i<lines;++i){auto line=std::string(layout->display_text(i));if(i==1&&layout->lines().size()>2)line+="…";
-                        auto bounds=geometry->description;bounds.y+=11*double(i);bounds.height=(std::max)(0.,(std::min)(11.,geometry->description.height-11*double(i)));
-                        emit(bounds,line,false);}
-                }else{auto bounds=geometry->description;bounds.height=(std::min)(11.,bounds.height);emit(bounds,display.description,false);}
+                        auto bounds=geometry->description;bounds.y+=line_height*double(i);bounds.height=(std::max)(0.,(std::min)(line_height,geometry->description.height-line_height*double(i)));
+                        emit(bounds,line,false,true);}
+                }else{auto bounds=geometry->description;bounds.height=(std::min)(line_height,bounds.height);emit(bounds,display.description,false,true);}
             }
             const std::array<const std::string*,3> metadata{&state.input.date_text,&state.input.metadata1,&state.input.metadata2};
-            for(std::size_t i=0;i<metadata.size();++i)emit(geometry->metadata[i],*metadata[i],false);
+            for(std::size_t i=0;i<metadata.size();++i)emit(geometry->metadata[i],*metadata[i],false,i==0);
             emit(geometry->duration,state.input.duration_text,false);emit(geometry->media_detail,state.input.media_detail,false);
             emit(geometry->status,state.input.status_text,false);return {};
         }catch(...){return ii::core::fail(ii::core::ErrorCode::failed,"Preview item drawing failed",std::current_exception());}
@@ -726,13 +740,15 @@ class BasicNativeListItemComposite final {
             const auto text=ii::gui::srgb_to_linear(enabled?c.palette.text:c.palette.disabled_text);
             const auto caption=ii::gui::srgb_to_linear(enabled?c.palette.description:c.palette.disabled_text);
             const ii::gui::Rect clip{0,0,float(view.size.width),float(view.size.height)};
-            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body){
+            const auto emit=[&](ListItemRect bounds,const std::string& value,bool body,bool is_description=false){
                 if(value.empty()||bounds.width<=0||bounds.height<=0)return;
+                const auto role=body?TextRole::body:is_description?TextRole::description:TextRole::caption;
+                const auto style=list_item_text_style(view,role,body?TextRoleStyle{13,13,500}:TextRoleStyle{11,11,400});
                 drawing.texts.push_back({.bounds=list_item_rect(bounds),.text=Policy::native_display_text(value),.color=body?text:caption,
-                    .font_size=body?13.f:11.f,.font_weight=body?500u:400u,.alignment=ii::gui::TextAlignment::left,
-                    .font_family=view.font_family,.line_height=body?13.f:11.f,.elide_right=true,.clip=clip});
+                    .font_size=float(style.font_size),.font_weight=style.font_weight,.alignment=ii::gui::TextAlignment::left,
+                    .font_family=view.font_family,.line_height=float(style.line_height),.elide_right=true,.clip=clip});
             };
-            const auto& display=row.model.configuration();emit(geometry->label,display.label,true);emit(geometry->description,display.description,false);
+            const auto& display=row.model.configuration();emit(geometry->label,display.label,true);emit(geometry->description,display.description,false,true);
             emit(geometry->field_label1,state.input.field_label1,false);emit(geometry->field_label2,state.input.field_label2,false);
             emit(geometry->status,state.input.status_text,false);return {};
         }catch(...){return ii::core::fail(ii::core::ErrorCode::failed,"Form item drawing failed",std::current_exception());}

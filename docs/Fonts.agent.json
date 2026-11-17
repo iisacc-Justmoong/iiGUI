@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/Fonts.md",
-    "sha256": "bd0dc397059b30a42e5baa4bd03339cb281bbcc7e1a11228aab4841285f68dfb",
-    "bytes": 8214,
-    "line_count": 71,
+    "sha256": "fda467b2c9ea93486ac2e584143ec90312aab5cc76a3666b50035cb1b19c59ed",
+    "bytes": 10637,
+    "line_count": 102,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -142,52 +142,108 @@
       "id": "b000017",
       "kind": "paragraph",
       "start_line": 26,
-      "end_line": 33,
-      "raw": "창의 규칙을 변경하면 유지된 콘텐츠와 팝업에 전달하고 텍스트 측정·배치 캐시를\n무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때\n이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.\n`default_text_tokens()`와 `default_widget_appearance()`는 기존 iiGUI 사용자를 위한\n기본값이다. `lvrs_text_tokens()`는 같은 텍스트 규칙을 반환하고, `lvrs_appearance()`는\n이전 창 강조색 혼합을 보존한 호환 스냅샷이다. 일반 기본 외형의 창은 중립색이며,\nLVUI는 `Panel/window` 토큰을 전달한다. 호환 API는 별도 객체 파일에 두어 정적 링크의\n일반 호스트가 이를 끌어오지 않는다. 외부 LVRS나 Qt는 필요하지 않다.\n"
+      "end_line": 32,
+      "raw": "`WidgetAppearance::text_colors`는 상위 UI 라이브러리의 역할별 encoded sRGB\n텍스트 색상을 알파와 함께 전달한다. 지정하지 않으면 기존 `text_alpha`의 흰색\n기본 정책을 유지한다. 유효하지 않은 색상은 초기 트리와 창 변경 모두에서 적용 전에\n거절하며, 명시적인 위젯 색상과 컴포넌트의 상태별 색상은 공통 역할색보다 우선한다.\n네이티브와 Web은 같은 위젯 상태와 색 공간 변환을 사용한다.\n색상 선택기 구분선은 상위 입력에 색상이 있으면 그 값을 쓰고, 없으면 iiGUI의\n기존 색상을 사용한다. 색상 변경 시 그리기를 다시 요청한다.\n"
     },
     {
       "id": "b000018",
       "kind": "blank",
-      "start_line": 34,
-      "end_line": 34,
+      "start_line": 33,
+      "end_line": 33,
       "raw": "\n"
     },
     {
       "id": "b000019",
       "kind": "paragraph",
-      "start_line": 35,
-      "end_line": 40,
-      "raw": "iiGUI 0.5.0의 이 변경은 값으로 전달되는 공개 C++ `WidgetAppearance`의 크기를\n바꾼다. 공유 라이브러리의 ABI 식별 버전은 1로 변경하고 Windows 공유 라이브러리\n이름도 `iiGUI-abi1`로 구분한다. 생성된 LVUI 창은 ABI 1 심볼을 참조하므로 새 헤더와\n오래된 라이브러리를 섞으면 링크에 실패한다. 기존 바이너리는 호환되는 헤더와\n라이브러리로 다시 빌드해야 한다. Windows 이름 규칙은 소스 수준이며 대상 호스트에서\n실행 검증하지 않았다. 작업 공간의 스테이징은 별도이며 사용자 설치본을 덮어쓰지 않는다.\n"
+      "start_line": 34,
+      "end_line": 39,
+      "raw": "`WidgetAppearance::text_styles`는 여덟 텍스트 역할의 크기·줄 높이·굵기를\n사용자 정의 그리기 제공자의 `WidgetPaintState`에 전달한다. 이 값이 없으면\n제공자는 기존 자체 기본값을 유지한다. 크기는 1–256, 줄 높이는 0–8192인\n유한한 수이며 굵기는 400·500·600·700만 허용한다. 설정 변경 시 측정과\n그리기를 무효화한다. 이 전달 경계가 모든 개별 컴포넌트의 역할 사용을\n자동으로 보장하지는 않는다.\n"
     },
     {
       "id": "b000020",
       "kind": "blank",
-      "start_line": 41,
-      "end_line": 41,
+      "start_line": 40,
+      "end_line": 40,
       "raw": "\n"
     },
     {
       "id": "b000021",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 44,
+      "raw": "`SheetInput::title_style`과 `description_style`은 상위 디자인 시스템이 Sheet\n텍스트 역할을 전달하는 선택 입력이다. 설정하지 않으면 iiGUI의 기존 Sheet\n기본값을 사용한다. 텍스트 내용은 Sheet 설정에서 가져오며 잘못된 스타일은\n위젯 적용 단계에서 거절하고 기존 설정으로 되돌린다.\n"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 45,
+      "end_line": 45,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 46,
+      "end_line": 50,
+      "raw": "내부 `LabelOptions`는 `theme_typography_role`과 `theme_color_role`을 별도로\n선택해 글꼴 역할과 색상 역할이 다른 디자인을 표현할 수 있다. 각 역할의 공통\n값이 없으면 기존 크기·줄 높이·굵기와 `role` 색상을 유지한다. 명시적인\n`color`는 공통 역할색보다 우선한다. 선택한 역할 번호가 범위를 벗어나면\n위젯이 입력을 거절한다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 51,
+      "end_line": 51,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 52,
+      "end_line": 59,
+      "raw": "창의 규칙을 변경하면 유지된 콘텐츠와 팝업에 전달하고 텍스트 측정·배치 캐시를\n무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때\n이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.\n`default_text_tokens()`와 `default_widget_appearance()`는 기존 iiGUI 사용자를 위한\n기본값이다. `lvrs_text_tokens()`는 같은 텍스트 규칙을 반환하고, `lvrs_appearance()`는\n이전 창 강조색 혼합을 보존한 호환 스냅샷이다. 일반 기본 외형의 창은 중립색이며,\nLVUI는 `Panel/window` 토큰을 전달한다. 호환 API는 별도 객체 파일에 두어 정적 링크의\n일반 호스트가 이를 끌어오지 않는다. 외부 LVRS나 Qt는 필요하지 않다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 60,
+      "end_line": 60,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "paragraph",
+      "start_line": 61,
+      "end_line": 66,
+      "raw": "iiGUI 0.6.0의 역할색과 역할별 타이포그래피 추가는 값으로 전달되는 공개 C++ `WidgetAppearance`와\n`LabelOptions`의 크기를 바꾼다. 공유 라이브러리의 ABI 식별 버전은 2이며 Windows 공유 라이브러리\n이름도 `iiGUI-abi2`로 구분한다. 생성된 LVUI 창은 ABI 2 심볼을 참조하므로 새 헤더와\n오래된 라이브러리를 섞으면 링크에 실패한다. 기존 바이너리는 호환되는 헤더와\n라이브러리로 다시 빌드해야 한다. Windows 이름 규칙은 소스 수준이며 대상 호스트에서\n실행 검증하지 않았다. 작업 공간의 스테이징은 별도이며 사용자 설치본을 덮어쓰지 않는다.\n"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 67,
+      "end_line": 67,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
       "kind": "heading",
-      "start_line": 42,
-      "end_line": 42,
+      "start_line": 68,
+      "end_line": 68,
       "raw": "## 플랫폼과 리소스\n",
       "level": 2,
       "title": "플랫폼과 리소스"
     },
     {
-      "id": "b000022",
+      "id": "b000030",
       "kind": "blank",
-      "start_line": 43,
-      "end_line": 43,
+      "start_line": 69,
+      "end_line": 69,
       "raw": "\n"
     },
     {
-      "id": "b000023",
+      "id": "b000031",
       "kind": "table",
-      "start_line": 44,
-      "end_line": 49,
-      "raw": "| 플랫폼 | 조회·등록 경로 |\n|---|---|\n| macOS·iOS | CoreText 가족 목록과 프로세스 범위 글꼴 등록 |\n| Windows 10+ | DirectWrite 시스템·번들 font set을 결합한 공통 collection |\n| Linux | Fontconfig 애플리케이션 글꼴 등록과 Pango font map 갱신 |\n| Android | API 29+ native matcher 또는 구형 시스템 설정에서 기본 가족 식별, 시스템 SFNT 메타데이터 및 APK 자산 |\n",
+      "start_line": 70,
+      "end_line": 76,
+      "raw": "| 플랫폼 | 조회·등록 경로 |\n|---|---|\n| macOS·iOS | CoreText 가족 목록과 프로세스 범위 글꼴 등록 |\n| Windows 10+ | DirectWrite 시스템·번들 font set을 결합한 공통 collection |\n| Linux | Fontconfig 애플리케이션 글꼴 등록과 Pango font map 갱신 |\n| Android | API 29+ native matcher 또는 구형 시스템 설정에서 기본 가족 식별, 시스템 SFNT 메타데이터 및 APK 자산 |\n| Web | 번들 글꼴의 각 굵기를 FontFace로 등록하고 Canvas 글꼴 선택에 사용 |\n",
       "columns": [
         "플랫폼",
         "조회·등록 경로"
@@ -208,137 +264,155 @@
         [
           "Android",
           "API 29+ native matcher 또는 구형 시스템 설정에서 기본 가족 식별, 시스템 SFNT 메타데이터 및 APK 자산"
+        ],
+        [
+          "Web",
+          "번들 글꼴의 각 굵기를 FontFace로 등록하고 Canvas 글꼴 선택에 사용"
         ]
       ]
     },
     {
-      "id": "b000024",
-      "kind": "blank",
-      "start_line": 50,
-      "end_line": 50,
-      "raw": "\n"
-    },
-    {
-      "id": "b000025",
-      "kind": "paragraph",
-      "start_line": 51,
-      "end_line": 51,
-      "raw": "Windows의 private collection은 실제 텍스트 측정·렌더링에도 전달한다. 등록됐다는 별도 목록만 만들고 화면에서 다른 collection을 사용하는 구조를 피한다. 플랫폼 코드의 존재, 컴파일, 실제 실행은 각각 별도로 검증해야 한다.\n"
-    },
-    {
-      "id": "b000026",
-      "kind": "blank",
-      "start_line": 52,
-      "end_line": 52,
-      "raw": "\n"
-    },
-    {
-      "id": "b000027",
-      "kind": "paragraph",
-      "start_line": 53,
-      "end_line": 53,
-      "raw": "`resources/lvrs-native-appearance.json`이 번들 파일 목록과 SHA-256의 기준이다. 원본 순서대로 Inter 1개와 Pretendard 9개를 제공한다. 글꼴 10개와 라이선스 2개의 설치·앱 리소스 목록을 이 자료에서 생성한다. 원본 LVRS는 갱신 도구에서만 읽으며 빌드·런타임 의존성이 아니다. `tools/update_native_font_assets.py --check`로 원본 목록·바이트·순서를 대조한다.\n"
-    },
-    {
-      "id": "b000028",
-      "kind": "blank",
-      "start_line": 54,
-      "end_line": 54,
-      "raw": "\n"
-    },
-    {
-      "id": "b000029",
-      "kind": "paragraph",
-      "start_line": 55,
-      "end_line": 55,
-      "raw": "각 파일의 등록 성공 여부와 오류를 별도로 반환한다. 일부 파일의 실패를 전체 성공으로 숨기지 않으며, 사용 가능한 글꼴 목록으로 실제 family 존재 여부를 확인한다. 동일 데이터베이스에서는 등록을 한 번 시도한다. 표시 조회는 정규화한 가족명 인덱스를 사용하고 매번 OS 목록을 재열거하지 않는다. OS 외부의 설치·제거는 `refresh()`로 다시 조회한다.\n"
-    },
-    {
-      "id": "b000030",
-      "kind": "blank",
-      "start_line": 56,
-      "end_line": 56,
-      "raw": "\n"
-    },
-    {
-      "id": "b000031",
-      "kind": "paragraph",
-      "start_line": 57,
-      "end_line": 57,
-      "raw": "Android의 시스템 기본 가족명은 고정된 Roboto 문자열로 추정하지 않는다. [NDK font matcher](https://developer.android.com/ndk/reference/group/font)가 반환한 파일·collection index의 실제 이름을 읽고, 이전 API에서는 시스템 fonts.xml의 기본 가족을 읽는다. glyph 데이터는 텍스트 run 동안 강하게 유지한다. 시스템 glyph face 캐시는 최근 8개로 제한하며 번들 자산은 별도로 유지한다. Windows private set은 [DirectWrite의 font set 결합](https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-sets-win10) 방식이다.\n"
-    },
-    {
       "id": "b000032",
       "kind": "blank",
-      "start_line": 58,
-      "end_line": 58,
+      "start_line": 77,
+      "end_line": 77,
       "raw": "\n"
     },
     {
       "id": "b000033",
-      "kind": "heading",
-      "start_line": 59,
-      "end_line": 59,
-      "raw": "## 제한된 메타데이터 판독\n",
-      "level": 2,
-      "title": "제한된 메타데이터 판독"
+      "kind": "paragraph",
+      "start_line": 78,
+      "end_line": 80,
+      "raw": "Web Canvas의 `sans-serif`, `serif`, `monospace`는 브라우저의 일반 글꼴 계열로\n전달한다. 사용자나 번들이 지정한 글꼴 이름은 CSS 문자열로 이스케이프한다. 텍스트\n측정과 그리기는 같은 이름과 굵기 규칙을 사용한다.\n"
     },
     {
       "id": "b000034",
       "kind": "blank",
-      "start_line": 60,
-      "end_line": 60,
+      "start_line": 81,
+      "end_line": 81,
       "raw": "\n"
     },
     {
       "id": "b000035",
       "kind": "paragraph",
-      "start_line": 61,
-      "end_line": 61,
-      "raw": "Android 목록 조회에 사용하는 `FontMetadata`는 SFNT/TTC의 name·OS/2 테이블만 읽는다. 파일 전체를 glyph 버퍼로 복사하지 않는다. 파일·테이블·레코드·문자열 범위를 검사하고 UTF-16BE를 Core UTF-8로 변환한다. 이 판독기는 글리프 파서나 일반적인 임의 글꼴 렌더러가 아니다. Android의 기존 ASCII shaping 제한과 16 MiB 글리프 데이터 한도, TTC의 개별 face 처리, 플랫폼별 glyph cascade 동등성은 별도 검증 대상이다.\n"
+      "start_line": 82,
+      "end_line": 82,
+      "raw": "Windows의 private collection은 실제 텍스트 측정·렌더링에도 전달한다. 등록됐다는 별도 목록만 만들고 화면에서 다른 collection을 사용하는 구조를 피한다. 플랫폼 코드의 존재, 컴파일, 실제 실행은 각각 별도로 검증해야 한다.\n"
     },
     {
       "id": "b000036",
       "kind": "blank",
-      "start_line": 62,
-      "end_line": 62,
+      "start_line": 83,
+      "end_line": 83,
       "raw": "\n"
     },
     {
       "id": "b000037",
       "kind": "paragraph",
-      "start_line": 63,
-      "end_line": 63,
-      "raw": "검사는 `font_database.cpp`, `font_metadata.cpp`, `font_widgets.cpp`에 둔다. mock 공급자 검사는 실제 정책·상태 코드를 실행하고, native 공급자 검사는 창 없이 프로세스 범위 리소스와 시스템 메타데이터만 조회한다. LVRS의 최종 앱·테스트 실행 유보 방침과 iiGUI 서비스 검증을 구분한다.\n"
+      "start_line": 84,
+      "end_line": 84,
+      "raw": "`resources/lvrs-native-appearance.json`이 번들 파일 목록과 SHA-256의 기준이다. 원본 순서대로 Inter 1개와 Pretendard 9개를 제공한다. 글꼴 10개와 라이선스 2개의 설치·앱 리소스 목록을 이 자료에서 생성한다. 원본 LVRS는 갱신 도구에서만 읽으며 빌드·런타임 의존성이 아니다. `tools/update_native_font_assets.py --check`로 원본 목록·바이트·순서를 대조한다.\n"
     },
     {
       "id": "b000038",
       "kind": "blank",
-      "start_line": 64,
-      "end_line": 64,
+      "start_line": 85,
+      "end_line": 85,
       "raw": "\n"
     },
     {
       "id": "b000039",
-      "kind": "heading",
-      "start_line": 65,
-      "end_line": 65,
-      "raw": "## 대량 행의 글꼴 구독\n",
-      "level": 2,
-      "title": "대량 행의 글꼴 구독"
+      "kind": "paragraph",
+      "start_line": 86,
+      "end_line": 86,
+      "raw": "각 파일의 등록 성공 여부와 오류를 별도로 반환한다. 일부 파일의 실패를 전체 성공으로 숨기지 않으며, 사용 가능한 글꼴 목록으로 실제 family 존재 여부를 확인한다. 동일 데이터베이스에서는 등록을 한 번 시도한다. 표시 조회는 정규화한 가족명 인덱스를 사용하고 매번 OS 목록을 재열거하지 않는다. OS 외부의 설치·제거는 `refresh()`로 다시 조회한다.\n"
     },
     {
       "id": "b000040",
       "kind": "blank",
-      "start_line": 66,
-      "end_line": 66,
+      "start_line": 87,
+      "end_line": 87,
       "raw": "\n"
     },
     {
       "id": "b000041",
       "kind": "paragraph",
-      "start_line": 67,
-      "end_line": 71,
+      "start_line": 88,
+      "end_line": 88,
+      "raw": "Android의 시스템 기본 가족명은 고정된 Roboto 문자열로 추정하지 않는다. [NDK font matcher](https://developer.android.com/ndk/reference/group/font)가 반환한 파일·collection index의 실제 이름을 읽고, 이전 API에서는 시스템 fonts.xml의 기본 가족을 읽는다. glyph 데이터는 텍스트 run 동안 강하게 유지한다. 시스템 glyph face 캐시는 최근 8개로 제한하며 번들 자산은 별도로 유지한다. Windows private set은 [DirectWrite의 font set 결합](https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-sets-win10) 방식이다.\n"
+    },
+    {
+      "id": "b000042",
+      "kind": "blank",
+      "start_line": 89,
+      "end_line": 89,
+      "raw": "\n"
+    },
+    {
+      "id": "b000043",
+      "kind": "heading",
+      "start_line": 90,
+      "end_line": 90,
+      "raw": "## 제한된 메타데이터 판독\n",
+      "level": 2,
+      "title": "제한된 메타데이터 판독"
+    },
+    {
+      "id": "b000044",
+      "kind": "blank",
+      "start_line": 91,
+      "end_line": 91,
+      "raw": "\n"
+    },
+    {
+      "id": "b000045",
+      "kind": "paragraph",
+      "start_line": 92,
+      "end_line": 92,
+      "raw": "Android 목록 조회에 사용하는 `FontMetadata`는 SFNT/TTC의 name·OS/2 테이블만 읽는다. 파일 전체를 glyph 버퍼로 복사하지 않는다. 파일·테이블·레코드·문자열 범위를 검사하고 UTF-16BE를 Core UTF-8로 변환한다. 이 판독기는 글리프 파서나 일반적인 임의 글꼴 렌더러가 아니다. Android의 기존 ASCII shaping 제한과 16 MiB 글리프 데이터 한도, TTC의 개별 face 처리, 플랫폼별 glyph cascade 동등성은 별도 검증 대상이다.\n"
+    },
+    {
+      "id": "b000046",
+      "kind": "blank",
+      "start_line": 93,
+      "end_line": 93,
+      "raw": "\n"
+    },
+    {
+      "id": "b000047",
+      "kind": "paragraph",
+      "start_line": 94,
+      "end_line": 94,
+      "raw": "검사는 `font_database.cpp`, `font_metadata.cpp`, `font_widgets.cpp`에 둔다. mock 공급자 검사는 실제 정책·상태 코드를 실행하고, native 공급자 검사는 창 없이 프로세스 범위 리소스와 시스템 메타데이터만 조회한다. LVRS의 최종 앱·테스트 실행 유보 방침과 iiGUI 서비스 검증을 구분한다.\n"
+    },
+    {
+      "id": "b000048",
+      "kind": "blank",
+      "start_line": 95,
+      "end_line": 95,
+      "raw": "\n"
+    },
+    {
+      "id": "b000049",
+      "kind": "heading",
+      "start_line": 96,
+      "end_line": 96,
+      "raw": "## 대량 행의 글꼴 구독\n",
+      "level": 2,
+      "title": "대량 행의 글꼴 구독"
+    },
+    {
+      "id": "b000050",
+      "kind": "blank",
+      "start_line": 97,
+      "end_line": 97,
+      "raw": "\n"
+    },
+    {
+      "id": "b000051",
+      "kind": "paragraph",
+      "start_line": 98,
+      "end_line": 102,
       "raw": "같은 글꼴 데이터베이스를 쓰는 콘텐츠·키 행·팝업은 루트 뷰의 구독 하나를 차용한다.\n변경 시 게시된 하위 트리와 아직 게시하지 않은 후보의 조상·자식을 함께 갱신하고 루트를\n한 번 무효화한다. 행마다 공유 Observable 구독을 만들지 않으므로 4,096 노드 경계의\n2,047행도 관측자 한도를 먼저 소진하지 않는다. 후보 생성 중 글꼴 변경, 기존 편집·포커스,\n퇴역과 최대 행 수의 재활성화를 회귀 검사한다. Core의 공통 관측자 한도는 바꾸지 않는다.\n"
     }
   ],
@@ -360,28 +434,28 @@
       "start_line": 5
     },
     {
-      "block_id": "b000021",
+      "block_id": "b000029",
       "parent_id": "b000001",
       "level": 2,
       "title": "플랫폼과 리소스",
       "anchor": "플랫폼과-리소스",
-      "start_line": 42
+      "start_line": 68
     },
     {
-      "block_id": "b000033",
+      "block_id": "b000043",
       "parent_id": "b000001",
       "level": 2,
       "title": "제한된 메타데이터 판독",
       "anchor": "제한된-메타데이터-판독",
-      "start_line": 59
+      "start_line": 90
     },
     {
-      "block_id": "b000039",
+      "block_id": "b000049",
       "parent_id": "b000001",
       "level": 2,
       "title": "대량 행의 글꼴 구독",
       "anchor": "대량-행의-글꼴-구독",
-      "start_line": 65
+      "start_line": 96
     }
   ],
   "indexes": {
@@ -402,56 +476,91 @@
       },
       {
         "block_id": "b000017",
-        "line": 27,
-        "text": "무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때",
-        "basis": "lexical_match",
-        "context": "paragraph"
-      },
-      {
-        "block_id": "b000017",
-        "line": 28,
-        "text": "이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.",
+        "line": 29,
+        "text": "거절하며, 명시적인 위젯 색상과 컴포넌트의 상태별 색상은 공통 역할색보다 우선한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000019",
         "line": 39,
-        "text": "라이브러리로 다시 빌드해야 한다. Windows 이름 규칙은 소스 수준이며 대상 호스트에서",
+        "text": "자동으로 보장하지는 않는다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 49,
+        "text": "`color`는 공통 역할색보다 우선한다. 선택한 역할 번호가 범위를 벗어나면",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000023",
+        "line": 50,
+        "text": "위젯이 입력을 거절한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000025",
-        "line": 51,
-        "text": "Windows의 private collection은 실제 텍스트 측정·렌더링에도 전달한다. 등록됐다는 별도 목록만 만들고 화면에서 다른 collection을 사용하는 구조를 피한다. 플랫폼 코드의 존재, 컴파일, 실제 실행은 각각 별도로 검증해야 한다.",
+        "line": 53,
+        "text": "무효화한다. 위젯·입력·포커스를 교체하지 않는다. LVUI는 자체 토큰을 컴파일할 때",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000029",
-        "line": 55,
-        "text": "각 파일의 등록 성공 여부와 오류를 별도로 반환한다. 일부 파일의 실패를 전체 성공으로 숨기지 않으며, 사용 가능한 글꼴 목록으로 실제 family 존재 여부를 확인한다. 동일 데이터베이스에서는 등록을 한 번 시도한다. 표시 조회는 정규화한 가족명 인덱스를 사용하고 매번 OS 목록을 재열거하지 않는다. OS 외부의 설치·제거는 `refresh()`로 다시 조회한다.",
+        "block_id": "b000025",
+        "line": 54,
+        "text": "이 규칙을 제공하므로 iiGUI가 그 앱의 스타일을 결정하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
-        "block_id": "b000031",
-        "line": 57,
-        "text": "Android의 시스템 기본 가족명은 고정된 Roboto 문자열로 추정하지 않는다. [NDK font matcher](https://developer.android.com/ndk/reference/group/font)가 반환한 파일·collection index의 실제 이름을 읽고, 이전 API에서는 시스템 fonts.xml의 기본 가족을 읽는다. glyph 데이터는 텍스트 run 동안 강하게 유지한다. 시스템 glyph face 캐시는 최근 8개로 제한하며 번들 자산은 별도로 유지한다. Windows private set은 [DirectWrite의 font set 결합](https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-sets-win10) 방식이다.",
+        "block_id": "b000027",
+        "line": 65,
+        "text": "라이브러리로 다시 빌드해야 한다. Windows 이름 규칙은 소스 수준이며 대상 호스트에서",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000027",
+        "line": 66,
+        "text": "실행 검증하지 않았다. 작업 공간의 스테이징은 별도이며 사용자 설치본을 덮어쓰지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000035",
-        "line": 61,
-        "text": "Android 목록 조회에 사용하는 `FontMetadata`는 SFNT/TTC의 name·OS/2 테이블만 읽는다. 파일 전체를 glyph 버퍼로 복사하지 않는다. 파일·테이블·레코드·문자열 범위를 검사하고 UTF-16BE를 Core UTF-8로 변환한다. 이 판독기는 글리프 파서나 일반적인 임의 글꼴 렌더러가 아니다. Android의 기존 ASCII shaping 제한과 16 MiB 글리프 데이터 한도, TTC의 개별 face 처리, 플랫폼별 glyph cascade 동등성은 별도 검증 대상이다.",
+        "line": 82,
+        "text": "Windows의 private collection은 실제 텍스트 측정·렌더링에도 전달한다. 등록됐다는 별도 목록만 만들고 화면에서 다른 collection을 사용하는 구조를 피한다. 플랫폼 코드의 존재, 컴파일, 실제 실행은 각각 별도로 검증해야 한다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000039",
+        "line": 86,
+        "text": "각 파일의 등록 성공 여부와 오류를 별도로 반환한다. 일부 파일의 실패를 전체 성공으로 숨기지 않으며, 사용 가능한 글꼴 목록으로 실제 family 존재 여부를 확인한다. 동일 데이터베이스에서는 등록을 한 번 시도한다. 표시 조회는 정규화한 가족명 인덱스를 사용하고 매번 OS 목록을 재열거하지 않는다. OS 외부의 설치·제거는 `refresh()`로 다시 조회한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000041",
-        "line": 70,
+        "line": 88,
+        "text": "Android의 시스템 기본 가족명은 고정된 Roboto 문자열로 추정하지 않는다. [NDK font matcher](https://developer.android.com/ndk/reference/group/font)가 반환한 파일·collection index의 실제 이름을 읽고, 이전 API에서는 시스템 fonts.xml의 기본 가족을 읽는다. glyph 데이터는 텍스트 run 동안 강하게 유지한다. 시스템 glyph face 캐시는 최근 8개로 제한하며 번들 자산은 별도로 유지한다. Windows private set은 [DirectWrite의 font set 결합](https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-sets-win10) 방식이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000045",
+        "line": 92,
+        "text": "Android 목록 조회에 사용하는 `FontMetadata`는 SFNT/TTC의 name·OS/2 테이블만 읽는다. 파일 전체를 glyph 버퍼로 복사하지 않는다. 파일·테이블·레코드·문자열 범위를 검사하고 UTF-16BE를 Core UTF-8로 변환한다. 이 판독기는 글리프 파서나 일반적인 임의 글꼴 렌더러가 아니다. Android의 기존 ASCII shaping 제한과 16 MiB 글리프 데이터 한도, TTC의 개별 face 처리, 플랫폼별 glyph cascade 동등성은 별도 검증 대상이다.",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000051",
+        "line": 101,
         "text": "2,047행도 관측자 한도를 먼저 소진하지 않는다. 후보 생성 중 글꼴 변경, 기존 편집·포커스,",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -460,23 +569,23 @@
     "commands": [],
     "links": [
       {
-        "block_id": "b000031",
+        "block_id": "b000041",
         "label": "NDK font matcher",
         "target": "https://developer.android.com/ndk/reference/group/font",
         "kind": "external",
-        "line": 57
+        "line": 88
       },
       {
-        "block_id": "b000031",
+        "block_id": "b000041",
         "label": "DirectWrite의 font set 결합",
         "target": "https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-sets-win10",
         "kind": "external",
-        "line": 57
+        "line": 88
       }
     ],
     "tables": [
       {
-        "block_id": "b000023",
+        "block_id": "b000031",
         "columns": [
           "플랫폼",
           "조회·등록 경로"
@@ -497,6 +606,10 @@
           [
             "Android",
             "API 29+ native matcher 또는 구형 시스템 설정에서 기본 가족 식별, 시스템 SFNT 메타데이터 및 APK 자산"
+          ],
+          [
+            "Web",
+            "번들 글꼴의 각 굵기를 FontFace로 등록하고 Canvas 글꼴 선택에 사용"
           ]
         ]
       }
@@ -504,7 +617,7 @@
   },
   "provenance": {
     "generator": "workspace-docs",
-    "version": "1.0.0",
+    "version": "1.0.0+manual-sync",
     "profile": "lossless-blocks-v1",
     "derived": true
   }

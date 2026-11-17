@@ -175,6 +175,7 @@ class BasicNativeButton final {
         std::uint64_t motion_revision=0;
         unsigned options_depth=0;
         bool live=false,interaction_seen=false,pointer_departed=false,last_effective_pressed=false;
+        bool pointer_focused=false;
     };
     std::shared_ptr<State> state_;
     explicit BasicNativeButton(std::shared_ptr<State> state):state_(std::move(state)){}
@@ -297,8 +298,13 @@ class BasicNativeButton final {
         if(!interaction.pressed||*origin!=ii::gui::WidgetPressOrigin::pointer)state->pointer_departed=false;
         else if(!interaction.hovered)state->pointer_departed=true;
         const bool effective_pressed=interaction.pressed&&!state->pointer_departed;
+        if(!interaction.focused)state->pointer_focused=false;
+        else if(interaction.pressed&&*origin==ii::gui::WidgetPressOrigin::pointer)state->pointer_focused=true;
+        else if(interaction.pressed&&*origin==ii::gui::WidgetPressOrigin::keyboard)state->pointer_focused=false;
+        const bool focus_visible=interaction.focused&&
+            (state->prepared->view.configuration().pointer_focus_visible||!state->pointer_focused);
         const auto visual=state->prepared->view.visual({interaction.enabled,interaction.hovered,
-            effective_pressed,interaction.focused,action->checked});
+            effective_pressed,focus_visible,action->checked});
         const auto target=channels(visual.background);
         const std::array<double,1> focus_opacity{visual.focused?1.:0.};
         const std::array<double,1> focus_scale{visual.focused?1.:.96};

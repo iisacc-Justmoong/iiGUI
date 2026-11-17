@@ -105,3 +105,5 @@ iiGUI regression 35/35, focused ASan/UBSan 7/7 and relocated installed consumer
 through the macOS accessibility interface; the label changed to Hello World · Cocoa!.
 Evidence is in `build/aot-regression-tests.xml`,
 `build/aot-sanitizer/build/aot-sanitizer-tests.xml` and `build/aot-consumer/`.
+
+Link widgets may be measured and painted while a candidate tree is being constructed. They accept input only after publication, and retirement invalidates the model and callbacks.

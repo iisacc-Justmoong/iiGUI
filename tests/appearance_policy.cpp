@@ -34,10 +34,113 @@ unsigned weight(const std::shared_ptr<gui::detail::WidgetState>& tree, const gui
     for (const auto& layer : frame.overlays) if (auto found = find(layer.texts)) return found;
     throw std::runtime_error("Typography sample was not drawn");
 }
+const gui::TextRun& text(const gui::CanvasFrame& frame, std::string_view value) {
+    for (const auto& item : frame.texts) if (item.text == value) return item;
+    for (const auto& layer : frame.overlays)
+        for (const auto& item : layer.texts) if (item.text == value) return item;
+    throw std::runtime_error("Palette test text was not drawn");
+}
+void check_color(const gui::TextRun& run, gui::WidgetColor expected) {
+    const auto linear = [](double c) { return c <= .04045 ? c / 12.92 : std::pow((c + .055) / 1.055, 2.4); };
+    check(std::abs(run.color.red - linear(expected.red)) < 1e-6 &&
+          std::abs(run.color.green - linear(expected.green)) < 1e-6 &&
+          std::abs(run.color.blue - linear(expected.blue)) < 1e-6 &&
+          std::abs(run.color.alpha - expected.alpha) < 1e-6, "Role color did not reach the rendered text");
+}
+void palette() {
+    using namespace ii;
+    const gui::WidgetColor body{.25, .5, .75, .8}, disabled{.8, .3, .1, .4}, explicit_ink{.1, .2, .3, 1}, description{.2,.3,.4,.6};
+    auto appearance = gui::default_widget_appearance();
+    std::array<gui::WidgetColor, 8> colors{};
+    colors.fill({1, 1, 1, 1});
+    colors[static_cast<unsigned>(gui::TextRole::body)] = body;
+    colors[static_cast<unsigned>(gui::TextRole::description)] = description;
+    colors[static_cast<unsigned>(gui::TextRole::disabled)] = disabled;
+    appearance.text_colors = colors;
+    std::array<gui::TextRoleStyle,8> styles{};
+    styles.fill({13,13,500});
+    styles[static_cast<unsigned>(gui::TextRole::body)] = {19.5,20,700};
+    appearance.text_styles=styles;
+    std::optional<gui::TextRoleStyle> painted_style;
+    gui::Widget role_probe;
+    gui::detail::WidgetFrameHooks hooks;
+    hooks.window_geometry = [](const gui::WindowGeometry&) -> core::Result<void> { return {}; };
+    auto tree = std::make_shared<gui::detail::WidgetState>([](runtime::Task task) { task(); }, appearance, hooks);
+    good(tree->construct([&](gui::WidgetBuilder& builder) -> core::Result<void> {
+        auto root = take(builder.vstack({}, "root", {.alignment = gui::StackAlignment::leading}));
+        take(builder.label(root, "label", {.text = "Palette label", .role = gui::TextRole::body}));
+        take(builder.button(root, "button", {.text = "Palette button"}));
+        take(builder.check_box(root, "disabled", {.text = "Palette disabled", .enabled = false}));
+        take(builder.label(root, "explicit", {.text = "Explicit ink", .role = gui::TextRole::body, .color = explicit_ink}));
+        role_probe=take(builder.label(root, "themed", {.text = "Themed label", .font_size=13, .role=gui::TextRole::body,
+            .line_height=16, .font_weight=500, .theme_typography_role=gui::TextRole::body,
+            .theme_color_role=gui::TextRole::description}));
+        take(builder.label(root, "themed-explicit", {.text = "Themed explicit", .color=explicit_ink,
+            .theme_typography_role=gui::TextRole::body, .theme_color_role=gui::TextRole::description}));
+        auto probe=take(builder.absolute_stack(root,"style-probe",{20,20}));
+        good(probe.set_paint_handler([&](const gui::WidgetPaintState& state)->core::Result<std::shared_ptr<const gui::WidgetDrawing>>{
+            painted_style=state.text_styles?std::optional{(*state.text_styles)[static_cast<unsigned>(gui::TextRole::body)]}:std::nullopt;
+            return std::make_shared<const gui::WidgetDrawing>();
+        }));
+        auto child = take(builder.content_host(root, "child", {300, 40}));
+        return child.set_content([](gui::WidgetBuilder& nested) -> core::Result<void> {
+            auto label = nested.label({}, "child-label", {.text = "Nested palette", .role = gui::TextRole::body});
+            return label ? core::Result<void>{} : std::unexpected(label.error());
+        });
+    }));
+    good(tree->window_properties({.geometry = {.title = "Palette"}, .appearance = appearance}));
+    good(tree->commit_window_properties()); tree->commit_publication();
+    auto frame = take(tree->drawing_snapshot({640, 480}));
+    check_color(text(frame, "Palette label"), body);
+    check_color(text(frame, "Palette button"), body);
+    check_color(text(frame, "Nested palette"), body);
+    check_color(text(frame, "Palette disabled"), disabled);
+    check_color(text(frame, "Explicit ink"), explicit_ink);
+    check_color(text(frame, "Themed label"), description);
+    check_color(text(frame, "Themed explicit"), explicit_ink);
+    check(text(frame,"Themed label").font_size==19.5f && text(frame,"Themed label").line_height==20 &&
+          text(frame,"Themed label").font_weight==700,"Opted-in label ignored the global typography role");
+    auto invalid_label=gui::LabelOptions{};invalid_label.theme_color_role=static_cast<gui::TextRole>(8);
+    check(!role_probe.set_label_options(invalid_label),"An invalid label theme role was accepted");
+    check(painted_style==gui::TextRoleStyle{19.5,20,700},"Role typography did not reach custom paint providers");
+    const gui::WidgetColor next_body{.6, .2, .4, .5};
+    (*appearance.text_colors)[static_cast<unsigned>(gui::TextRole::body)] = next_body;
+    (*appearance.text_styles)[static_cast<unsigned>(gui::TextRole::body)] = {20,21,600};
+    good(tree->window_properties({.geometry = {.title = "Palette"}, .appearance = appearance}));
+    frame = take(tree->drawing_snapshot({640, 480}));
+    check_color(text(frame, "Palette label"), next_body);
+    check_color(text(frame, "Nested palette"), next_body);
+    check_color(text(frame, "Explicit ink"), explicit_ink);
+    check(text(frame,"Themed label").font_size==20 && text(frame,"Themed label").line_height==21 &&
+          text(frame,"Themed label").font_weight==600,"Updated role typography did not reach an opted-in label");
+    check(painted_style==gui::TextRoleStyle{20,21,600},"Updated role typography did not reach custom paint providers");
+    auto invalid = appearance;
+    (*invalid.text_colors)[0].red = std::numeric_limits<double>::quiet_NaN();
+    check(!tree->window_properties({.geometry = {.title = "Invalid"}, .appearance = invalid}),
+          "An invalid role color was accepted");
+    auto bad_style=appearance;(*bad_style.text_styles)[0].font_weight=450;
+    check(!tree->window_properties({.geometry = {.title = "Invalid"}, .appearance = bad_style}),
+          "Invalid role typography was accepted");
+    check_color(text(take(tree->drawing_snapshot({640, 480})), "Palette label"), next_body);
+    bool rejected=false;
+    try { (void)std::make_shared<gui::detail::WidgetState>([](runtime::Task task) { task(); }, invalid); }
+    catch(const std::invalid_argument&) { rejected=true; }
+    check(rejected, "An invalid initial role color was accepted");
+    appearance.text_colors.reset();appearance.text_styles.reset();
+    good(tree->window_properties({.geometry = {.title = "Palette"}, .appearance = appearance}));
+    check_color(text(take(tree->drawing_snapshot({640, 480})), "Palette label"),
+                {1,1,1,appearance.text_alpha[static_cast<unsigned>(gui::TextRole::body)]});
+    const auto fallback=take(tree->drawing_snapshot({640,480}));
+    check_color(text(fallback,"Themed label"),{1,1,1,appearance.text_alpha[static_cast<unsigned>(gui::TextRole::body)]});
+    check(text(fallback,"Themed label").font_size==13 && text(fallback,"Themed label").line_height==16 &&
+          text(fallback,"Themed label").font_weight==500,"Opted-in label did not retain its fallback style");
+    tree->close();
+}
 }
 
 int main() {
     using namespace ii;
+    palette();
     gui::require_text_weight_rules_abi_v1();
     const auto generic = gui::default_widget_appearance();
     const auto legacy = gui::lvrs_appearance();

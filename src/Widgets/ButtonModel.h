@@ -38,6 +38,7 @@ struct ButtonConfiguration final {
     double border_width=0;
     bool motion_enabled=true,enter_key_activation=true;
     ButtonSelectionStyle selection_style=ButtonSelectionStyle::accent;
+    bool pointer_focus_visible=true;
     friend bool operator==(const ButtonConfiguration&,const ButtonConfiguration&)=default;
 };
 struct ButtonInteraction final {
@@ -112,7 +113,12 @@ public:
         const auto& p=configuration_.palette;
         const bool enabled=configuration_.enabled&&interaction.enabled&&configuration_.tone!=ButtonTone::disabled;
         ButtonVisual result{enabled,enabled&&interaction.focused,p.primary,p.text,p.primary};
-        if(!enabled){result.background=p.disabled_background;result.text=p.disabled_text;return result;}
+        if(!enabled){
+            // Disabling an unselected borderless action dims its content, not its surface.
+            result.background=configuration_.tone==ButtonTone::borderless&&!interaction.checked
+                ?StyleColor{0,0,0,0}:p.disabled_background;
+            result.text=p.disabled_text;return result;
+        }
         const auto darken=[](StyleColor c,double factor){return StyleColor{c.red/factor,c.green/factor,c.blue/factor,c.alpha};};
         const auto tone=interaction.checked&&configuration_.selection_style==ButtonSelectionStyle::segmented
             ?ButtonTone::normal:configuration_.tone;

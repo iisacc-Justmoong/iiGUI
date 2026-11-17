@@ -9,6 +9,26 @@ using Ink=std::array<float,4>;
 void over(Ink& dst,Ink src){for(unsigned c=0;c<4;++c)dst[c]=src[c]+dst[c]*(1-src[3]);}
 Ink ink(Color c){return {c.red*c.alpha,c.green*c.alpha,c.blue*c.alpha,c.alpha};}
 Ink lerp(Ink a,Ink b,float f){for(unsigned c=0;c<4;++c)a[c]+=f*(b[c]-a[c]);return a;}
+Ink sample_image(const RasterImage& image,double sx,double sy,double rx,double ry){
+    const auto bytes=image.rgba();Ink result{};
+    if(rx<=1&&ry<=1){
+        const auto ix=std::uint32_t(sx),iy=std::uint32_t(sy),jx=std::min(ix+1,image.width()-1),jy=std::min(iy+1,image.height()-1);
+        const float fx=float(sx-ix),fy=float(sy-iy);
+        for(int j=0;j<2;++j)for(int i=0;i<2;++i){const auto* p=bytes.data()+(std::size_t(j?jy:iy)*image.width()+(i?jx:ix))*4;const float w=(i?fx:1-fx)*(j?fy:1-fy),a=p[3]/255.f;for(unsigned c=0;c<3;++c)result[c]+=decoded(p[c]/255.f)*a*w;result[3]+=a*w;}
+        return result;
+    }
+    // Widen the bilinear kernel by the source footprint when reducing an
+    // image. This avoids aliasing without changing the linear-light contract.
+    static const auto linear=[] {std::array<float,256> table{};for(unsigned i=0;i<table.size();++i)table[i]=decoded(i/255.f);return table;}();
+    double total=0;std::array<double,4> sums{};
+    const int x0=int(std::floor(sx-rx))+1,x1=int(std::ceil(sx+rx))-1;
+    const int y0=int(std::floor(sy-ry))+1,y1=int(std::ceil(sy+ry))-1;
+    for(int y=y0;y<=y1;++y){const auto wy=std::max(0.,1-std::abs(sy-y)/ry);const auto iy=std::clamp(y,0,int(image.height())-1);
+        for(int x=x0;x<=x1;++x){const auto w=wy*std::max(0.,1-std::abs(sx-x)/rx);if(w<=0)continue;
+            const auto ix=std::clamp(x,0,int(image.width())-1);const auto* p=bytes.data()+(std::size_t(iy)*image.width()+std::size_t(ix))*4;
+            const auto a=p[3]/255.;for(unsigned c=0;c<3;++c)sums[c]+=linear[p[c]]*a*w;sums[3]+=a*w;total+=w;}}
+    if(total>0)for(unsigned c=0;c<4;++c)result[c]=float(sums[c]/total);return result;
+}
 void blend(std::uint8_t* p,const Ink& src){
     if(src[3]<=0)return;const float a=p[3]/255.f;Ink result{decoded(p[0]/255.f)*a,decoded(p[1]/255.f)*a,decoded(p[2]/255.f)*a,a};over(result,src);
     for(unsigned c=0;c<3;++c)p[c]=std::uint8_t(std::clamp(std::lround(encoded_srgb(result[c]/result[3])*255),0l,255l));p[3]=std::uint8_t(std::clamp(std::lround(result[3]*255),0l,255l));
@@ -19,7 +39,7 @@ float coverage(double x,double y,double w,double h,double radius,double scale){
 }
 void transformed(std::vector<TextRun>& texts,std::vector<ImageRun>& images,ContentTransform t){
     if(t.identity())return;
-    for(auto& text:texts){text.bounds=transform_rect(text.bounds,t);if(text.clip)text.clip=transform_rect(*text.clip,t);text.font_size*=t.scale;text.line_height*=t.scale;text.color.alpha*=t.opacity;}
+    for(auto& text:texts){text.bounds=transform_rect(text.bounds,t);if(text.clip)text.clip=transform_rect(*text.clip,t);text.font_size*=t.scale;text.line_height*=t.scale;text.letter_spacing*=t.scale;text.color.alpha*=t.opacity;}
     for(auto& image:images){image.bounds=transform_rect(image.bounds,t);image.opacity*=t.opacity;image.radius*=t.scale;image.border_width*=t.scale;if(image.gradient)image.gradient->height*=t.scale;}
 }
 }
@@ -27,7 +47,9 @@ PixelBuffer rasterize_foreground(Rect viewport,CanvasLayerView layer,double scal
     CanvasFrame text_frame;text_frame.viewport=viewport;text_frame.texts.assign(layer.texts.begin(),layer.texts.end());const auto [width,height]=canvas_pixels(text_frame,scale);
     auto out=!layer.images_before_text&&!layer.texts.empty()?rasterize_text(text_frame,scale):PixelBuffer{width,height,std::vector<std::uint8_t>(std::size_t(width)*height*4)};
     for(const auto& run:layer.images){
-        const auto& image=*run.image;const auto bytes=image.rgba();const auto r=run.bounds;const auto uv=run.source;
+        const auto& image=*run.image;const auto r=run.bounds;const auto uv=run.source;
+        const double rx=std::clamp(double(uv.width)*image.width()/(r.width*scale),1.,double(image.width())),
+                     ry=std::clamp(double(uv.height)*image.height()/(r.height*scale),1.,double(image.height()));
         const auto x0=std::clamp(int(std::clamp(std::floor(r.x*scale),0.,double(width))),0,int(width)),y0=std::clamp(int(std::clamp(std::floor(r.y*scale),0.,double(height))),0,int(height));
         const auto x1=std::clamp(int(std::clamp(std::ceil((r.x+r.width)*scale),0.,double(width))),0,int(width)),y1=std::clamp(int(std::clamp(std::ceil((r.y+r.height)*scale),0.,double(height))),0,int(height));
         for(int y=y0;y<y1;++y)for(int x=x0;x<x1;++x){
@@ -35,8 +57,7 @@ PixelBuffer rasterize_foreground(Rect viewport,CanvasLayerView layer,double scal
             const auto mask=run.radius>0?coverage(local_x,local_y,r.width,r.height,run.radius,scale):1.f;if(mask<=0)continue;
             const auto sx=std::clamp((uv.x+local_x/r.width*uv.width)*image.width()-.5,0.,double(image.width()-1));
             const auto sy=std::clamp((uv.y+local_y/r.height*uv.height)*image.height()-.5,0.,double(image.height()-1));
-            const auto ix=std::uint32_t(sx),iy=std::uint32_t(sy),jx=std::min(ix+1,image.width()-1),jy=std::min(iy+1,image.height()-1);const float fx=float(sx-ix),fy=float(sy-iy);Ink src{};
-            for(int j=0;j<2;++j)for(int i=0;i<2;++i){const auto* p=bytes.data()+(std::size_t(j?jy:iy)*image.width()+(i?jx:ix))*4;const float w=(i?fx:1-fx)*(j?fy:1-fy),a=p[3]/255.f;for(unsigned c=0;c<3;++c)src[c]+=decoded(p[c]/255.f)*a*w;src[3]+=a*w;}
+            Ink src=sample_image(image,sx,sy,rx,ry);
             if(run.tint){const auto c=*run.tint;src={c.red*src[3]*c.alpha,c.green*src[3]*c.alpha,c.blue*src[3]*c.alpha,src[3]*c.alpha};}
             if(run.gradient&&run.gradient->height>0){const auto& g=*run.gradient;const auto t=float(std::clamp((local_y-(r.height-g.height))/g.height,0.,1.));auto paint=t<g.middle_position?lerp(ink(g.top),ink(g.middle),t/g.middle_position):lerp(ink(g.middle),ink(g.bottom),(t-g.middle_position)/(1-g.middle_position));over(src,paint);}
             if(run.border_width>0&&run.border.alpha>0){const auto b=run.border_width;const auto inside=coverage(local_x-b,local_y-b,r.width-2*b,r.height-2*b,std::max(0.f,run.radius-b),scale);auto paint=ink(run.border);for(auto& c:paint)c*=std::clamp(1-inside/mask,0.f,1.f);over(src,paint);}

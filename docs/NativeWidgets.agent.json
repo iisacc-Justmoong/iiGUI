@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/NativeWidgets.md",
-    "sha256": "1ee342d6328749fe09db2f56a63dce854f88befe17efd2a3d38333d52f6a3c16",
-    "bytes": 6161,
-    "line_count": 107,
+    "sha256": "840d53640b8ba30e35eb7903247bba0c4b5a298414aa4e15e729c853acdd8bd0",
+    "bytes": 6342,
+    "line_count": 109,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -292,6 +292,20 @@
       "start_line": 102,
       "end_line": 107,
       "raw": "Verified on macOS arm64 / AppleClang 21 on 2026-10-22: LVUI 20/20,\niiGUI regression 35/35, focused ASan/UBSan 7/7 and relocated installed consumer\n1/1. The actual app was also opened and its native Say Hello button was clicked\nthrough the macOS accessibility interface; the label changed to Hello World · Cocoa!.\nEvidence is in `build/aot-regression-tests.xml`,\n`build/aot-sanitizer/build/aot-sanitizer-tests.xml` and `build/aot-consumer/`.\n"
+    },
+    {
+      "id": "b000038",
+      "kind": "blank",
+      "start_line": 108,
+      "end_line": 108,
+      "raw": "\n"
+    },
+    {
+      "id": "b000039",
+      "kind": "paragraph",
+      "start_line": 109,
+      "end_line": 109,
+      "raw": "Link widgets may be measured and painted while a candidate tree is being constructed. They accept input only after publication, and retirement invalidates the model and callbacks.\n"
     }
   ],
   "outline": [

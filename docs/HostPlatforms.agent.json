@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/HostPlatforms.md",
-    "sha256": "6e209f1bda5550d8a476267a9851d091b17e815edd25a90c680be507efff77f1",
-    "bytes": 70769,
+    "sha256": "40834f4bdf4d7886c2a17b2e835a401f86c4954819be6bfde85eeb704937ce5e",
+    "bytes": 70828,
     "line_count": 837,
     "encoding": "utf-8",
     "language": "ko"
@@ -647,7 +647,7 @@
       "kind": "table",
       "start_line": 330,
       "end_line": 338,
-      "raw": "| 대상 | 호스트 | 자체 위젯 출력 | 프레임 공급원 |\n| --- | --- | --- | --- |\n| macOS | Cocoa | Metal, 선택적 Vulkan | 창 display link |\n| Windows | Win32 | D3D11, 선택적 Vulkan | 기존 명시적 cadence |\n| Linux/Wayland | wl_compositor + xdg-shell | VK_KHR_wayland_surface | wl_surface.frame |\n| Linux/X11 | Xlib + XI2 | VK_KHR_xlib_surface | 기존 명시적 cadence |\n| Android | NativeActivity/native_app_glue/ALooper | VK_KHR_android_surface | AChoreographer |\n| iOS/iPadOS | UIKit 장면 | Metal, 선택적 MoltenVK | 기존 display link |\n| Web | WASM application pthread + canvas | WebGL2/OffscreenCanvas | worker requestAnimationFrame |\n",
+      "raw": "| 대상 | 호스트 | 자체 위젯 출력 | 프레임 공급원 |\n| --- | --- | --- | --- |\n| macOS | Cocoa | Metal, 선택적 Vulkan | 창 display link |\n| Windows | Win32 | D3D11, 선택적 Vulkan | 기존 명시적 cadence |\n| Linux/Wayland | wl_compositor + xdg-shell | VK_KHR_wayland_surface | wl_surface.frame |\n| Linux/X11 | Xlib + XI2 | VK_KHR_xlib_surface | 기존 명시적 cadence |\n| Android | NativeActivity/native_app_glue/ALooper | VK_KHR_android_surface | AChoreographer |\n| iOS/iPadOS | UIKit 장면 | Metal, 선택적 MoltenVK | 기존 display link |\n| Web | 메인 스레드 또는 pthread + canvas | WebGL2 canvas/OffscreenCanvas | requestAnimationFrame |\n",
       "columns": [
         "대상",
         "호스트",
@@ -693,9 +693,9 @@
         ],
         [
           "Web",
-          "WASM application pthread + canvas",
-          "WebGL2/OffscreenCanvas",
-          "worker requestAnimationFrame"
+          "메인 스레드 또는 pthread + canvas",
+          "WebGL2 canvas/OffscreenCanvas",
+          "requestAnimationFrame"
         ]
       ]
     },
@@ -1534,7 +1534,7 @@
       "kind": "paragraph",
       "start_line": 683,
       "end_line": 688,
-      "raw": "Core가 브라우저 UI 스레드에서 worker 생성/join을 거부하는 기존 계약을 유지한다.\n설치된 Core Runtime이 공개 CMake 계약에 -pthread를 내보내지 않으면 iiGUI 구성에서\n즉시 거부한다. 스레드 없는 Core와 GUI 호스트를 섞은 패키지를 성공으로 보고하지 않는다.\nPROXY_TO_PTHREAD로 앱을 pthread에서 실행하고 Core 상시 worker pool을 사용한다.\nOffscreenCanvas도 앱 스레드가 소유하며 DOM/클립보드/URL 호출만 메인 스레드로\n전달한다. OS I/O readiness waiter는 만들지 않고 HostLoop wake 계약을 사용한다.\n"
+      "raw": "Core가 브라우저 UI 스레드에서 worker 생성/join을 거부하는 기존 계약을 유지한다.\niiGUI는 설치된 Core의 -pthread 공개 설정을 따르며 명시된 설정과 일치해야 한다.\npthread 빌드는 PROXY_TO_PTHREAD로 앱을 worker에서 실행하고 Core worker를 쓴다.\nOffscreenCanvas도 앱 스레드가 소유하며 DOM/클립보드/URL은 메인 스레드로 전달한다.\n단일 스레드 빌드는 메인 스레드의 WebGL2 canvas를 사용하고 공유 메모리를 요구하지 않는다.\n두 모드는 OS I/O readiness waiter 대신 HostLoop wake 계약을 사용한다.\n"
     },
     {
       "id": "b000194",
@@ -1562,7 +1562,7 @@
       "kind": "paragraph",
       "start_line": 702,
       "end_line": 707,
-      "raw": "유휴 대기는 Atomics.waitAsync와 Core 데드라인으로 구성한다. 모션/FrameLoop가 있을\n때만 worker requestAnimationFrame을 요청한다. Core wake가 와도 이미 요청한 프레임을 취소하지\n않고, MessageChannel task yield를 통해 연속 wake가 브라우저 프레임을 굶기지 않게 한다.\n자체 검사에서는 1ms 간격 background wake 중에도 프레임이 진행되는지 확인한다. 숨겨진 페이지에서도 Core 데드라인을\n처리하고 GPU 표시는 멈춘다. context loss에는 표시를 정지하고 restore에서 자원을\n재구축한다. readback은 명시적 capture에서만 사용한다.\n"
+      "raw": "pthread 유휴 대기는 Atomics.waitAsync, 단일 스레드는 이벤트 Promise와 데드라인을 사용한다.\n모션/FrameLoop가 있을 때만 각 모드의 requestAnimationFrame을 요청한다. Core wake가 와도\n이미 요청한 프레임을 유지하고 MessageChannel로 연속 wake의 브라우저 독점을 막는다.\n자체 검사에서는 1ms 간격 background wake 중에도 프레임이 진행되는지 확인한다. 숨겨진 페이지에서도 Core 데드라인을\n처리하고 GPU 표시는 멈춘다. context loss에는 표시를 정지하고 restore에서 자원을\n재구축한다. readback은 명시적 capture에서만 사용한다.\n"
     },
     {
       "id": "b000198",
@@ -1590,7 +1590,7 @@
       "kind": "paragraph",
       "start_line": 717,
       "end_line": 723,
-      "raw": "Web의 일반 텍스트는 요청된 논리 폭에 맞춰 같은 줄 분할 결과를 측정과 그리기에\n사용한다. 명시적인 CR·LF·CRLF와 빈 문단을 보존하고, 공백에서 나눌 수 없는 긴\n내용은 Unicode 그래핌 경계에서 나눈다. 말줄임 요청에는 자동 줄바꿈을 추가하지\n않는다. 이는 전체 Unicode 줄바꿈 규칙이나 모든 언어의 단어 분리·시각 품질을\n보장하는 구현은 아니다. 브라우저 `OffscreenCanvas`의 글꼴 측정과 텍스트 래스터를\n사용한 뒤 결과를 WebGL 텍스처로 합성하며, GPU 글리프 래스터화로 주장하지 않는다.\n그리기는 기존의 변경 기반 캐시에 따라 발생한다.\n"
+      "raw": "Web의 일반 텍스트는 요청된 논리 폭에 맞춰 같은 줄 분할 결과를 측정과 그리기에\n사용한다. 명시적인 CR·LF·CRLF와 빈 문단을 보존하고, 공백에서 나눌 수 없는 긴\n내용은 Unicode 그래핌 경계에서 나눈다. 말줄임 요청에는 자동 줄바꿈을 추가하지\n않는다. 이는 전체 Unicode 줄바꿈 규칙이나 모든 언어의 단어 분리·시각 품질을\n보장하는 구현은 아니다. 브라우저 Canvas 2D의 글꼴 측정과 텍스트 래스터를\n사용한 뒤 결과를 WebGL 텍스처로 합성하며, GPU 글리프 래스터화로 주장하지 않는다.\n그리기는 기존의 변경 기반 캐시에 따라 발생한다.\n"
     },
     {
       "id": "b000202",
@@ -1632,7 +1632,7 @@
       "kind": "paragraph",
       "start_line": 743,
       "end_line": 746,
-      "raw": "필요 조건은 Emscripten pthread, SharedArrayBuffer, OffscreenCanvas/WebGL2,\nworker requestAnimationFrame, Atomics.waitAsync, Worker FontFace/FontFaceSet이다.\n서버에 COOP same-origin, COEP require-corp가 필요하다. tools/serve_web.py는\n127.0.0.1에 이 헤더들을 제공하며 공개 서버나 자동 시작 작업을 등록하지 않는다.\n"
+      "raw": "pthread 모드는 SharedArrayBuffer, OffscreenCanvas/WebGL2, worker requestAnimationFrame,\nAtomics.waitAsync, Worker FontFace/FontFaceSet과 교차 출처 격리 헤더가 필요하다.\n단일 스레드는 WebGL2와 브라우저 메인 스레드를 사용하며 위 격리 헤더는 요구하지 않는다.\ntools/serve_web.py는 loopback에 격리 헤더를 제공하며 자동 시작 작업은 등록하지 않는다.\n"
     },
     {
       "id": "b000208",
@@ -1785,7 +1785,7 @@
       "kind": "paragraph",
       "start_line": 784,
       "end_line": 789,
-      "raw": "창을 열지 않는 CTest 34/34, ASan+UBSan 계약 검사 7/7, Python 검사 25/25가\n통과했다. Python 수치는 CTest에서 호출한 일부 검사와 중복되므로 이들을 합산하지 않는다.\npthread 공개 계약을 제거한 Core 패키지를 실제 구성에서 거부하는 부정 구성 검사도 통과했다.\nWindows/Linux/macOS 최종 앱의 Qt·LVUI 파서·인터프리터 부재, Core 최종 진입점과\n설치 헤더 사용을 확인했다. Wayland 앱에 XOpenDisplay/XCreateWindow 경로가 없음을\n확인했으며 배포판 라이브러리의 모든 간접 의존성 부재까지 주장하지 않는다.\n"
+      "raw": "창을 열지 않는 CTest 34/34, ASan+UBSan 계약 검사 7/7, Python 검사 25/25가\n통과했다. Python 수치는 CTest에서 호출한 일부 검사와 중복되므로 이들을 합산하지 않는다.\n당시 pthread 공개 계약을 제거한 Core 패키지 거부를 검사했으며 현재는 모드 일치를 검사한다.\nWindows/Linux/macOS 최종 앱의 Qt·LVUI 파서·인터프리터 부재, Core 최종 진입점과\n설치 헤더 사용을 확인했다. Wayland 앱에 XOpenDisplay/XCreateWindow 경로가 없음을\n확인했으며 배포판 라이브러리의 모든 간접 의존성 부재까지 주장하지 않는다.\n"
     },
     {
       "id": "b000224",
@@ -2519,7 +2519,7 @@
       {
         "block_id": "b000193",
         "line": 685,
-        "text": "즉시 거부한다. 스레드 없는 Core와 GUI 호스트를 섞은 패키지를 성공으로 보고하지 않는다.",
+        "text": "pthread 빌드는 PROXY_TO_PTHREAD로 앱을 worker에서 실행하고 Core worker를 쓴다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
@@ -2547,7 +2547,7 @@
       {
         "block_id": "b000207",
         "line": 746,
-        "text": "127.0.0.1에 이 헤더들을 제공하며 공개 서버나 자동 시작 작업을 등록하지 않는다.",
+        "text": "tools/serve_web.py는 loopback에 격리 헤더를 제공하며 자동 시작 작업은 등록하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
@@ -2824,9 +2824,9 @@
           ],
           [
             "Web",
-            "WASM application pthread + canvas",
-            "WebGL2/OffscreenCanvas",
-            "worker requestAnimationFrame"
+            "메인 스레드 또는 pthread + canvas",
+            "WebGL2 canvas/OffscreenCanvas",
+            "requestAnimationFrame"
           ]
         ]
       },

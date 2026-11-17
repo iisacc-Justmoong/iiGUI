@@ -97,7 +97,7 @@ struct PlatformCanvas::Impl final {
     explicit Impl(Acceleration policy){
         EmscriptenWebGLContextAttributes attributes;emscripten_webgl_init_context_attributes(&attributes);
         attributes.majorVersion=2;attributes.minorVersion=0;attributes.alpha=true;attributes.antialias=false;attributes.depth=false;attributes.stencil=false;attributes.premultipliedAlpha=true;attributes.preserveDrawingBuffer=true;
-        context=emscripten_webgl_create_context("#canvas",&attributes);if(context<=0)throw std::runtime_error("WebGL2 with OffscreenCanvas is required");
+        context=emscripten_webgl_create_context("#canvas",&attributes);if(context<=0)throw std::runtime_error("A WebGL2 canvas is required");
         try{
             current();half=emscripten_webgl_enable_extension(context,"EXT_color_buffer_float")||
                 emscripten_webgl_enable_extension(context,"EXT_color_buffer_half_float");

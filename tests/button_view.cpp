@@ -1,5 +1,6 @@
 #include <iiGUI/NativeButtonView.h>
 #include <iiGUI/WidgetState.h>
+#include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <limits>
@@ -47,9 +48,14 @@ int main() {
     input.icon_name = "icon"; input.icon_source = source;
     std::vector<std::string> events;
     std::optional<NativeButton> button;
+    Widget editor;
     good(host.set_content([&](WidgetBuilder& builder) -> ii::core::Result<void> {
         auto root = builder.absolute_stack({}, "root", {240, 100});
         if (!root) return std::unexpected(root.error());
+        auto field = builder.input_field(*root, "editor", {.text = "query"});
+        if (!field) return std::unexpected(field.error());
+        editor = *field;
+        if (auto placed = editor.set_frame({140, 20, 80, 30}); !placed) return placed;
         auto created = NativeButton::create(builder, *root, "button", input, [&] { events.emplace_back("clicked"); });
         if (!created) return std::unexpected(created.error());
         button = *created;
@@ -63,6 +69,27 @@ int main() {
         has_icon = has_icon || !overlay.images.empty();
     }
     require(has_panel && has_icon, "Button did not draw its surface and icon");
+    const auto button_surface_visible = [&] {
+        const auto drawing = take(tree->drawing_snapshot({240, 100}));
+        const auto contains_surface = [](const auto& panels) {
+            return std::ranges::any_of(panels, [](const auto& panel) {
+                return panel.stroke_width == 0 && panel.top.alpha > 0 &&
+                    std::abs(panel.bounds.x - 20) < .1 && std::abs(panel.bounds.y - 20) < .1 &&
+                    std::abs(panel.bounds.width - 100) < .1 && std::abs(panel.bounds.height - 30) < .1;
+            });
+        };
+        return contains_surface(drawing.panels) || std::ranges::any_of(drawing.overlays,
+            [&](const auto& layer) { return contains_surface(layer.panels); });
+    };
+    auto borderless = input;
+    borderless.configuration.tone = ButtonTone::borderless;
+    borderless.configuration.palette.disabled_background = {.1, .1, .1, 1};
+    good(button->set_options(borderless));
+    require(!button_surface_visible(), "An enabled idle borderless button drew a background");
+    borderless.configuration.enabled = false;
+    good(button->set_options(borderless));
+    require(!button_surface_visible(), "A disabled borderless button drew a background");
+    good(button->set_options(input));
     auto updated = input; updated.configuration.text = "Save again";
     good(button->set_options(updated));
     require(source->calls == 1, "An unchanged icon was resolved again");
@@ -82,10 +109,39 @@ int main() {
                 "Button method payload changed");
         events.emplace_back("method");
     }));
+    auto ring_visible = [&] {
+        const auto drawing = take(tree->drawing_snapshot({240, 100}));
+        const auto has_ring = [](const auto& panels) {
+            return std::ranges::any_of(panels, [](const auto& panel) {
+                return panel.stroke_width > 0 && panel.top.alpha > 0 &&
+                    std::abs(panel.bounds.x - 17) < .1 && std::abs(panel.bounds.y - 17) < .1 &&
+                    std::abs(panel.bounds.width - 106) < .1 && std::abs(panel.bounds.height - 36) < .1;
+            });
+        };
+        return has_ring(drawing.panels) || std::ranges::any_of(drawing.overlays,
+            [&](const auto& layer) { return has_ring(layer.panels); });
+    };
     good(tree->input({.kind = WidgetInputKind::pointer_down, .x = 30, .y = 30}));
     good(tree->input({.kind = WidgetInputKind::pointer_up, .x = 30, .y = 30}));
     require(events == std::vector<std::string>{"pressed", "released", "method", "clicked"},
             "Button input and method ordering changed");
+    require(ring_visible(), "Default pointer focus visibility changed");
+    auto focus_policy = input;
+    focus_policy.configuration.pointer_focus_visible = false;
+    good(button->set_options(focus_policy));
+    good(editor.focus());
+    good(tree->input({.kind = WidgetInputKind::pointer_down, .x = 30, .y = 30}));
+    good(tree->input({.kind = WidgetInputKind::pointer_up, .x = 30, .y = 30}));
+    require(take(button->root().snapshot()).focused && !take(editor.snapshot()).focused && !ring_visible(),
+            "Pointer focus changed logical focus or drew a focus ring");
+    good(tree->input({.kind = WidgetInputKind::key_down, .key = WidgetKey::space}));
+    require(ring_visible(), "Keyboard interaction did not reveal the focus ring");
+    good(tree->input({.kind = WidgetInputKind::key_up, .key = WidgetKey::space}));
+    good(tree->input({.kind = WidgetInputKind::focus_lost}));
+    good(button->root().focus());
+    require(ring_visible(), "Programmatic keyboard focus did not show the focus ring");
+    good(button->set_options(input));
+    events.clear();
     auto invalid = input; invalid.configuration.height = std::numeric_limits<double>::quiet_NaN();
     require(!button->set_options(invalid) && take(button->options()).configuration.height == 30,
             "Invalid update replaced retained button options");

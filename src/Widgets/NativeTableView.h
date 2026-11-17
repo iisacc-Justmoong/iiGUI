@@ -332,6 +332,9 @@ class BasicNativeTable final {
         if (!state->header_ink) return ii::core::fail(ii::core::ErrorCode::failed, "Table header presentation is unavailable");
         output->images_before_text = true;
         const auto& a = state->authored.appearance; const auto background = color(a.palette.background), divider = color(a.palette.divider), ink = color(a.palette.header_text);
+        const auto header_size=a.header_typography?a.header_typography->font_size:a.font_size;
+        const auto header_line=a.header_typography?a.header_typography->line_height:a.font_size+3;
+        const auto header_weight=a.header_typography?a.header_typography->font_weight:500u;
         if (paint.size.width > 0 && paint.size.height > 0) output->panels.push_back({{0, 0, float(paint.size.width), float(paint.size.height)}, background, background});
         const auto budget = std::max<std::size_t>(4, 128 * 1024 / std::max<std::size_t>(1, state->frame->columns.size()));
         for (const auto& column : state->frame->columns) {
@@ -340,13 +343,13 @@ class BasicNativeTable final {
             const auto indicator = sorted && column.extent >= 24 ? 12. : 0.;
             const bool custom=state->header_views&&state->header_views->has(data.key);
             if (!custom)if (auto rendered = state->header_ink->draw(*output, column.index, data.title, column.offset, column.extent,
-                    paint.size.height, paint, ink, a.font_size, a.font_size + 3, indicator, budget); !rendered)
+                    paint.size.height, paint, ink, header_size, header_line, header_weight, indicator, budget); !rendered)
                 return std::unexpected(rendered.error());
             if (!custom&&indicator && paint.size.height > 0) output->texts.push_back({
                 .bounds={float(column.offset + column.extent - indicator), 0, float(indicator), float(paint.size.height)},
                 .text=state->sort_order == TableSortOrder::ascending ? "↑" : "↓", .color=ink,
-                .font_size=float(a.font_size), .font_weight=500, .alignment=ii::gui::TextAlignment::center,
-                .font_family=paint.font_family, .line_height=float(a.font_size + 3),
+                .font_size=float(header_size), .font_weight=header_weight, .alignment=ii::gui::TextAlignment::center,
+                .font_family=paint.font_family, .line_height=float(header_line),
                 .clip=ii::gui::Rect{float(column.offset), 0, float(column.extent), float(paint.size.height)}});
             if (paint.focused && state->authored.sorting_enabled && state->focused_header == data.key && paint.size.height >= 2) {
                 const auto left_edge = (std::max)(0., column.offset), right_edge = (std::min)(paint.size.width, column.offset + column.extent);
@@ -380,6 +383,9 @@ class BasicNativeTable final {
         auto output = std::make_shared<ii::gui::WidgetDrawing>(); if (!state->frame) return std::shared_ptr<const ii::gui::WidgetDrawing>(output);
         const auto& a = state->authored.appearance; const auto background = color(a.palette.background), divider = color(a.palette.divider);
         const auto selection = color(a.palette.selection), current = color(a.palette.current), ink = color(a.palette.cell_text);
+        const auto cell_size=a.cell_typography?a.cell_typography->font_size:a.font_size;
+        const auto cell_line=a.cell_typography?a.cell_typography->line_height:a.font_size+3;
+        const auto cell_weight=a.cell_typography?a.cell_typography->font_weight:500u;
         if (paint.size.width > 0 && paint.size.height > 0) output->panels.push_back({{0, 0, float(paint.size.width), float(paint.size.height)}, background, background});
         const auto count = state->frame->rows.size() * state->frame->columns.size();
         const auto budget = std::max<std::size_t>(4, 800 * 1024 / std::max<std::size_t>(1, count));
@@ -399,8 +405,8 @@ class BasicNativeTable final {
             if (!custom&&!cell.text.empty() && text_width > 0 && text_height > 0 && text_x >= -32767 && text_y >= -32767 &&
                 text_x < paint.size.width && text_y < paint.size.height && text_x + text_width > 0 && text_y + text_height > 0) output->texts.push_back({
                 .bounds={float(text_x), float(text_y), float(text_width), float(text_height)},
-                .text=bounded_text(cell.text, budget), .color=ink, .font_size=float(a.font_size), .font_weight=500,
-                .alignment=ii::gui::TextAlignment::left, .font_family=paint.font_family, .line_height=float(a.font_size + 3),
+                .text=bounded_text(cell.text, budget), .color=ink, .font_size=float(cell_size), .font_weight=cell_weight,
+                .alignment=ii::gui::TextAlignment::left, .font_family=paint.font_family, .line_height=float(cell_line),
                 .elide_right=true, .clip=ii::gui::Rect{float(left), float(top), float(right-left), float(bottom-top)}});
             if (a.selection_enabled && state->selection && state->selection->current.row == state->snapshot->rows[row].key &&
                 state->selection->current.column == state->snapshot->columns[column].key && right-left >= 2 && bottom-top >= 2)
@@ -678,6 +684,7 @@ class BasicNativeTable final {
         if(!state->live||state->revision!=revision||state->authored.controller!=controller)return {};
         if(action==ii::gui::WidgetInputKind::activate&&state->authored.editable&&!state->editing){
             auto editing=begin_edit(state);
+            if(!editing&&editing.error().code==ii::core::ErrorCode::unsupported){state->failure=editing.error();return {};}
             if(!editing&&editing.error().code!=ii::core::ErrorCode::invalid_argument&&editing.error().code!=ii::core::ErrorCode::not_found)return editing;
         }
         return {};
@@ -757,7 +764,11 @@ class BasicNativeTable final {
         if (auto frame = state->edit_host.set_frame(*rect); !frame) return frame;
         InputFieldConfiguration field; field.text = value->draft; field.width = rect->width; field.height = rect->height;
         field.horizontal_padding = (std::min)(state->authored.appearance.cell_padding, double(rect->width) / 2);
-        field.corner_radius = 0; field.font_size = state->authored.appearance.font_size; field.accessibility_name = state->authored.text.edit_cell;
+        field.corner_radius = 0; field.font_size = state->authored.appearance.cell_typography ?
+            state->authored.appearance.cell_typography->font_size : state->authored.appearance.font_size;
+        if(state->authored.appearance.cell_typography&&state->authored.appearance.cell_typography->line_height<=1024)
+            field.line_height=state->authored.appearance.cell_typography->line_height;
+        field.accessibility_name = state->authored.text.edit_cell;
         field.palette.background = state->authored.appearance.palette.background; field.palette.text = state->authored.appearance.palette.cell_text;
         field.palette.focus = state->authored.appearance.palette.current;
         field.palette.selection = field.palette.focus; field.palette.selection.alpha *= .38;
@@ -790,6 +801,7 @@ class BasicNativeTable final {
         }); !escape) { (void)clear_edit(state, false); return escape; }
         if (auto shown = state->edit_host.set_visible(true); !shown) { (void)clear_edit(state, false); return shown; }
         if (auto focused = state->field->root().focus(); !focused) { (void)clear_edit(state, false); return focused; }
+        if (state->failure && state->failure->code == ii::core::ErrorCode::unsupported) state->failure.reset();
         return {};
     }
     enum class ClipboardOperation { copy, cut, paste };
@@ -1423,6 +1435,9 @@ class BasicNativeTable final {
         if (!direction) {
             if (event.key == WidgetKey::enter && state->authored.editable) {
                 auto started = begin_edit(state);
+                if (!started && started.error().code == ii::core::ErrorCode::unsupported) {
+                    state->failure = started.error();return true;
+                }
                 if (!started && started.error().code != ii::core::ErrorCode::invalid_argument && started.error().code != ii::core::ErrorCode::not_found)
                     return std::unexpected(started.error());
                 return true;

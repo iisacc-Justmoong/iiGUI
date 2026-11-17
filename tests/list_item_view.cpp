@@ -25,6 +25,11 @@ bool contains(const ii::gui::CanvasFrame& frame, std::string_view text) {
     for (const auto& layer : frame.overlays) for (const auto& run : layer.texts) if (run.text == text) return true;
     return false;
 }
+const ii::gui::TextRun& text_run(const ii::gui::CanvasFrame& frame, std::string_view text) {
+    for (const auto& run : frame.texts) if (run.text == text) return run;
+    for (const auto& layer : frame.overlays) for (const auto& run : layer.texts) if (run.text == text) return run;
+    throw std::runtime_error("List item text run was not drawn");
+}
 }
 int main() {
     using namespace ii::gui;
@@ -49,6 +54,25 @@ int main() {
             "Standalone list item lost its dimensions or accessible text");
     const auto frame = take(tree->drawing_snapshot({400,120}));
     require(contains(frame,"Camera") && contains(frame,"Shared camera"), "Standalone list item omitted its text");
+    require(text_run(frame,"Camera").font_size == 13 && text_run(frame,"Camera").line_height == 16,
+            "List item changed its legacy typography without a role theme");
+    auto appearance = default_widget_appearance();
+    appearance.text_styles = std::array<TextRoleStyle, 8>{};
+    (*appearance.text_styles)[static_cast<unsigned>(TextRole::body)] = {19, 21, 700};
+    (*appearance.text_styles)[static_cast<unsigned>(TextRole::description)] = {15, 17, 600};
+    auto themed_tree = std::make_shared<ii::gui::detail::WidgetState>([](ii::runtime::Task task) { task(); }, appearance);
+    auto themed_host = take(themed_tree->content_host({}, "themedHost", {400,120}));
+    good(themed_host.set_content([&](WidgetBuilder& builder) -> ii::core::Result<void> {
+        auto value = NativeListItem::create(builder, {}, "themedItem", input);
+        return value ? ii::core::Result<void>{} : std::unexpected(value.error());
+    }));
+    const auto themed = take(themed_tree->drawing_snapshot({400,120}));
+    const auto& themed_label = text_run(themed,"Camera");
+    const auto& themed_description = text_run(themed,"Shared camera");
+    require(themed_label.font_size == 19 && themed_label.line_height == 21 && themed_label.font_weight == 700 &&
+            themed_description.font_size == 15 && themed_description.line_height == 17 && themed_description.font_weight == 600,
+            "List item ignored global typography roles");
+    themed_tree->close();
     good(item->root().activate()); require(activations == 1, "Standalone list item activation was lost");
     auto next = input; next.configuration.label = "Light"; next.configuration.width = 315;
     next.configuration.selected = true; good(item->set_options(next));

@@ -1,6 +1,7 @@
 #include <iiGUI/NativeText.h>
 #include <iiGUI/FontDatabase.h>
 #include <pango/pangocairo.h>
+#include <cmath>
 #include <memory>
 
 namespace ii::gui::detail {
@@ -20,9 +21,10 @@ Layout layout(cairo_t* drawing,const TextRun& run) {
     pango_layout_set_width(result.get(),int(run.bounds.width*PANGO_SCALE));
     pango_layout_set_wrap(result.get(),PANGO_WRAP_WORD_CHAR);
     if(run.elide_right){pango_layout_set_single_paragraph_mode(result.get(),TRUE);pango_layout_set_ellipsize(result.get(),PANGO_ELLIPSIZE_END);pango_layout_set_height(result.get(),-1);}
-    if(run.line_height>0||run.underline){
+    if(run.line_height>0||run.underline||run.letter_spacing!=0){
         auto attrs=pango_attr_list_new();
         if(run.underline)pango_attr_list_insert(attrs,pango_attr_underline_new(PANGO_UNDERLINE_SINGLE));
+        if(run.letter_spacing!=0)pango_attr_list_insert(attrs,pango_attr_letter_spacing_new(int(std::round(run.letter_spacing*PANGO_SCALE))));
         if(run.line_height>0){
 #if PANGO_VERSION_CHECK(1,50,0)
             pango_attr_list_insert(attrs,pango_attr_line_height_new_absolute(int(run.line_height*PANGO_SCALE)));

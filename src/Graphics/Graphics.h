@@ -47,6 +47,7 @@ struct TextRun final {
     // still uses bounds, so cropping does not reset text origin or ellipsis.
     std::optional<Rect> clip=std::nullopt;
     bool underline=false;
+    float letter_spacing=0; // Logical pixels; zero retains native default tracking.
     friend bool operator==(const TextRun&, const TextRun&) = default;
 };
 enum class Acceleration { prefer_hardware, require_hardware };

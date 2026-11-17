@@ -14,7 +14,7 @@ public:
     [[nodiscard]] static bool validate(const TableRowViewConfiguration& c){
         if(c.cells.size()>1024)return false;
         TableCellItemConfiguration base;base.width=c.cell_width;base.height=c.cell_height;base.padding=c.content_spacing;base.font_size=c.font_size;
-        base.palette=c.palette;base.enabled=c.enabled;base.inputable=c.inputable;base.visible=c.visible;base.show_divider=c.show_divider;
+        base.palette=c.palette;base.typography=c.typography;base.enabled=c.enabled;base.inputable=c.inputable;base.visible=c.visible;base.show_divider=c.show_divider;
         if(!std::isfinite(c.width)||c.width<1||c.width>8192||!TableCellItem::validate(base))return false;
         std::unordered_set<std::string_view> keys;keys.reserve(c.cells.size());std::size_t bytes=0;
         for(const auto& cell:c.cells){

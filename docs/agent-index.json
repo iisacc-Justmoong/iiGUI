@@ -210,14 +210,14 @@
       "document_id": "urn:iisacc:document:a9b897d265071e0012f707cf10507af24520453bd2fae295c830d833dbcfc97c",
       "source": "docs/Fonts.md",
       "agent_json": "docs/Fonts.agent.json",
-      "source_sha256": "bd0dc397059b30a42e5baa4bd03339cb281bbcc7e1a11228aab4841285f68dfb",
+      "source_sha256": "fda467b2c9ea93486ac2e584143ec90312aab5cc76a3666b50035cb1b19c59ed",
       "role": "guide"
     },
     {
       "document_id": "urn:iisacc:document:228490d61d89dc03bf37bd4b772f46ea78cbb883cef259c451b732cc16836cee",
       "source": "docs/FrameworkBoundary.md",
       "agent_json": "docs/FrameworkBoundary.agent.json",
-      "source_sha256": "29e65678b843a193a535f3fba58df1ed306564815805590da1a9f19301ec131d",
+      "source_sha256": "9413cdff4d38d6d08a8248793728040f514a5d854e61cee8b90a136db22f7fd6",
       "role": "guide"
     },
     {
@@ -238,7 +238,7 @@
       "document_id": "urn:iisacc:document:37275a1645233afa8a5a76154c80a812a2ec55ce4d5476bf6aaec9c7f745ddb2",
       "source": "docs/HostPlatforms.md",
       "agent_json": "docs/HostPlatforms.agent.json",
-      "source_sha256": "6e209f1bda5550d8a476267a9851d091b17e815edd25a90c680be507efff77f1",
+      "source_sha256": "40834f4bdf4d7886c2a17b2e835a401f86c4954819be6bfde85eeb704937ce5e",
       "role": "guide"
     },
     {
@@ -266,7 +266,7 @@
       "document_id": "urn:iisacc:document:bb2e84a7bdb324680f469117a9cdeeaca4e9842f1ef05d6ed5ba359cdbea1749",
       "source": "docs/Images.md",
       "agent_json": "docs/Images.agent.json",
-      "source_sha256": "960b2146372a43b5b03c58c333618db61e65959471ad0dfd8dfb13f52651102d",
+      "source_sha256": "5079f764665de6611fba123561e614652cd793356d14d8e5c058faf446829ea2",
       "role": "guide"
     },
     {
@@ -336,7 +336,7 @@
       "document_id": "urn:iisacc:document:6fc509abe552dec7b07c14e9c1f054b7308985d05b6359c4d9ae398340b126a3",
       "source": "docs/NativeWidgets.md",
       "agent_json": "docs/NativeWidgets.agent.json",
-      "source_sha256": "1ee342d6328749fe09db2f56a63dce854f88befe17efd2a3d38333d52f6a3c16",
+      "source_sha256": "840d53640b8ba30e35eb7903247bba0c4b5a298414aa4e15e729c853acdd8bd0",
       "role": "guide"
     },
     {
@@ -515,10 +515,17 @@
       "role": "guide"
     },
     {
+      "document_id": "urn:iisacc:document:d239fbc561c82a38650a3ccf2160842ec85318a16a887ba9d062aeb35156b69f",
+      "source": "docs/WebResponsive.md",
+      "agent_json": "docs/WebResponsive.agent.json",
+      "source_sha256": "83791f1223ba4caaa2f9f9b92d8e4b6d9e66372201e745f0d4cff4aa4a884fd9",
+      "role": "guide"
+    },
+    {
       "document_id": "urn:iisacc:document:780b7c07bb3bb9d820dc6cee29af33dd4c7440aa24a1c9d0bd1e6e904f994481",
       "source": "docs/WidgetInteraction.md",
       "agent_json": "docs/WidgetInteraction.agent.json",
-      "source_sha256": "52559d039796e0ce529c7381dc952538287d21f82ca2174f5e4fdf89ec3fb1cc",
+      "source_sha256": "b180ffe51723d9e58b0fb0f94a54b05203ab53816674a88d051fe1211395c651",
       "role": "guide"
     },
     {
@@ -618,6 +625,13 @@
       "agent_json": "docs/mirrors/examples/HelloHosts/README.agent.json",
       "source_sha256": "597c90bba205f6edc9372a29ad09d2ff95ab071247d69bc478b73a85b5d31ac6",
       "role": "overview"
+    },
+    {
+      "document_id": "urn:iisacc:document:e773bd2067a7acfd32f5ea1adc30a334ec9f97677b5b28e15f0020ed3a26519c",
+      "source": "docs/TextTracking.md",
+      "agent_json": "docs/TextTracking.agent.json",
+      "source_sha256": "da8606693fd4d6feb530f276f9eca51a3af242c0e82c26d4351dd9fe24c9936d",
+      "role": "guide"
     }
   ],
   "layout": {

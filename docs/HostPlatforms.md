@@ -335,7 +335,7 @@ X11 창 관리자·앱 실행은 검증하지 않았다. iiGUI 검사에서는 L
 | Linux/X11 | Xlib + XI2 | VK_KHR_xlib_surface | 기존 명시적 cadence |
 | Android | NativeActivity/native_app_glue/ALooper | VK_KHR_android_surface | AChoreographer |
 | iOS/iPadOS | UIKit 장면 | Metal, 선택적 MoltenVK | 기존 display link |
-| Web | WASM application pthread + canvas | WebGL2/OffscreenCanvas | worker requestAnimationFrame |
+| Web | 메인 스레드 또는 pthread + canvas | WebGL2 canvas/OffscreenCanvas | requestAnimationFrame |
 
 OS 버튼·레이블·레이아웃 엔진으로 위젯을 교체하지 않는다. 공통 WidgetState가
 레이아웃, 입력 대상, 포커스, 상태와 표시 순서를 소유한다. Web도 DOM 위젯 트리를
@@ -681,11 +681,11 @@ HelloHosts는 언어 module 단위를 사용하지 않으므로 네이티브 kit
 iiSDKBuilder와 설치 소비자 검증 도구는 이 값을 설정하며 C++ 언어/ABI 검사는 유지한다.
 
 Core가 브라우저 UI 스레드에서 worker 생성/join을 거부하는 기존 계약을 유지한다.
-설치된 Core Runtime이 공개 CMake 계약에 -pthread를 내보내지 않으면 iiGUI 구성에서
-즉시 거부한다. 스레드 없는 Core와 GUI 호스트를 섞은 패키지를 성공으로 보고하지 않는다.
-PROXY_TO_PTHREAD로 앱을 pthread에서 실행하고 Core 상시 worker pool을 사용한다.
-OffscreenCanvas도 앱 스레드가 소유하며 DOM/클립보드/URL 호출만 메인 스레드로
-전달한다. OS I/O readiness waiter는 만들지 않고 HostLoop wake 계약을 사용한다.
+iiGUI는 설치된 Core의 -pthread 공개 설정을 따르며 명시된 설정과 일치해야 한다.
+pthread 빌드는 PROXY_TO_PTHREAD로 앱을 worker에서 실행하고 Core worker를 쓴다.
+OffscreenCanvas도 앱 스레드가 소유하며 DOM/클립보드/URL은 메인 스레드로 전달한다.
+단일 스레드 빌드는 메인 스레드의 WebGL2 canvas를 사용하고 공유 메모리를 요구하지 않는다.
+두 모드는 OS I/O readiness waiter 대신 HostLoop wake 계약을 사용한다.
 
 Asyncify는 C++ 스택을 보존하면서 브라우저에 제어를 돌려주는 빌드 변환이다. 위젯
 소스를 해석하거나 JavaScript로 위젯 로직을 재작성하지 않는다. 외부 입력 callback은
@@ -699,9 +699,9 @@ tools/verify_web_runtime.py는 브라우저 개발 도구에서 수집한 JSON �
 READY/OK/CLOSED 순서, 모든 기능 검사와 양수 프레임 수를 요구하며 CLOSED 뒤 오류도
 실패로 판정한다. 검증기의 단위 테스트는 실제 브라우저 실행 증거와 구분한다.
 
-유휴 대기는 Atomics.waitAsync와 Core 데드라인으로 구성한다. 모션/FrameLoop가 있을
-때만 worker requestAnimationFrame을 요청한다. Core wake가 와도 이미 요청한 프레임을 취소하지
-않고, MessageChannel task yield를 통해 연속 wake가 브라우저 프레임을 굶기지 않게 한다.
+pthread 유휴 대기는 Atomics.waitAsync, 단일 스레드는 이벤트 Promise와 데드라인을 사용한다.
+모션/FrameLoop가 있을 때만 각 모드의 requestAnimationFrame을 요청한다. Core wake가 와도
+이미 요청한 프레임을 유지하고 MessageChannel로 연속 wake의 브라우저 독점을 막는다.
 자체 검사에서는 1ms 간격 background wake 중에도 프레임이 진행되는지 확인한다. 숨겨진 페이지에서도 Core 데드라인을
 처리하고 GPU 표시는 멈춘다. context loss에는 표시를 정지하고 restore에서 자원을
 재구축한다. readback은 명시적 capture에서만 사용한다.
@@ -718,7 +718,7 @@ Web의 일반 텍스트는 요청된 논리 폭에 맞춰 같은 줄 분할 결�
 사용한다. 명시적인 CR·LF·CRLF와 빈 문단을 보존하고, 공백에서 나눌 수 없는 긴
 내용은 Unicode 그래핌 경계에서 나눈다. 말줄임 요청에는 자동 줄바꿈을 추가하지
 않는다. 이는 전체 Unicode 줄바꿈 규칙이나 모든 언어의 단어 분리·시각 품질을
-보장하는 구현은 아니다. 브라우저 `OffscreenCanvas`의 글꼴 측정과 텍스트 래스터를
+보장하는 구현은 아니다. 브라우저 Canvas 2D의 글꼴 측정과 텍스트 래스터를
 사용한 뒤 결과를 WebGL 텍스처로 합성하며, GPU 글리프 래스터화로 주장하지 않는다.
 그리기는 기존의 변경 기반 캐시에 따라 발생한다.
 
@@ -740,10 +740,10 @@ WebGL2 소스는 재질·그림자·콘텐츠 변환과 배경·콘텐츠 장면
 파일 handle을 가짜 로컬 경로로 돌려주지 않는다. 문서 선택/FileProvider handle,
 IME/텍스트 편집, 접근성, 보조 canvas/window는 현재 계약 밖이다.
 
-필요 조건은 Emscripten pthread, SharedArrayBuffer, OffscreenCanvas/WebGL2,
-worker requestAnimationFrame, Atomics.waitAsync, Worker FontFace/FontFaceSet이다.
-서버에 COOP same-origin, COEP require-corp가 필요하다. tools/serve_web.py는
-127.0.0.1에 이 헤더들을 제공하며 공개 서버나 자동 시작 작업을 등록하지 않는다.
+pthread 모드는 SharedArrayBuffer, OffscreenCanvas/WebGL2, worker requestAnimationFrame,
+Atomics.waitAsync, Worker FontFace/FontFaceSet과 교차 출처 격리 헤더가 필요하다.
+단일 스레드는 WebGL2와 브라우저 메인 스레드를 사용하며 위 격리 헤더는 요구하지 않는다.
+tools/serve_web.py는 loopback에 격리 헤더를 제공하며 자동 시작 작업은 등록하지 않는다.
 
 ## HiDPI 변경 검증
 
@@ -783,7 +783,7 @@ macOS 창 실행 검증은 마지막 묶음에서만 진행한다.
 
 창을 열지 않는 CTest 34/34, ASan+UBSan 계약 검사 7/7, Python 검사 25/25가
 통과했다. Python 수치는 CTest에서 호출한 일부 검사와 중복되므로 이들을 합산하지 않는다.
-pthread 공개 계약을 제거한 Core 패키지를 실제 구성에서 거부하는 부정 구성 검사도 통과했다.
+당시 pthread 공개 계약을 제거한 Core 패키지 거부를 검사했으며 현재는 모드 일치를 검사한다.
 Windows/Linux/macOS 최종 앱의 Qt·LVUI 파서·인터프리터 부재, Core 최종 진입점과
 설치 헤더 사용을 확인했다. Wayland 앱에 XOpenDisplay/XCreateWindow 경로가 없음을
 확인했으며 배포판 라이브러리의 모든 간접 의존성 부재까지 주장하지 않는다.

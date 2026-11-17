@@ -1,5 +1,6 @@
 #pragma once
 #include <iiGUI/Graphics.h>
+#include <iiGUI/GraphicsValidation.h>
 #include <iiGUI/Image.h>
 #include <iiGUI/NativeText.h>
 #include <algorithm>
@@ -17,8 +18,8 @@ struct WebGLScenePlan final {
     [[nodiscard]] std::uint64_t effect_bytes()const noexcept{return scene_bytes+snapshot_bytes+asset_bytes;}
 };
 inline std::optional<WebGLScenePlan> webgl_scene_plan(const CanvasFrame& frame,std::uint32_t width,std::uint32_t height,bool half){
-    if(width<1||height<1||width>8192||height>8192||!valid_canvas(frame))return std::nullopt;
-    const auto order=plan_canvas_scenes(frame);if(!order)return std::nullopt;
+    if(width<1||height<1||width>8192||height>8192)return std::nullopt;
+    const auto order=valid_surface_scene_plan(frame);if(!order)return std::nullopt;
     WebGLScenePlan result;result.order=*order;
     const auto add=[&](const auto& image){if(image&&std::ranges::find(result.assets,image)==result.assets.end())result.assets.push_back(image);};
     const auto account=[&](const auto& layers){for(const auto& layer:layers){

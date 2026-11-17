@@ -21,6 +21,26 @@ else()
 endif()
 unset(_iigui_cmake_packages)
 find_dependency(iiSDKCore 0.16 CONFIG COMPONENTS Runtime)
+if(EMSCRIPTEN AND "@CMAKE_SYSTEM_NAME@" STREQUAL "Emscripten")
+    # The installed archives and the selected Core must agree on the Wasm
+    # shared-memory ABI. iiGUI's build-time check alone cannot protect a
+    # consumer that later changes its Core package.
+    get_target_property(_iigui_consumer_core_options iiSDKCore::iiSDKCore INTERFACE_COMPILE_OPTIONS)
+    set(_iigui_consumer_core_threads FALSE)
+    if("-pthread" IN_LIST _iigui_consumer_core_options)
+        set(_iigui_consumer_core_threads TRUE)
+    endif()
+    set(_iigui_package_web_threads "@_iigui_web_threads@")
+    if((_iigui_package_web_threads AND NOT _iigui_consumer_core_threads) OR
+       (NOT _iigui_package_web_threads AND _iigui_consumer_core_threads))
+        set(iiGUI_FOUND FALSE)
+        set(iiGUI_NOT_FOUND_MESSAGE "Web Core Runtime thread mode does not match iiGUI package")
+        return()
+    endif()
+    unset(_iigui_consumer_core_options)
+    unset(_iigui_consumer_core_threads)
+    unset(_iigui_package_web_threads)
+endif()
 find_dependency(iiGUIPainter 0.5 CONFIG
     PATHS "${CMAKE_CURRENT_LIST_DIR}/../iiGUIPainter" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
 if(NOT "@CMAKE_SYSTEM_NAME@" STREQUAL "Emscripten")

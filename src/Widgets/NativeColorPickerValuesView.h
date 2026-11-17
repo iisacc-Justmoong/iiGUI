@@ -199,7 +199,8 @@ public:
                 }); !painted) return std::unexpected(painted.error());
             auto make_label = [&](std::string_view suffix, std::string text) {
                 return builder.label(*root, name(suffix), {.text = std::move(text), .font_size = 11, .selectable = false,
-                    .role = ii::gui::TextRole::caption, .line_height = 11, .font_weight = 400});
+                    .role = ii::gui::TextRole::caption, .line_height = 11, .font_weight = 400,
+                    .theme_typography_role = ii::gui::TextRole::caption, .theme_color_role = ii::gui::TextRole::description});
             };
             auto hex_label = make_label("hex-label", "Hex"); if (!hex_label) return std::unexpected(hex_label.error()); state->hex_label = *hex_label;
             auto alpha_label = make_label("alpha-label", "A"); if (!alpha_label) return std::unexpected(alpha_label.error()); state->alpha_label = *alpha_label;

@@ -5,6 +5,12 @@
 #include <stdexcept>
 
 namespace ii::gui::detail {
+// A platform may have no shaped-editor service even when label drawing is
+// available. Preserve that capability boundary through the public Result.
+class NativeTextUnavailable final:public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
 struct NativeLineSlice;
 class NativeTextLine {
 public:

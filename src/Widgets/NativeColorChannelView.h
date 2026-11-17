@@ -101,7 +101,8 @@ template<class Policy>class BasicNativeColorChannel final {
         auto result = step([&] { return state->root.set_extent({state->authored.width, 22}); });
         if (!result || !*result) return result;
         result = step([&] { return state->label.set_label_options({.text = std::string(names(state->authored.channel).first),
-            .font_size = 13, .selectable = false, .role = ii::gui::TextRole::body, .line_height = 13, .font_weight = 500}); });
+            .font_size = 13, .selectable = false, .role = ii::gui::TextRole::body, .line_height = 13, .font_weight = 500,
+            .theme_typography_role = ii::gui::TextRole::body, .theme_color_role = ii::gui::TextRole::description}); });
         if (!result || !*result) return result;
         result = step([&] { return state->ramp->set_options(ramp_options(*state)); });
         if (!result || !*result) return result;
@@ -183,7 +184,8 @@ public:
             if (!holder) return std::unexpected(holder.error());
             if (auto extent = holder->set_extent({20, 22}); !extent) return std::unexpected(extent.error());
             auto label = builder.label(*holder, name("label"), {.text = std::string(names(state->authored.channel).first), .font_size = 13,
-                .selectable = false, .role = ii::gui::TextRole::body, .line_height = 13, .font_weight = 500});
+                .selectable = false, .role = ii::gui::TextRole::body, .line_height = 13, .font_weight = 500,
+                .theme_typography_role = ii::gui::TextRole::body, .theme_color_role = ii::gui::TextRole::description});
             if (!label) return std::unexpected(label.error()); state->label = *label;
             auto ramp = NativeColorSurface::create(builder, *root, name("ramp"), ramp_options(*state), [weak](ii::gui::WidgetColor color) {
                 if (auto state = weak.lock(); state && state->live) {

@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/FrameworkBoundary.md",
-    "sha256": "29e65678b843a193a535f3fba58df1ed306564815805590da1a9f19301ec131d",
-    "bytes": 51034,
+    "sha256": "9413cdff4d38d6d08a8248793728040f514a5d854e61cee8b90a136db22f7fd6",
+    "bytes": 51192,
     "line_count": 507,
     "encoding": "utf-8",
     "language": "ko"
@@ -231,7 +231,7 @@
       "kind": "paragraph",
       "start_line": 75,
       "end_line": 80,
-      "raw": "`iiGUI/ButtonModel.h`는 앱이 전달한 색상 값으로 버튼의 활성·포커스·선택·\n호버·누름 상태를 판정하고 아이콘과 텍스트의 기하를 계산한다. 앱은 명시적\n선택 색상과 기준 액센트·표면 색상을 제공할 수 있으며, 잘못된 입력은 마지막\n유효 설정을 유지한다. `ButtonModel`은 독립 C++ API이고 `BasicButton`은 같은\n계산을 다른 값 계약으로 사용할 수 있는 정책 기반 API다. 두 타입은 특정\n디자인 토큰이나 LVUI에 의존하지 않는다.\n"
+      "raw": "`iiGUI/ButtonModel.h`는 앱이 전달한 색상 값으로 버튼의 활성·포커스·선택·\n호버·누름 상태를 판정하고 아이콘과 텍스트의 기하를 계산한다. 앱은 명시적\n선택 색상과 기준 액센트·표면 색상을 제공할 수 있으며, 잘못된 입력은 마지막\n유효 설정을 유지한다. `ButtonModel`은 독립 C++ API이고 `BasicButton`은 같은\n계산을 다른 값 계약으로 사용할 수 있는 정책 기반 API다. 두 타입은 특정\n디자인 토큰이나 LVUI에 의존하지 않는다. 선택되지 않은 무테 버튼은 비활성화해도 배경을 그리지 않으며, 선택된 버튼과 다른 유형의 비활성 배경은 유지한다.\n"
     },
     {
       "id": "b000030",
@@ -1736,7 +1736,7 @@
       {
         "block_id": "b000029",
         "line": 80,
-        "text": "디자인 토큰이나 LVUI에 의존하지 않는다.",
+        "text": "디자인 토큰이나 LVUI에 의존하지 않는다. 선택되지 않은 무테 버튼은 비활성화해도 배경을 그리지 않으며, 선택된 버튼과 다른 유형의 비활성 배경은 유지한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },

@@ -42,6 +42,10 @@ template<class Rect>
 [[nodiscard]] inline ii::gui::Rect list_item_rect(Rect value) noexcept {
     return {float(value.x), float(value.y), float(value.width), float(value.height)};
 }
+[[nodiscard]] inline TextRoleStyle list_item_text_style(const WidgetPaintState& state, TextRole role,
+                                                        TextRoleStyle fallback) noexcept {
+    return state.text_styles ? (*state.text_styles)[static_cast<unsigned>(role)] : fallback;
+}
 template<class Policy>
 [[nodiscard]] inline ii::core::Result<std::shared_ptr<const ii::gui::WidgetDrawing>> list_item_paint(
         const BasicListItemDrawing<Policy>& drawing, const ii::gui::WidgetPaintState& state,bool include_content=true) {
@@ -61,25 +65,28 @@ template<class Policy>
         if (include_content && drawing.icon && geometry->icon.width > 0) result->images.push_back({.bounds=list_item_rect(geometry->icon), .image=drawing.icon, .opacity=state.enabled ? 1.f : .35f});
         if (include_content && drawing.chevron && geometry->chevron.width > 0) result->images.push_back({.bounds=list_item_rect(geometry->chevron), .image=drawing.chevron, .opacity=state.enabled ? 1.f : .35f});
         const auto clip = list_item_rect(geometry->surface);
+        const auto body = list_item_text_style(state, TextRole::body, {13, 16, 500});
+        const auto description = list_item_text_style(state, TextRole::description, {11, 14, 400});
+        const auto caption = list_item_text_style(state, TextRole::caption, {11, 14, 400});
         if (include_content && !c.label.empty() && geometry->label.width > 0 && geometry->label.height > 0)
             result->texts.push_back({.bounds=list_item_rect(geometry->label), .text=c.label, .color=Policy::encoded_color(visual.text),
-                .font_size=13, .font_weight=500, .alignment=ii::gui::TextAlignment::left, .font_family=state.font_family,
-                .line_height=16, .elide_right=true, .clip=clip});
+                .font_size=float(body.font_size), .font_weight=body.font_weight, .alignment=ii::gui::TextAlignment::left, .font_family=state.font_family,
+                .line_height=float(body.line_height), .elide_right=true, .clip=clip});
         if (include_content && geometry->description.width > 0 && geometry->description.height > 0)
             result->texts.push_back({.bounds=list_item_rect(geometry->description), .text=c.description, .color=Policy::encoded_color(visual.description),
-                .font_size=11, .font_weight=400, .alignment=ii::gui::TextAlignment::left, .font_family=state.font_family,
-                .line_height=14, .elide_right=true, .clip=clip});
+                .font_size=float(description.font_size), .font_weight=description.font_weight, .alignment=ii::gui::TextAlignment::left, .font_family=state.font_family,
+                .line_height=float(description.line_height), .elide_right=true, .clip=clip});
         if(include_content&&c.value&&geometry->value.width>0&&geometry->value.height>0)
             result->texts.push_back({.bounds=list_item_rect(geometry->value),.text=*c.value,.color=Policy::encoded_color(visual.description),
                 .font_size=float(Policy::value_font_size(c)),.font_weight=400,.alignment=ii::gui::TextAlignment::right,
                 .font_family=state.font_family,.line_height=float(Policy::value_line_height(c)),.elide_right=true,.clip=clip});
-        const auto metadata=[&](ListRowRect area,const std::string& first,const std::string& second={}){
+        const auto metadata=[&](TextRoleStyle style,ListRowRect area,const std::string& first,const std::string& second={}){
             if(!include_content||area.width<=0||area.height<=0)return;auto text=first;
             if(!second.empty()){if(!text.empty())text+=" · ";text+=second;}if(text.empty())return;
             result->texts.push_back({.bounds=list_item_rect(area),.text=std::move(text),.color=Policy::encoded_color(visual.description),
-                .font_size=11,.font_weight=400,.alignment=ii::gui::TextAlignment::left,.font_family=state.font_family,.line_height=14,.elide_right=true,.clip=clip});};
-        metadata(geometry->detail_date,c.detail_date);metadata(geometry->detail_folders,c.detail_folder1,c.detail_folder2);
-        metadata(geometry->detail_tags,c.detail_tag1,c.detail_tag2);
+                .font_size=float(style.font_size),.font_weight=style.font_weight,.alignment=ii::gui::TextAlignment::left,.font_family=state.font_family,.line_height=float(style.line_height),.elide_right=true,.clip=clip});};
+        metadata(description,geometry->detail_date,c.detail_date);metadata(caption,geometry->detail_folders,c.detail_folder1,c.detail_folder2);
+        metadata(caption,geometry->detail_tags,c.detail_tag1,c.detail_tag2);
         return std::shared_ptr<const ii::gui::WidgetDrawing>(std::move(result));
     } catch (...) { return ii::core::fail(ii::core::ErrorCode::failed, "List item paint failed", std::current_exception()); }
 }

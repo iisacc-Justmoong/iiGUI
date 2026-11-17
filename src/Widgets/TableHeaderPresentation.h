@@ -89,7 +89,7 @@ public:
     // Draw one clipped cell without reading a widget or invoking an icon provider.
     [[nodiscard]] ii::core::Result<void> draw(ii::gui::WidgetDrawing& drawing,std::size_t index,std::string_view text,
             double offset,double extent,double row_height,const ii::gui::WidgetPaintState& view,ii::gui::Color ink,
-            double font_size,double line_height,double indicator,std::size_t budget)const{
+            double font_size,double line_height,unsigned font_weight,double indicator,std::size_t budget)const{
         try{
             if(index>=columns_.size())return ii::core::fail(ii::core::ErrorCode::out_of_range,"Table header presentation index is stale");
             const auto& style=columns_[index];const auto left=(std::max)(0.,offset),right=(std::min)(view.size.width,offset+extent);
@@ -103,7 +103,7 @@ public:
             const auto title=Policy::display_text(text,budget);const auto text_x=content_x+leading+leading_gap;
             auto text_width=text_available;
             if(trailing>0&&!title.empty()&&text_available>0){
-                auto measured=ii::gui::measure_text_layout({.text=title,.color=ink,.font_size=float(font_size),.font_weight=500,
+                auto measured=ii::gui::measure_text_layout({.text=title,.color=ink,.font_size=float(font_size),.font_weight=font_weight,
                     .font_family=view.font_family,.line_height=float(line_height)});
                 if(!measured)return std::unexpected(measured.error());text_width=(std::min)(text_available,measured->width);
             }else if(title.empty())text_width=0;
@@ -119,7 +119,7 @@ public:
             };
             icon(style.leading_image,content_x,leading);icon(style.trailing_image,text_x+text_width+trailing_gap,trailing);
             if(!title.empty()&&text_width>0)drawing.texts.push_back({.bounds={float(text_x),0,float(text_width),float((std::min)(row_height,view.size.height))},
-                .text=title,.color=ink,.font_size=float(font_size),.font_weight=500,.alignment=ii::gui::TextAlignment::left,
+                .text=title,.color=ink,.font_size=float(font_size),.font_weight=font_weight,.alignment=ii::gui::TextAlignment::left,
                 .font_family=view.font_family,.line_height=float(line_height),.elide_right=true,
                 .clip=ii::gui::Rect{float(left),0,float(right-left),float((std::min)(row_height,view.size.height))}});
             return {};

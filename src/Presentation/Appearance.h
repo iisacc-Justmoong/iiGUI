@@ -8,6 +8,7 @@
 #include <vector>
 
 #define IIGUI_TEXT_WEIGHT_RULES_API 1
+#define IIGUI_TEXT_COLORS_API 1
 
 namespace ii::gui {
 // Encoded sRGB, not GPU linear colors.
@@ -23,10 +24,17 @@ struct TextStyleToken final {int pixels,weight;std::string_view style;};
 [[nodiscard]] IIGUI_EXPORT std::span<const TextStyleToken> default_text_tokens()noexcept;
 // Referencing this symbol makes a new-header/old-library mismatch fail at link time.
 IIGUI_EXPORT void require_text_weight_rules_abi_v1() noexcept;
+// Referenced by clients that pass the expanded WidgetAppearance by value.
+IIGUI_EXPORT void require_text_colors_abi_v2() noexcept;
 struct TextWeightRule final {
     double font_size=13;
     unsigned weight=500;
     friend bool operator==(const TextWeightRule&,const TextWeightRule&)=default;
+};
+struct TextRoleStyle final {
+    double font_size=13, line_height=13;
+    unsigned font_weight=500;
+    friend bool operator==(const TextRoleStyle&,const TextRoleStyle&)=default;
 };
 inline constexpr double default_widget_corner_radius=8;
 struct WidgetAppearance final {
@@ -38,6 +46,10 @@ struct WidgetAppearance final {
     // nullopt retains the historical defaults; an empty vector uses role weights.
     // Matching sizes are applied in order, so the final matching rule wins.
     std::optional<std::vector<TextWeightRule>> text_weight_rules;
+    // Encoded sRGB role colors. nullopt preserves the historical white/alpha policy.
+    std::optional<std::array<WidgetColor,8>> text_colors;
+    // Typed role metrics made available to custom paint providers.
+    std::optional<std::array<TextRoleStyle,8>> text_styles;
     friend bool operator==(const WidgetAppearance&,const WidgetAppearance&)=default;
 };
 // The default preserves the existing generic host appearance.

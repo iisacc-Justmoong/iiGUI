@@ -131,6 +131,8 @@ struct WidgetPaintState final {
     double backing_scale=1;
     // Resolved application font for host-independent custom control drawing.
     std::string font_family;
+    // The host may provide design-system role metrics to custom drawing.
+    std::optional<std::array<TextRoleStyle,8>> text_styles;
     friend bool operator==(const WidgetPaintState&,const WidgetPaintState&)=default;
 };
 // Pure, owner-thread paint provider. UI queries/mutations during it are rejected.
@@ -138,7 +140,11 @@ using WidgetPaintHandler=std::function<core::Result<std::shared_ptr<const Widget
 // Owner-thread Core frames may update widgets. False stops this request;
 // request_frames restarts it. All handlers in a View share one frame slot.
 using WidgetFrameHandler=std::function<core::Result<bool>(runtime::Clock::time_point)>;
-struct LabelOptions final { std::string text; double font_size = 14; bool selectable = true; TextRole role=TextRole::description;std::optional<WidgetColor> color;TextAlignment alignment=TextAlignment::left;double line_height=0;std::optional<unsigned> font_weight;bool elide_right=false;friend bool operator==(const LabelOptions&,const LabelOptions&)=default; };
+struct LabelOptions final { std::string text; double font_size = 14; bool selectable = true; TextRole role=TextRole::description;std::optional<WidgetColor> color;TextAlignment alignment=TextAlignment::left;double line_height=0;std::optional<unsigned> font_weight;bool elide_right=false;
+    // When supplied by an owner, theme roles replace only the corresponding fallback metrics or color.
+    std::optional<TextRole> theme_typography_role,theme_color_role;
+    double letter_spacing=0; // Logical pixels between shaped text characters.
+    friend bool operator==(const LabelOptions&,const LabelOptions&)=default; };
 struct ButtonStyle final {
     std::optional<WidgetColor> fill,hover_fill,pressed_fill,disabled_fill,text,disabled_text,border;
     double border_width=0;

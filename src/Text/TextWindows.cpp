@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <d2d1.h>
 #include <dwrite.h>
+#include <dwrite_1.h>
 #include <wincodec.h>
 #include <wrl/client.h>
 #include <iiGUI/NativeText.h>
@@ -38,6 +39,8 @@ ComPtr<IDWriteTextLayout> layout(IDWriteFactory* factory,const TextRun& run) {
     if(run.line_height>0)checked(format->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM,run.line_height,run.line_height*.8f),"Cannot set fixed native line height");
     auto text=wide(run.text); ComPtr<IDWriteTextLayout> result;
     checked(factory->CreateTextLayout(text.data(),UINT32(text.size()),format.Get(),run.bounds.width,8192,&result),"Cannot shape native text");
+    if(run.letter_spacing!=0){ComPtr<IDWriteTextLayout1> advanced;checked(result.As(&advanced),"Character spacing requires DirectWrite 1");
+        checked(advanced->SetCharacterSpacing(0,run.letter_spacing,0,DWRITE_TEXT_RANGE{0,UINT32(text.size())}),"Cannot set native character spacing");}
     if(run.underline)checked(result->SetUnderline(TRUE,DWRITE_TEXT_RANGE{0,UINT32(text.size())}),"Cannot underline native text");
     return result;
 }

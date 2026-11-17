@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 cxx, include, library = sys.argv[1:4]
-source = "#include <iiGUI/Appearance.h>\nint main(){ii::gui::require_text_weight_rules_abi_v1();}\n"
+source = "#include <iiGUI/Appearance.h>\nint main(){ii::gui::require_text_colors_abi_v2();}\n"
 base = [cxx, "-std=c++23", "-DIIGUI_STATIC_DEFINE", "-I", include, "-x", "c++", "-", "-x", "none"]
 
 def link(extra):
@@ -12,7 +12,7 @@ def link(extra):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 missing = link([])
-if missing.returncode == 0 or "require_text_weight_rules_abi_v1" not in missing.stderr:
+if missing.returncode == 0 or "require_text_colors_abi_v2" not in missing.stderr:
     raise AssertionError(f"Missing ABI anchor was not diagnosed: {missing.stderr}")
 current = link([library])
 if current.returncode != 0:

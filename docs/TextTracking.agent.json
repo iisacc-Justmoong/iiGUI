@@ -1,0 +1,99 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:e773bd2067a7acfd32f5ea1adc30a334ec9f97677b5b28e15f0020ed3a26519c",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/TextTracking.md",
+    "sha256": "da8606693fd4d6feb530f276f9eca51a3af242c0e82c26d4351dd9fe24c9936d",
+    "bytes": 1004,
+    "line_count": 15,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "텍스트 자간",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 텍스트 자간\n",
+      "level": 1,
+      "title": "텍스트 자간"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 6,
+      "raw": "`TextRun.letter_spacing`과 `LabelOptions.letter_spacing`은 글자 사이의 자간을\n논리 픽셀로 지정한다. 기본값은 0이며 기존 글꼴의 기본 자간을 유지한다.\n유효 범위는 유한한 -256부터 256까지이다. 자간은 텍스트 너비 측정,\n줄바꿈, 말줄임 및 래스터화에 같은 값으로 적용한다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 7,
+      "end_line": 7,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 8,
+      "end_line": 11,
+      "raw": "플랫폼은 Core Text, DirectWrite, Pango, Android Paint 또는 브라우저\nCanvas의 자간 기능을 사용한다. 브라우저 Canvas가 자간 속성을 제공하지 않는\n경우 0이 아닌 요청을 조용히 무시하지 않고 실패로 보고한다. DirectWrite 1 또는\nAndroid API 21 미만에서 해당 요청을 지원하지 못하는 경우에도 실패로 보고한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 12,
+      "end_line": 12,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 13,
+      "end_line": 15,
+      "raw": "관련 단위 검사는 자간에 따른 너비 변화와 유효성, 웹 측정과 그리기에 전달되는\n값을 확인한다. 이 검사는 실제 브라우저 렌더링이나 모든 언어의 시각적 동등성을\n입증하지 않는다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "텍스트 자간",
+      "anchor": "text-tracking",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [],
+    "commands": [],
+    "links": [],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "manual",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

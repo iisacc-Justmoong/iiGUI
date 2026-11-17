@@ -3,7 +3,7 @@
 `rgba_image` transfers an encoded-sRGB straight-alpha RGBA8 buffer into immutable
 `RasterImage` storage. Dimensions must be 1..2048 and the byte count must match.
 `ImageRun` specifies logical bounds, an optional **linear** color tint, and opacity.
-The rasterizer bilinearly samples in premultiplied linear light and clips to the
+The rasterizer bilinearly samples in premultiplied linear light, widens its filter to cover the source footprint when downscaling, and clips to the
 surface. The GPU samples the resulting sRGB texture and blends in linear light.
 There is no mutable pixel view or implicit resource-file access.
 

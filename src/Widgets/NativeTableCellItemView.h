@@ -63,8 +63,8 @@ class BasicNativeTableCellItem final {
             if(visual.current&&g->surface.width>=2&&g->surface.height>=2&&c.current_border_width>0){const auto border=ii::gui::srgb_to_linear(visual.border);
                 result->panels.push_back({rect(g->surface),border,border,0,float((std::min)({c.current_border_width,g->surface.width/2,g->surface.height/2}))});}
             if(!c.text.empty()&&g->text.width>0&&g->text.height>0){auto ink=visual.text;if(!view.enabled)ink.alpha*=.35;
-                result->texts.push_back({.bounds=rect(g->text),.text=c.text,.color=ii::gui::srgb_to_linear(ink),.font_size=float(c.font_size),.font_weight=500,
-                    .alignment=ii::gui::TextAlignment::left,.font_family=view.font_family,.line_height=float(c.font_size+3),.elide_right=true,
+                result->texts.push_back({.bounds=rect(g->text),.text=c.text,.color=ii::gui::srgb_to_linear(ink),.font_size=float(c.typography?c.typography->font_size:c.font_size),.font_weight=c.typography?c.typography->font_weight:500u,
+                    .alignment=ii::gui::TextAlignment::left,.font_family=view.font_family,.line_height=float(c.typography?c.typography->line_height:c.font_size+3),.elide_right=true,
                     .clip=c.clip_content?std::optional<ii::gui::Rect>{rect(g->surface)}:std::nullopt});}
             return std::shared_ptr<const ii::gui::WidgetDrawing>(std::move(result));
         }catch(...){return ii::core::fail(ii::core::ErrorCode::failed,"Table cell paint failed",std::current_exception());}
@@ -73,7 +73,9 @@ class BasicNativeTableCellItem final {
         const auto& c=state.prepared->input.configuration;InputFieldConfiguration field;
         field.text=state.draft;field.accessibility_name=c.accessibility_name.empty()?"Edit table cell":c.accessibility_name;
         field.width=(std::max)(1.,state.extent.width);field.height=(std::max)(1.,state.extent.height);field.horizontal_padding=c.padding;
-        field.corner_radius=0;field.font_size=c.font_size;field.enabled=c.enabled;
+        field.corner_radius=0;field.font_size=c.typography?c.typography->font_size:c.font_size;
+        if(c.typography&&c.typography->line_height<=1024)field.line_height=c.typography->line_height;
+        field.enabled=c.enabled;
         field.palette.background=c.palette.background;field.palette.hover=c.palette.background;field.palette.text=c.palette.cell_text;
         field.palette.selection=c.palette.selection;field.palette.focus=c.palette.current;return field;
     }

@@ -10,6 +10,7 @@ template<class T, class F> core::Result<T> protect(F&& f) {
     try { return f(); }
     catch (const std::bad_alloc&) { return core::fail(core::ErrorCode::full, "Native text line allocation failed"); }
     catch (const std::length_error& e) { return core::fail(core::ErrorCode::full, e.what()); }
+    catch (const detail::NativeTextUnavailable& e) { return core::fail(core::ErrorCode::unsupported, e.what()); }
     catch (...) { return core::fail(core::ErrorCode::failed, "Native text line operation failed", std::current_exception()); }
 }
 bool color_valid(Color c) {

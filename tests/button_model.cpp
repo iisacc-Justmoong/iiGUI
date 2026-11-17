@@ -53,8 +53,29 @@ int main() {
             "Borderless interaction state changed");
     config.enabled = false;
     require(button.set_configuration(config) && !button.visual({.pressed = true}).enabled &&
-            button.visual({.pressed = true}).background == config.palette.disabled_background,
-            "Disabled state admitted input");
+            button.visual({.pressed = true}).background.alpha == 0 &&
+            button.visual({.pressed = true}).text == config.palette.disabled_text,
+            "An unselected disabled borderless button must remain transparent and reject input");
+    require(button.visual({.hovered = true}).background.alpha == 0 &&
+            button.visual({.focused = true}).background.alpha == 0 && !button.visual({.focused = true}).focused,
+            "Disabled borderless interaction states must not draw a surface or focus ring");
+    config.enabled = true;
+    require(button.set_configuration(config) && !button.visual({.enabled = false}).enabled &&
+            button.visual({.enabled = false}).background.alpha == 0,
+            "A borderless button disabled by its parent must remain transparent");
+    config.enabled = false;
+    config.selection_style = ButtonSelectionStyle::segmented;
+    require(button.set_configuration(config) &&
+            button.visual({.checked = true}).background == config.palette.disabled_background,
+            "A disabled selected segment must retain its selected surface");
+    config.tone = ButtonTone::normal;
+    require(button.set_configuration(config) &&
+            button.visual({}).background == config.palette.disabled_background,
+            "A disabled normal button must retain its disabled surface");
+    config.tone = ButtonTone::disabled;
+    require(button.set_configuration(config) &&
+            button.visual({}).background == config.palette.disabled_background,
+            "The explicit disabled tone must retain its disabled surface");
     const auto old = button.configuration();
     auto invalid = old; invalid.palette.selected_surface.red = std::numeric_limits<double>::quiet_NaN();
     require(!button.set_configuration(invalid) && button.configuration() == old,

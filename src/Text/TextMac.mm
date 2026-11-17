@@ -44,9 +44,11 @@ NSAttributedString* attributed(const TextRun& run) {
     auto color=[NSColor colorWithSRGBRed:encoded_srgb(c.red) green:encoded_srgb(c.green)
         blue:encoded_srgb(c.blue) alpha:c.alpha];
 #endif
-    return [[NSAttributedString alloc] initWithString:text attributes:@{
+    NSMutableDictionary* attributes=[@{
         NSFontAttributeName:font, NSForegroundColorAttributeName:color, NSParagraphStyleAttributeName:paragraph,
-        NSUnderlineStyleAttributeName:@(run.underline?NSUnderlineStyleSingle:NSUnderlineStyleNone)}];
+        NSUnderlineStyleAttributeName:@(run.underline?NSUnderlineStyleSingle:NSUnderlineStyleNone)} mutableCopy];
+    if(run.letter_spacing!=0)attributes[NSKernAttributeName]=@(run.letter_spacing);
+    return [[NSAttributedString alloc] initWithString:text attributes:attributes];
 }
 constexpr auto options=NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesFontLeading;
 }

@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/Images.md",
-    "sha256": "960b2146372a43b5b03c58c333618db61e65959471ad0dfd8dfb13f52651102d",
-    "bytes": 4805,
+    "sha256": "5079f764665de6611fba123561e614652cd793356d14d8e5c058faf446829ea2",
+    "bytes": 4872,
     "line_count": 68,
     "encoding": "utf-8",
     "language": "ko"
@@ -43,7 +43,7 @@
       "kind": "paragraph",
       "start_line": 3,
       "end_line": 8,
-      "raw": "`rgba_image` transfers an encoded-sRGB straight-alpha RGBA8 buffer into immutable\n`RasterImage` storage. Dimensions must be 1..2048 and the byte count must match.\n`ImageRun` specifies logical bounds, an optional **linear** color tint, and opacity.\nThe rasterizer bilinearly samples in premultiplied linear light and clips to the\nsurface. The GPU samples the resulting sRGB texture and blends in linear light.\nThere is no mutable pixel view or implicit resource-file access.\n"
+      "raw": "`rgba_image` transfers an encoded-sRGB straight-alpha RGBA8 buffer into immutable\n`RasterImage` storage. Dimensions must be 1..2048 and the byte count must match.\n`ImageRun` specifies logical bounds, an optional **linear** color tint, and opacity.\nThe rasterizer bilinearly samples in premultiplied linear light, widens its filter to cover the source footprint when downscaling, and clips to the\nsurface. The GPU samples the resulting sRGB texture and blends in linear light.\nThere is no mutable pixel view or implicit resource-file access.\n"
     },
     {
       "id": "b000004",

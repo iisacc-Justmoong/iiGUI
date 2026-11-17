@@ -35,7 +35,7 @@ double alignment_offset(StackAlignment alignment,double available,double content
 }
 bool valid_style(const ButtonStyle& s){for(const auto* c:{&s.fill,&s.hover_fill,&s.pressed_fill,&s.disabled_fill,&s.text,&s.disabled_text,&s.border})if(*c&&!valid_color(**c))return false;return geometry(s.border_width)&&geometry(s.line_height)&&s.line_height<=8192&&(!s.text_role||unsigned(*s.text_role)<=7)&&(!s.font_size||(std::isfinite(*s.font_size)&&*s.font_size>=1&&*s.font_size<=256));}
 bool valid_button(const ButtonOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&unsigned(o.tone)<=4&&valid_title(o.icon_name)&&o.icon_name.size()<=65536&&valid_title(o.accessibility_name)&&o.accessibility_name.size()<=65536&&geometry(o.icon_size)&&o.icon_size>=1&&o.icon_size<=256&&(!o.style||valid_style(*o.style))&&(!o.height||(geometry(*o.height)&&*o.height>=1))&&(!o.corner_radius||geometry(*o.corner_radius))&&(!o.horizontal_padding||geometry(*o.horizontal_padding))&&(!o.left_padding||geometry(*o.left_padding))&&(!o.right_padding||geometry(*o.right_padding))&&(!o.content_spacing||(std::isfinite(*o.content_spacing)&&*o.content_spacing>=-256&&*o.content_spacing<=8192))&&(!o.indicator_size||(geometry(*o.indicator_size)&&*o.indicator_size>=1&&*o.indicator_size<=256))&&(!o.width||(geometry(*o.width)&&*o.width>=1))&&(!o.icon_mode||o.icon);}
-bool valid_label(const LabelOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&std::isfinite(o.font_size)&&o.font_size>=1&&o.font_size<=256&&geometry(o.line_height)&&o.line_height<=8192&&unsigned(o.role)<=7&&unsigned(o.alignment)<=2&&(!o.color||valid_color(*o.color))&&(!o.font_weight||*o.font_weight==400||*o.font_weight==500||*o.font_weight==600||*o.font_weight==700);}
+bool valid_label(const LabelOptions& o){return valid_title(o.text)&&o.text.size()<=65536&&std::isfinite(o.font_size)&&o.font_size>=1&&o.font_size<=256&&geometry(o.line_height)&&o.line_height<=8192&&std::isfinite(o.letter_spacing)&&std::abs(o.letter_spacing)<=256&&unsigned(o.role)<=7&&unsigned(o.alignment)<=2&&(!o.color||valid_color(*o.color))&&(!o.theme_typography_role||unsigned(*o.theme_typography_role)<=7)&&(!o.theme_color_role||unsigned(*o.theme_color_role)<=7)&&(!o.font_weight||*o.font_weight==400||*o.font_weight==500||*o.font_weight==600||*o.font_weight==700);}
 bool valid_action(const ActionOptions& o){
     if(!valid_title(o.accessibility_description)||o.accessibility_description.size()>65536||!valid_title(o.text)||o.text.size()>65536||!valid_title(o.accessibility_name)||o.accessibility_name.size()>65536||unsigned(o.role)>unsigned(ActionRole::menu_item)||unsigned(o.text_role)>7||!std::isfinite(o.font_size)||o.font_size<1||o.font_size>256)return false;
     for(auto n:{o.line_height,o.padding.left,o.padding.top,o.padding.right,o.padding.bottom,o.minimum_width,o.minimum_height,o.corner_radius})if(!geometry(n)||n>8192)return false;
@@ -730,9 +730,13 @@ struct WidgetState::Impl final {
         for(auto child:node.children)clear_paint_subtree(child);
     }
     bool custom_action_content(const Node& n)const{return std::ranges::any_of(n.children,[&](auto child){return !nodes[child].popup;});}
+    WidgetColor text_ink(TextRole role) const {
+        const auto index=static_cast<unsigned>(role);
+        return appearance.text_colors ? (*appearance.text_colors)[index] : WidgetColor{1,1,1,appearance.text_alpha[index]};
+    }
     WidgetColor action_ink(const Node& n)const{
         const auto& o=*n.action_surface;const auto i=std::size_t(&n-nodes.data());const auto base=o.text_color.value_or(appearance.primary);
-        if(!effective_enabled(n))return o.disabled_text_color.value_or(WidgetColor{1,1,1,appearance.text_alpha[7]});
+        if(!effective_enabled(n))return o.disabled_text_color.value_or(text_ink(TextRole::disabled));
         if(pressed==i)return o.pressed_text_color.value_or(WidgetColor{base.red/1.2,base.green/1.2,base.blue/1.2,base.alpha});
         if(hovered!=absent&&descendant(hovered,i))return o.hover_text_color.value_or(WidgetColor{1,1,1,.9});return base;
     }
@@ -740,15 +744,19 @@ struct WidgetState::Impl final {
         const bool label=n.kind==WidgetKind::label,enabled=effective_enabled(n);
         const bool compact=n.menu_item && n.menu_item->compact.value_or(false);
         const auto role=n.action_surface?n.action_surface->text_role:label?n.label.role:n.kind==WidgetKind::button&&n.button.style&&n.button.style->text_role?*n.button.style->text_role:TextRole::body;
-        const auto i=static_cast<unsigned>(role);
-        auto run=TextRun{.bounds=n.bounds,.text=n.text,.color=color(label&&n.label.color&&enabled?*n.label.color:WidgetColor{1,1,1,enabled?appearance.text_alpha[i]:appearance.text_alpha[7]}),
+        const auto color_role=label&&n.label.theme_color_role&&appearance.text_colors?*n.label.theme_color_role:role;
+        const auto* theme=label&&n.label.theme_typography_role&&appearance.text_styles?
+            &(*appearance.text_styles)[static_cast<unsigned>(*n.label.theme_typography_role)]:nullptr;
+        auto run=TextRun{.bounds=n.bounds,.text=n.text,.color=color(label&&n.label.color&&enabled?*n.label.color:text_ink(enabled?color_role:TextRole::disabled)),
             .font_size=float(compact?12:label?n.label.font_size:13),
             .font_weight=compact?400u:role==TextRole::title || role==TextRole::title2 ? 700u : role==TextRole::header || role==TextRole::header2 || role==TextRole::description ? 600u : role==TextRole::body ? 500u : 400u,
             .alignment=label?n.label.alignment:TextAlignment::left,.font_family=fonts->resolve_family(compact?std::string_view("Inter"):appearance.styled?std::string_view(appearance.font_family):std::string_view{}),.line_height=label?float(n.label.line_height):0};
-        if(label&&n.label.font_weight)run.font_weight=*n.label.font_weight;if(label)run.elide_right=n.label.elide_right;if(n.kind==WidgetKind::button&&n.button.style){run.line_height=float(n.button.style->line_height);if(n.button.style->font_size)run.font_size=float(*n.button.style->font_size);}
+        if(theme){run.font_size=float(theme->font_size);run.line_height=float(theme->line_height);run.font_weight=theme->font_weight;}
+        else if(label&&n.label.font_weight)run.font_weight=*n.label.font_weight;
+        if(label){run.elide_right=n.label.elide_right;run.letter_spacing=float(n.label.letter_spacing);}if(n.kind==WidgetKind::button&&n.button.style){run.line_height=float(n.button.style->line_height);if(n.button.style->font_size)run.font_size=float(*n.button.style->font_size);}
         if(n.action_surface){run.color=color(action_ink(n));run.font_size=float(n.action_surface->font_size);run.line_height=float(n.action_surface->line_height);run.underline=n.action_surface->underline;run.elide_right=true;}
         if(n.kind==WidgetKind::input_field&&n.field.style){const auto& s=*n.field.style;run.font_size=float(s.font_size);run.line_height=float(s.line_height);if(s.text)run.color=color(*s.text);}
-        if(!compact&&!(label&&n.label.font_weight)) {
+        if(!compact&&!theme&&!(label&&n.label.font_weight)) {
             if(appearance.text_weight_rules) {
                 for(const auto& rule:*appearance.text_weight_rules)
                     if(run.font_size==static_cast<float>(rule.font_size))run.font_weight=rule.weight;
@@ -1088,7 +1096,10 @@ WidgetState::WidgetState(std::function<void(runtime::Task)> invoke,WidgetAppeara
     if (!geometry(appearance.button_height) || !appearance.button_height || !geometry(appearance.button_padding) || !geometry(appearance.button_radius) || !valid_title(appearance.font_family))
         throw std::invalid_argument("Invalid widget appearance");
     for (auto alpha:appearance.text_alpha) if (!std::isfinite(alpha) || alpha<0 || alpha>1) throw std::invalid_argument("Invalid text alpha");
+    if(appearance.text_colors)for(const auto& ink:*appearance.text_colors)
+        if(!valid_color(ink))throw std::invalid_argument("Invalid text role color");
     if(!valid_text_weight_rules(appearance.text_weight_rules))throw std::invalid_argument("Invalid text weight rules");
+    if(!valid_text_role_styles(appearance.text_styles))throw std::invalid_argument("Invalid text role styles");
     impl_->appearance=std::move(appearance); impl_->invoke=std::move(invoke);
     impl_->frame_hooks=std::move(hooks);
     impl_->fonts=impl_->frame_hooks.fonts?impl_->frame_hooks.fonts:FontDatabase::application();
@@ -1386,7 +1397,8 @@ core::Result<WindowProperties> WidgetState::window_properties() const {
 }
 void WidgetState::apply_appearance(const WidgetAppearance& appearance) {
     const bool measure=impl_->appearance.font_family!=appearance.font_family||impl_->appearance.button_height!=appearance.button_height||
-        impl_->appearance.button_padding!=appearance.button_padding||impl_->appearance.text_weight_rules!=appearance.text_weight_rules;
+        impl_->appearance.button_padding!=appearance.button_padding||impl_->appearance.text_weight_rules!=appearance.text_weight_rules||
+        impl_->appearance.text_styles!=appearance.text_styles;
     impl_->appearance=appearance;
     impl_->resolved_font_family=impl_->fonts->resolve_family(appearance.font_family);
     impl_->resolved_compact_font_family=impl_->fonts->resolve_family("Inter");
@@ -4550,7 +4562,7 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
             return;
         }
         if(stack_kind(n.kind) || n.kind==WidgetKind::spacer) return;
-        auto run=impl_->text_run(n);if(!enabled&&n.kind!=WidgetKind::label)run.color=color({1,1,1,impl_->appearance.text_alpha[7]});
+        auto run=impl_->text_run(n);if(!enabled&&n.kind!=WidgetKind::label)run.color=color(impl_->text_ink(TextRole::disabled));
         if(n.action_surface){
             const auto& o=*n.action_surface;const auto& p=o.padding;
             run.color=color(impl_->action_ink(n));run.bounds={r.x+float(p.left),r.y+float(p.top),std::max(0.f,r.width-float(p.left+p.right)),std::max(0.f,r.height-float(p.top+p.bottom))};
@@ -4715,7 +4727,7 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
         if(draw&&!provided)use_clip(impl_->clip_rect(i));
         if(provided){
             const auto source=n.paint_source==absent?i:n.paint_source;const auto& owner=impl_->nodes[source];
-            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),impl_->hovered!=absent&&impl_->descendant(impl_->hovered,source),impl_->pressed==source,impl_->focused==source,owner.checked,impl_->nodes[owner.default_content==absent?source:owner.default_content].children.size(),impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1,impl_->resolved_font_family};
+            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),impl_->hovered!=absent&&impl_->descendant(impl_->hovered,source),impl_->pressed==source,impl_->focused==source,owner.checked,impl_->nodes[owner.default_content==absent?source:owner.default_content].children.size(),impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1,impl_->resolved_font_family,impl_->appearance.text_styles};
             struct Guard{bool& local;bool& domain;Guard(bool& l,bool& d):local(l),domain(d){local=domain=true;}~Guard(){local=domain=false;}}guard{impl_->painting,impl_->domain->painting};
             // Explicit subtree captures preserve their fresh-provider contract;
             // ordinary presentation retains an unchanged widget's drawing.

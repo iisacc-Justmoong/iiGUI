@@ -30,7 +30,7 @@ public:
            !bound(value.separator_height,0,8192-value.row_height)||!bound(value.minimum_column_width,32,8192)||
            !bound(value.fallback_column_width,0,8192)||(value.fallback_column_width>0&&value.fallback_column_width<value.minimum_column_width)||
            !color(p.background)||!color(p.divider)||!color(p.header_text)||!color(p.cell_text)||!color(p.selection)||!color(p.current)||
-           !Policy::valid_presentation(value)||value.column_appearance.size()>value.columns.size())return false;
+           !Policy::valid_presentation(value)||!Policy::valid_typography(value.typography)||value.column_appearance.size()>value.columns.size())return false;
         auto snapshot=std::make_shared<TableSnapshot>();snapshot->columns=value.columns;
         auto index=TableIndex::create(std::move(snapshot));
         if(!index)return false;

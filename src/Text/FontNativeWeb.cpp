@@ -6,7 +6,14 @@
 namespace ii::gui::detail {
 namespace {
 IIGUI_WEB_ASYNC_JS(int,register_font,(const char* family,int weight,const unsigned char* bytes,int length),{
-    try{const face=new FontFace(UTF8ToString(family),HEAPU8.slice(bytes,bytes+length),{weight:String(weight)});await face.load();self.fonts.add(face);return 1;}catch(error){console.error('iiGUI font:',error);return 0;}
+    /* IIGUI_WEB_FONT_BEGIN */
+    try{
+        const fonts=self.fonts||(typeof document!=='undefined'?document.fonts:null);
+        if(!fonts)return 0;
+        const face=new FontFace(UTF8ToString(family),HEAPU8.slice(bytes,bytes+length),{weight:String(weight)});
+        await face.load();fonts.add(face);return 1;
+    }catch(error){console.error('iiGUI font:',error);return 0;}
+    /* IIGUI_WEB_FONT_END */
 });
 class Provider final:public FontProvider {
     std::filesystem::path directory_;std::set<std::string> families_{"sans-serif","serif","monospace"};

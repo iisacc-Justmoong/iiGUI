@@ -1,4 +1,5 @@
 #include <iiGUI/NativeSheetView.h>
+#include <iiGUI/SrgbColor.h>
 #include <iiGUI/WidgetState.h>
 
 #include <memory>
@@ -15,6 +16,11 @@ template<class T>T take(ii::core::Result<T> value) {
 }
 void good(ii::core::Result<void> value) {
     if (!value) { if (value.error().cause) std::rethrow_exception(value.error().cause); throw std::runtime_error(value.error().message); }
+}
+const ii::gui::TextRun& text_run(const ii::gui::CanvasFrame& frame, std::string_view text) {
+    for (const auto& run : frame.texts) if (run.text == text) return run;
+    for (const auto& layer : frame.overlays) for (const auto& run : layer.texts) if (run.text == text) return run;
+    throw std::runtime_error("Sheet text was not drawn");
 }
 }
 
@@ -58,6 +64,24 @@ int main() {
     const auto desktop = take(root.snapshot());
     require(desktop.modal && desktop.bounds.width == 560 && desktop.bounds.height == 420 && made == 1 && opened == 1,
             "Independent desktop Sheet did not open at its preferred geometry");
+    auto themed = input;
+    themed.title_style = LabelOptions{.font_size=21, .role=TextRole::header, .color=WidgetColor{.1,.2,.3,.7},
+                                     .line_height=22, .font_weight=600};
+    themed.description_style = LabelOptions{.font_size=19, .role=TextRole::body, .color=WidgetColor{.2,.4,.6,.5},
+                                           .line_height=20, .font_weight=500};
+    good(sheet->set_options(themed));
+    const auto theme_frame = take(tree->drawing_snapshot({800, 600}));
+    const auto& title = text_run(theme_frame,"Export"); const auto& description = text_run(theme_frame,"Save your file");
+    require(title.font_size==21 && title.line_height==22 && title.font_weight==600 &&
+            title.color==srgb_to_linear(WidgetColor{.1,.2,.3,.7}) &&
+            description.font_size==19 && description.line_height==20 && description.font_weight==500 &&
+            description.color==srgb_to_linear(WidgetColor{.2,.4,.6,.5}),
+            "Sheet ignored its supplied theme styles");
+    auto invalid_style = themed; invalid_style.description_style->font_size = -1;
+    require(!sheet->set_options(invalid_style) && take(sheet->options()) == themed &&
+            text_run(take(tree->drawing_snapshot({800, 600})),"Export").font_size == 21,
+            "Invalid Sheet typography replaced its retained theme");
+    good(sheet->set_options(input));
     auto row = take(root.popup_content("row0")); const auto row_id = take(row.snapshot()).id;
     require(take(viewport.snapshot()).content_height > take(viewport.snapshot()).bounds.height,
             "Sheet did not expose its scrolling content");

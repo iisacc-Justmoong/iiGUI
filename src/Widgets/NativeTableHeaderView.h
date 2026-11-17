@@ -141,6 +141,9 @@ class BasicNativeTableHeader final {
         try {
             auto drawing=std::make_shared<ii::gui::WidgetDrawing>();const auto& prepared=*state->prepared;
             const auto& c=prepared.authored.configuration;const auto& frame=prepared.frame;
+            const auto font_size=c.typography?c.typography->font_size:13.;
+            const auto line_height=c.typography?c.typography->line_height:16.;
+            const auto font_weight=c.typography?c.typography->font_weight:500u;
             const auto background=ii::gui::srgb_to_linear(c.palette.background),divider=ii::gui::srgb_to_linear(c.palette.divider),ink=ii::gui::srgb_to_linear(c.palette.header_text);
             if(view.size.width>0&&view.size.height>0)drawing->panels.push_back({{0,0,float(view.size.width),float(view.size.height)},background,background});
             drawing->images_before_text=true;
@@ -153,11 +156,11 @@ class BasicNativeTableHeader final {
                 const auto indicator=sorted&&span.extent>=24?12.:0.;
                 const bool custom=state->views&&state->views->has(column.key);
                 if(!custom)if(auto content=prepared.presentation->draw(*drawing,span.index,column.title,span.offset,span.extent,c.row_height,
-                    view,ink,13,16,indicator,budget);!content)return std::unexpected(content.error());
+                    view,ink,font_size,line_height,font_weight,indicator,budget);!content)return std::unexpected(content.error());
                 if(!custom&&indicator&&view.size.height>0)drawing->texts.push_back({
                     .bounds={float(span.offset+span.extent-indicator),0,float(indicator),float((std::min)(c.row_height,view.size.height))},
-                    .text=c.sort->order==TableSortOrder::ascending?"↑":"↓",.color=ink,.font_size=13,.font_weight=500,
-                    .alignment=ii::gui::TextAlignment::center,.font_family=view.font_family,.line_height=16,
+                    .text=c.sort->order==TableSortOrder::ascending?"↑":"↓",.color=ink,.font_size=float(font_size),.font_weight=font_weight,
+                    .alignment=ii::gui::TextAlignment::center,.font_family=view.font_family,.line_height=float(line_height),
                     .clip=ii::gui::Rect{float(left),0,float(right-left),float((std::min)(c.row_height,view.size.height))}});
                 const auto edge=span.offset+span.extent-1;
                 if(edge>=0&&edge<view.size.width&&view.size.height>0)drawing->panels.push_back({{float(edge),0,1,float(view.size.height)},divider,divider});

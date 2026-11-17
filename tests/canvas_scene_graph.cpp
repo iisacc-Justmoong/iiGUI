@@ -303,6 +303,12 @@ void direct3d_graph(){
     require(!detail::direct3d_scene_plan(f,200,100),"Direct3D admitted a cyclic source graph");
 }
 void webgl_graph(){
+    CanvasFrame transparent{.viewport={0,0,200,100},.background={0,0,0,0}};
+    require(!valid_canvas(transparent),"Public raw canvases must retain their opaque-background contract");
+    require(bool(detail::webgl_scene_plan(transparent,200,100,true)),
+        "WebGL must accept a valid transparent internal widget surface");
+    transparent.background.alpha=1.1f;
+    require(!detail::webgl_scene_plan(transparent,200,100,true),"WebGL admitted an invalid surface alpha");
     auto f=graph();
     const auto half=detail::webgl_scene_plan(f,200,100,true);
     require(half&&half->order.count==3&&half->order.order[0]==2&&half->order.order[1]==0&&half->order.order[2]==1,

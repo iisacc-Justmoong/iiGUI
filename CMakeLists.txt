@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.31)
-project(iiGUI VERSION 0.5.0 LANGUAGES C CXX)
+project(iiGUI VERSION 0.6.0 LANGUAGES C CXX)
 set(CMAKE_CXX_EXTENSIONS OFF)
+if(EMSCRIPTEN AND NOT DEFINED CMAKE_CXX_SCAN_FOR_MODULES)
+    # The SDK uses headers and must build with Emscripten without clang-scan-deps.
+    set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+endif()
 set(IIGUI_LINUX_BACKEND "WAYLAND" CACHE STRING "Linux window system: WAYLAND (default), AUTO, or deprecated X11")
 set_property(CACHE IIGUI_LINUX_BACKEND PROPERTY STRINGS WAYLAND AUTO X11)
 
@@ -112,13 +116,17 @@ set(IIGUI_LVUI_COMPILER "" CACHE FILEPATH "Optional host-native LVUI AOT compile
 set(IIGUI_LVUI_TEST_INCLUDE "" CACHE PATH "Optional LVUI generated headers for application integration tests")
 set(IIGUI_LVUI_TEST_LIBRARY "" CACHE FILEPATH "Optional LVUI native library for application integration tests")
 find_package(iiSDKCore 0.16 CONFIG REQUIRED COMPONENTS Runtime)
-if(EMSCRIPTEN AND DEFINED IISDKCORE_WASM_THREADS AND NOT IISDKCORE_WASM_THREADS)
-    message(FATAL_ERROR "iiGUI Web requires iiSDKCore built with IISDKCORE_WASM_THREADS=ON")
-endif()
 if(EMSCRIPTEN)
     get_target_property(_iigui_core_options iiSDKCore::iiSDKCore INTERFACE_COMPILE_OPTIONS)
-    if(NOT "-pthread" IN_LIST _iigui_core_options)
-        message(FATAL_ERROR "iiGUI Web Core Runtime must export -pthread; install a compatible threaded Core package")
+    set(_iigui_web_threads FALSE)
+    if("-pthread" IN_LIST _iigui_core_options)
+        set(_iigui_web_threads TRUE)
+    endif()
+    if(DEFINED IISDKCORE_WASM_THREADS)
+        if((IISDKCORE_WASM_THREADS AND NOT _iigui_web_threads) OR
+           (NOT IISDKCORE_WASM_THREADS AND _iigui_web_threads))
+            message(FATAL_ERROR "The selected Web Core Runtime and IISDKCORE_WASM_THREADS disagree")
+        endif()
     endif()
 endif()
 if(NOT EMSCRIPTEN)
@@ -213,16 +221,19 @@ elseif(ANDROID)
     target_link_libraries(iiGUI PRIVATE android log dl jnigraphics)
     target_include_directories(iiGUI PRIVATE "${CMAKE_ANDROID_NDK}/sources/android/native_app_glue" "${lunasvg_SOURCE_DIR}/plutovg/include")
 elseif(EMSCRIPTEN)
-    # Core's native worker and shutdown contracts remain on a pthread. The
-    # browser main thread only owns DOM/OS bridges; widgets are C++/WebGL2.
-    target_compile_options(iiGUI PUBLIC -pthread)
     foreach(_codec lunasvg plutovg)
-        # Every object linked into shared WebAssembly memory needs atomics and
-        # bulk-memory features, including otherwise platform-neutral codecs.
-        target_compile_options(${_codec} PRIVATE -pthread -fexceptions)
+        target_compile_options(${_codec} PRIVATE -fexceptions)
     endforeach()
-    target_link_options(iiGUI PUBLIC -pthread -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=5
-        -sOFFSCREENCANVAS_SUPPORT=1 "-sOFFSCREENCANVASES_TO_PTHREAD=#canvas"
+    if(_iigui_web_threads)
+        # All objects in shared WebAssembly memory need the same atomics ABI.
+        target_compile_options(iiGUI PUBLIC -pthread)
+        foreach(_codec lunasvg plutovg)
+            target_compile_options(${_codec} PRIVATE -pthread)
+        endforeach()
+        target_link_options(iiGUI PUBLIC -pthread -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=5
+            -sOFFSCREENCANVAS_SUPPORT=1 "-sOFFSCREENCANVASES_TO_PTHREAD=#canvas")
+    endif()
+    target_link_options(iiGUI PUBLIC
         -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=131072
         "-sASYNCIFY_IMPORTS=web_wait,register_font,await_clipboard" -sALLOW_MEMORY_GROWTH=1
         -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sEXIT_RUNTIME=0)
@@ -286,7 +297,7 @@ endif()
 set_target_properties(iiGUI PROPERTIES CXX_EXTENSIONS OFF OBJCXX_EXTENSIONS OFF
     OBJCXX_STANDARD 23 OBJCXX_STANDARD_REQUIRED YES
     CXX_VISIBILITY_PRESET hidden OBJCXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN YES VERSION ${PROJECT_VERSION} SOVERSION 1)
+    VISIBILITY_INLINES_HIDDEN YES VERSION ${PROJECT_VERSION} SOVERSION 2)
 if(BUILD_SHARED_LIBS)
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set_target_properties(iiGUI PROPERTIES FRAMEWORK TRUE FRAMEWORK_VERSION A
@@ -308,7 +319,7 @@ if(BUILD_SHARED_LIBS)
     endif()
 endif()
 if(WIN32 AND BUILD_SHARED_LIBS)
-    set_target_properties(iiGUI PROPERTIES OUTPUT_NAME "iiGUI-abi1")
+    set_target_properties(iiGUI PROPERTIES OUTPUT_NAME "iiGUI-abi2")
 endif()
 if(IIGUI_SANITIZE)
     if(MSVC)
@@ -1129,9 +1140,12 @@ if(BUILD_TESTING)
     add_test(NAME iiGUI.web_text_wrap COMMAND iiGUIWebTextWrapTests)
     set_tests_properties(iiGUI.web_text_wrap PROPERTIES TIMEOUT 30)
     if(EMSCRIPTEN)
+        # Link the complete host path in both Core modes without opening an app.
+        add_executable(iiGUIWebHostLinkTests tests/web_host_link.cpp)
+        target_link_libraries(iiGUIWebHostLinkTests PRIVATE iiGUI::iiGUI)
         # Exercise the real backend with a deterministic font/Canvas boundary;
         # its private implementation need not be exported by the shared SDK.
-        add_executable(iiGUIWebTextBackendTests tests/web_text_backend.cpp src/Text/TextWeb.cpp
+        add_executable(iiGUIWebTextBackendTests tests/web_text_backend.cpp src/Text/TextWeb.cpp src/Text/TextLine.cpp
             src/Text/TextBoundary.cpp src/third_party/utf8proc/utf8proc.c)
         target_compile_features(iiGUIWebTextBackendTests PRIVATE cxx_std_23)
         target_compile_definitions(iiGUIWebTextBackendTests PRIVATE IIGUI_WEB_TEXT_TEST_FONT IIGUI_STATIC_DEFINE UTF8PROC_STATIC)
@@ -1147,6 +1161,40 @@ if(BUILD_TESTING)
         if(_iigui_node)
             add_test(NAME iiGUI.web_text_backend COMMAND "${_iigui_node}" "$<TARGET_FILE:iiGUIWebTextBackendTests>")
             set_tests_properties(iiGUI.web_text_backend PROPERTIES TIMEOUT 30)
+        endif()
+        add_executable(iiGUIWebDomTextBackendTests tests/web_text_backend.cpp src/Text/TextWeb.cpp src/Text/TextLine.cpp
+            src/Text/TextBoundary.cpp src/third_party/utf8proc/utf8proc.c)
+        target_compile_features(iiGUIWebDomTextBackendTests PRIVATE cxx_std_23)
+        target_compile_definitions(iiGUIWebDomTextBackendTests PRIVATE IIGUI_WEB_TEXT_TEST_FONT IIGUI_STATIC_DEFINE UTF8PROC_STATIC)
+        target_include_directories(iiGUIWebDomTextBackendTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_link_libraries(iiGUIWebDomTextBackendTests PRIVATE iiSDKCore::Contracts)
+        target_compile_options(iiGUIWebDomTextBackendTests PRIVATE -fexceptions "$<$<COMPILE_LANGUAGE:CXX>:-fexperimental-library>")
+        target_link_options(iiGUIWebDomTextBackendTests PRIVATE -fexceptions -fexperimental-library
+            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/tests/web_text_canvas_fake.js\""
+            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/tests/web_text_dom_only.js\""
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sEXIT_RUNTIME=1)
+        set_target_properties(iiGUIWebDomTextBackendTests PROPERTIES SUFFIX ".js" C_STANDARD 99 C_STANDARD_REQUIRED YES CXX_SCAN_FOR_MODULES OFF)
+        if(_iigui_node)
+            add_test(NAME iiGUI.web_dom_text_backend COMMAND "${_iigui_node}" "$<TARGET_FILE:iiGUIWebDomTextBackendTests>")
+            set_tests_properties(iiGUI.web_dom_text_backend PROPERTIES TIMEOUT 30)
+        endif()
+        add_executable(iiGUIWebSharedTextBackendTests tests/web_text_backend.cpp src/Text/TextWeb.cpp src/Text/TextLine.cpp
+            src/Text/TextBoundary.cpp src/third_party/utf8proc/utf8proc.c)
+        target_compile_features(iiGUIWebSharedTextBackendTests PRIVATE cxx_std_23)
+        target_compile_definitions(iiGUIWebSharedTextBackendTests PRIVATE IIGUI_WEB_TEXT_TEST_FONT
+            IIGUI_WEB_TEXT_TEST_SHARED IIGUI_STATIC_DEFINE UTF8PROC_STATIC)
+        target_include_directories(iiGUIWebSharedTextBackendTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_link_libraries(iiGUIWebSharedTextBackendTests PRIVATE iiSDKCore::Contracts)
+        target_compile_options(iiGUIWebSharedTextBackendTests PRIVATE -pthread -fexceptions "$<$<COMPILE_LANGUAGE:CXX>:-fexperimental-library>")
+        target_link_options(iiGUIWebSharedTextBackendTests PRIVATE -pthread -fexceptions -fexperimental-library
+            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/tests/web_shared_text_decoder.js\""
+            "SHELL:--pre-js \"${CMAKE_CURRENT_SOURCE_DIR}/tests/web_text_canvas_fake.js\""
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sEXIT_RUNTIME=1)
+        set_target_properties(iiGUIWebSharedTextBackendTests PROPERTIES SUFFIX ".js" C_STANDARD 99 C_STANDARD_REQUIRED YES
+            CXX_SCAN_FOR_MODULES OFF)
+        if(_iigui_node)
+            add_test(NAME iiGUI.web_shared_text_backend COMMAND "${_iigui_node}" "$<TARGET_FILE:iiGUIWebSharedTextBackendTests>")
+            set_tests_properties(iiGUI.web_shared_text_backend PROPERTIES TIMEOUT 30)
         endif()
     endif()
     add_executable(iiGUIVirtualViewportLegacyPolicyTests tests/virtual_viewport_legacy_policy.cpp)
@@ -1177,6 +1225,12 @@ if(BUILD_TESTING)
     target_link_libraries(iiGUIWindowsAccessibilityProjectionTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.windows_accessibility_projection COMMAND iiGUIWindowsAccessibilityProjectionTests)
     set_tests_properties(iiGUI.windows_accessibility_projection PROPERTIES TIMEOUT 30)
+    if(NOT EMSCRIPTEN)
+        add_executable(iiGUIWebAccessibilityTests tests/web_accessibility.cpp)
+        target_link_libraries(iiGUIWebAccessibilityTests PRIVATE iiGUI::iiGUI)
+        add_test(NAME iiGUI.web_accessibility COMMAND iiGUIWebAccessibilityTests)
+        set_tests_properties(iiGUI.web_accessibility PROPERTIES TIMEOUT 30)
+    endif()
     add_executable(iiGUIAtSpiTreeTests tests/atspi_accessibility_tree.cpp)
     target_link_libraries(iiGUIAtSpiTreeTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.atspi_accessibility_tree COMMAND iiGUIAtSpiTreeTests)
@@ -1242,14 +1296,39 @@ if(BUILD_TESTING)
         add_test(NAME iiGUI.clipboard_capacity_mac COMMAND iiGUIClipboardCapacityMacTests)
     endif()
     if(EMSCRIPTEN)
-        add_executable(iiGUIClipboardCapacityWebTests tests/clipboard_capacity_web.cpp)
-        target_link_libraries(iiGUIClipboardCapacityWebTests PRIVATE iiGUI::iiGUI)
-        target_link_options(iiGUIClipboardCapacityWebTests PRIVATE "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tests/clipboard_capacity_web_mock.js"
+        # Clipboard does not need a canvas. Link its actual platform source
+        # directly so this Node test keeps pthread/Asyncify without inheriting
+        # the GUI host's browser-only OffscreenCanvas transfer requirement.
+        add_executable(iiGUIClipboardCapacityWebTests tests/clipboard_capacity_web.cpp src/Platform/DesktopWeb.cpp)
+        target_compile_features(iiGUIClipboardCapacityWebTests PRIVATE cxx_std_23)
+        target_compile_definitions(iiGUIClipboardCapacityWebTests PRIVATE IIGUI_STATIC_DEFINE)
+        target_include_directories(iiGUIClipboardCapacityWebTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_link_libraries(iiGUIClipboardCapacityWebTests PRIVATE iiSDKCore::Contracts)
+        target_compile_options(iiGUIClipboardCapacityWebTests PRIVATE -pthread -fexceptions -fexperimental-library)
+        target_link_options(iiGUIClipboardCapacityWebTests PRIVATE
+            "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tests/web_shared_text_decoder.js"
+            "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tests/clipboard_capacity_web_mock.js"
+            -pthread -fexceptions -fexperimental-library -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=2
+            -sASYNCIFY=1 "-sASYNCIFY_IMPORTS=await_clipboard" -sALLOW_MEMORY_GROWTH=1
             "-sENVIRONMENT=node,worker" "-sEXIT_RUNTIME=1")
         find_program(_iigui_clipboard_node node)
         if(_iigui_clipboard_node)
             add_test(NAME iiGUI.clipboard_capacity_web COMMAND "${_iigui_clipboard_node}" "$<TARGET_FILE:iiGUIClipboardCapacityWebTests>")
             set_tests_properties(iiGUI.clipboard_capacity_web PROPERTIES TIMEOUT 60)
+        endif()
+        add_executable(iiGUIClipboardSingleWebTests tests/clipboard_capacity_web.cpp src/Platform/DesktopWeb.cpp)
+        target_compile_features(iiGUIClipboardSingleWebTests PRIVATE cxx_std_23)
+        target_compile_definitions(iiGUIClipboardSingleWebTests PRIVATE IIGUI_STATIC_DEFINE)
+        target_include_directories(iiGUIClipboardSingleWebTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_link_libraries(iiGUIClipboardSingleWebTests PRIVATE iiSDKCore::Contracts)
+        target_compile_options(iiGUIClipboardSingleWebTests PRIVATE -fexceptions -fexperimental-library)
+        target_link_options(iiGUIClipboardSingleWebTests PRIVATE
+            "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/tests/clipboard_capacity_web_mock.js"
+            -fexceptions -fexperimental-library -sASYNCIFY=1 "-sASYNCIFY_IMPORTS=await_clipboard"
+            -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=node -sSINGLE_FILE=1 -sEXIT_RUNTIME=1)
+        if(_iigui_clipboard_node)
+            add_test(NAME iiGUI.clipboard_single_web COMMAND "${_iigui_clipboard_node}" "$<TARGET_FILE:iiGUIClipboardSingleWebTests>")
+            set_tests_properties(iiGUI.clipboard_single_web PROPERTIES TIMEOUT 60)
         endif()
     endif()
     add_executable(iiGUIHostDriverPolicyTests tests/host_driver_policy.cpp)
@@ -1374,6 +1453,24 @@ if(BUILD_TESTING)
     if(_iigui_hidpi_node)
         add_test(NAME iiGUI.web_display_observer COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_display_observer.js")
         set_tests_properties(iiGUI.web_display_observer PROPERTIES TIMEOUT 15)
+        add_test(NAME iiGUI.web_single_wait COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_single_wait.cjs")
+        set_tests_properties(iiGUI.web_single_wait PROPERTIES TIMEOUT 15)
+        add_test(NAME iiGUI.web_font_environment COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_font_environment.cjs")
+        set_tests_properties(iiGUI.web_font_environment PROPERTIES TIMEOUT 15)
+        add_test(NAME iiGUI.web_canvas_observer COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_canvas_observer.cjs")
+        set_tests_properties(iiGUI.web_canvas_observer PROPERTIES TIMEOUT 15)
+        add_test(NAME iiGUI.web_canvas_minimum COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_canvas_minimum.cjs")
+        set_tests_properties(iiGUI.web_canvas_minimum PROPERTIES TIMEOUT 15)
+        add_test(NAME iiGUI.web_accessibility_dom COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_accessibility_dom.cjs")
+        set_tests_properties(iiGUI.web_accessibility_dom PROPERTIES TIMEOUT 15)
+    endif()
+    if(NOT EMSCRIPTEN)
+        # This exercises the native headless widget tree. A Web host target
+        # requires a real browser canvas rather than CTest's Node runner.
+        add_executable(iiGUIWebSurfaceSizeTests tests/web_surface_size.cpp)
+        target_link_libraries(iiGUIWebSurfaceSizeTests PRIVATE iiGUI::iiGUI)
+        add_test(NAME iiGUI.web_surface_size COMMAND iiGUIWebSurfaceSizeTests)
+        set_tests_properties(iiGUI.web_surface_size PROPERTIES TIMEOUT 15)
     endif()
     add_executable(iiGUIWaylandPolicyTests tests/wayland_policy.cpp)
     target_link_libraries(iiGUIWaylandPolicyTests PRIVATE iiGUI::iiGUI)
@@ -1440,6 +1537,19 @@ if(BUILD_TESTING)
     target_link_libraries(iiGUIHostInputQueueTests PRIVATE iiGUI::iiGUI)
     add_test(NAME iiGUI.host_input_queue COMMAND iiGUIHostInputQueueTests)
     set_tests_properties(iiGUI.host_input_queue PROPERTIES TIMEOUT 15)
+    add_executable(iiGUIWebHostEventsTests tests/web_host_events.cpp)
+    find_package(Threads REQUIRED)
+    target_compile_features(iiGUIWebHostEventsTests PRIVATE cxx_std_23)
+    target_include_directories(iiGUIWebHostEventsTests PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include")
+    target_link_libraries(iiGUIWebHostEventsTests PRIVATE iiSDKCore::Contracts Threads::Threads)
+    if(EMSCRIPTEN)
+        target_compile_definitions(iiGUIWebHostEventsTests PRIVATE IIGUI_STATIC_DEFINE)
+        target_compile_options(iiGUIWebHostEventsTests PRIVATE -pthread -fexceptions -fexperimental-library)
+        target_link_options(iiGUIWebHostEventsTests PRIVATE -pthread -fexceptions -fexperimental-library
+            -sPTHREAD_POOL_SIZE=1 "-sENVIRONMENT=node,worker" -sEXIT_RUNTIME=1)
+    endif()
+    add_test(NAME iiGUI.web_host_events COMMAND iiGUIWebHostEventsTests)
+    set_tests_properties(iiGUI.web_host_events PROPERTIES TIMEOUT 15)
     add_executable(iiGUISurfaceRegistryTests tests/surface_registry.cpp)
     target_include_directories(iiGUISurfaceRegistryTests PRIVATE src "${CMAKE_CURRENT_BINARY_DIR}/include")
     target_compile_features(iiGUISurfaceRegistryTests PRIVATE cxx_std_23)

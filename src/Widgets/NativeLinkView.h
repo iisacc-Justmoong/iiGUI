@@ -58,7 +58,9 @@ class BasicNativeLink final {
     }
     [[nodiscard]] static ii::core::Result<std::shared_ptr<const ii::gui::WidgetDrawing>>
     paint(const std::shared_ptr<State>& state,const ii::gui::WidgetPaintState& input){
-        if(!state->live||!state->view)return ii::core::fail(ii::core::ErrorCode::closed,"Link has retired");
+        // Layout may paint a candidate before its transaction is published.
+        // Input remains gated by live; only a retired model cannot be painted.
+        if(state->retired||!state->view)return ii::core::fail(ii::core::ErrorCode::closed,"Link has retired");
         const auto& c=state->view->configuration();const auto visual=state->view->visual({input.enabled,input.hovered,input.pressed,input.focused});
         double width=0,height=0;
         if(!c.text.empty()&&input.content_children==0){

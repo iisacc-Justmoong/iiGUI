@@ -15,6 +15,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -33,6 +34,8 @@ namespace ii::gui {
 struct SheetInput final {
     SheetConfiguration configuration;
     bool mobile_platform = sheet_mobile_platform();
+    // Supplied by an owning design system; absent values preserve iiGUI defaults.
+    std::optional<LabelOptions> title_style, description_style;
     friend bool operator==(const SheetInput&, const SheetInput&) = default;
 };
 
@@ -110,13 +113,15 @@ class NativeSheet final {
         return options;
     }
 
-    [[nodiscard]] static ii::gui::LabelOptions title_options(const SheetConfiguration& c) {
-        return {.text = c.title, .font_size = 20, .selectable = false, .role = ii::gui::TextRole::title2,
-                .color = ii::gui::WidgetColor{1, 1, 1, .9}, .line_height = 22, .font_weight = 700};
+    [[nodiscard]] static ii::gui::LabelOptions title_options(const SheetInput& input) {
+        auto result=input.title_style.value_or(ii::gui::LabelOptions{.font_size = 20, .selectable = false, .role = ii::gui::TextRole::title2,
+                .color = ii::gui::WidgetColor{1, 1, 1, .9}, .line_height = 22, .font_weight = 700});
+        result.text=input.configuration.title;result.selectable=false;return result;
     }
-    [[nodiscard]] static ii::gui::LabelOptions description_options(const SheetConfiguration& c) {
-        return {.text = c.description, .font_size = 13, .selectable = false, .role = ii::gui::TextRole::body,
-                .color = ii::gui::WidgetColor{1, 1, 1, .8}, .line_height = 18, .font_weight = 500};
+    [[nodiscard]] static ii::gui::LabelOptions description_options(const SheetInput& input) {
+        auto result=input.description_style.value_or(ii::gui::LabelOptions{.font_size = 13, .selectable = false, .role = ii::gui::TextRole::body,
+                .color = ii::gui::WidgetColor{1, 1, 1, .8}, .line_height = 18, .font_weight = 500});
+        result.text=input.configuration.description;result.selectable=false;return result;
     }
 
     [[nodiscard]] static ii::core::Result<bool> apply_host(const std::shared_ptr<State>& state,
@@ -129,9 +134,9 @@ class NativeSheet final {
         };
         auto result = step([&] { return state->root.set_popover_options(host_options(state)); });
         if (!result || !*result) return result;
-        result = step([&] { return state->title.set_label_options(title_options(c)); });
+        result = step([&] { return state->title.set_label_options(title_options(state->authored)); });
         if (!result || !*result) return result;
-        result = step([&] { return state->description.set_label_options(description_options(c)); });
+        result = step([&] { return state->description.set_label_options(description_options(state->authored)); });
         if (!result || !*result) return result;
         result = step([&] { return state->header.set_visible(c.show_header); });
         if (!result || !*result) return result;
@@ -228,7 +233,7 @@ public:
             if (!header) return std::unexpected(header.error()); state->header = *header;
             auto row = builder.hstack(*header, name("header-row"), {.spacing = 8, .alignment = ii::gui::StackAlignment::center});
             if (!row) return std::unexpected(row.error()); state->header_row = *row;
-            auto title = builder.label(*row, name("title"), title_options(state->prepared->model.configuration()));
+            auto title = builder.label(*row, name("title"), title_options(state->authored));
             if (!title) return std::unexpected(title.error()); state->title = *title;
             if (auto flex = title->set_flex(1); !flex) return std::unexpected(flex.error());
             auto close_action = [weak] {
@@ -243,7 +248,7 @@ public:
                 return builder.button(*row, name("close"), std::move(options), std::move(close_action));
             }();
             if (!close) return std::unexpected(close.error()); state->close = *close;
-            auto description = builder.label(*header, name("description"), description_options(state->prepared->model.configuration()));
+            auto description = builder.label(*header, name("description"), description_options(state->authored));
             if (!description) return std::unexpected(description.error()); state->description = *description;
             auto viewport = builder.scroll_view(*chrome, state->viewport_id, {});
             if (!viewport) return std::unexpected(viewport.error()); state->viewport = *viewport;

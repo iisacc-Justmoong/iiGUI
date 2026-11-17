@@ -48,12 +48,23 @@ struct WindowGeometryValue final {
            (rule.weight!=400&&rule.weight!=500&&rule.weight!=600&&rule.weight!=700))return false;
     return true;
 }
+[[nodiscard]] inline bool valid_text_role_styles(const std::optional<std::array<TextRoleStyle,8>>& styles) noexcept {
+    if(!styles)return true;
+    for(const auto& style:*styles)
+        if(!std::isfinite(style.font_size)||style.font_size<1||style.font_size>256||
+           !std::isfinite(style.line_height)||style.line_height<0||style.line_height>8192||
+           (style.font_weight!=400&&style.font_weight!=500&&style.font_weight!=600&&style.font_weight!=700))return false;
+    return true;
+}
 [[nodiscard]] inline bool valid_widget_appearance(const WidgetAppearance& value) {
     for(auto c:{value.window,value.primary,value.hover,value.pressed,value.disabled_background})
         for(auto channel:{c.red,c.green,c.blue,c.alpha})if(!std::isfinite(channel)||channel<0||channel>1)return false;
     for(auto alpha:value.text_alpha)if(!std::isfinite(alpha)||alpha<0||alpha>1)return false;
+    if(value.text_colors)for(const auto& color:*value.text_colors)
+        for(auto channel:{color.red,color.green,color.blue,color.alpha})
+            if(!std::isfinite(channel)||channel<0||channel>1)return false;
     for(auto number:{value.button_height,value.button_padding,value.button_radius})if(!std::isfinite(number)||number<0||number>32767)return false;
-    return valid_text_weight_rules(value.text_weight_rules)&&value.button_height>0&&!value.font_family.empty()&&value.font_family.size()<=4096&&
+    return valid_text_weight_rules(value.text_weight_rules)&&valid_text_role_styles(value.text_styles)&&value.button_height>0&&!value.font_family.empty()&&value.font_family.size()<=4096&&
         core::valid_utf8(value.font_family)&&value.font_family.find('\0')==value.font_family.npos;
 }
 [[nodiscard]] inline core::Result<void> validate_window_properties(const WindowProperties& value) {

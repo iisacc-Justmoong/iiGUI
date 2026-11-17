@@ -2,6 +2,7 @@
 
 namespace ii::gui {
 void require_text_weight_rules_abi_v1() noexcept {}
+void require_text_colors_abi_v2() noexcept {}
 std::span<const TextStyleToken> default_text_tokens()noexcept{
     static constexpr std::array tokens{TextStyleToken{26,700,"Bold"},TextStyleToken{22,700,"Bold"},TextStyleToken{17,600,"SemiBold"},TextStyleToken{15,600,"SemiBold"},TextStyleToken{13,500,"Medium"},TextStyleToken{12,600,"SemiBold"},TextStyleToken{11,400,"Regular"}};
     return tokens;

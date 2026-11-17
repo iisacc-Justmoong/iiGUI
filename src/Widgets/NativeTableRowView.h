@@ -56,7 +56,7 @@ template<class Policy>class BasicNativeTableRow final {
     [[nodiscard]] static TableCellItemInput cell_input(const Snapshot& prepared,std::size_t index){
         const auto& c=prepared->input.configuration;const auto& cell=c.cells[index];TableCellItemInput input;auto& value=input.configuration;
         value.text=cell.value.text;value.value_type=cell.value.value_type;value.width=c.cell_width;value.height=c.cell_height;value.padding=c.content_spacing;
-        value.font_size=c.font_size;value.palette=c.palette;value.enabled=c.enabled&&cell.value.enabled;value.inputable=c.inputable&&cell.value.editable;
+        value.font_size=c.font_size;value.typography=c.typography;value.palette=c.palette;value.enabled=c.enabled&&cell.value.enabled;value.inputable=c.inputable&&cell.value.editable;
         value.selected=cell.selected;value.current=cell.current;value.show_divider=c.show_divider;input.validator=cell.validator;return input;
     }
     [[nodiscard]] static std::optional<std::size_t> index(const std::shared_ptr<State>& state,std::string_view key){

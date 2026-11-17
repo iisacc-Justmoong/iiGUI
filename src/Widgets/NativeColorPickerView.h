@@ -54,6 +54,10 @@ template<class Policy>class BasicNativeColorPicker final {
     [[nodiscard]] static ii::core::Result<ColorSelectionSnapshot> read(const ColorPickerInput& input) {
         if (!input.session || input.source_revision < 0 || !ColorPicker::validate(input.configuration))
             return ii::core::fail(ii::core::ErrorCode::invalid_argument, "Invalid LVUI color picker configuration");
+        if constexpr (requires { input.divider_color; }) {
+            if(input.divider_color&&!Policy::valid_color(*input.divider_color))
+                return ii::core::fail(ii::core::ErrorCode::invalid_argument, "Invalid color picker divider color");
+        }
         auto snapshot = input.session->picker()->editor()->snapshot();
         if (!Policy::valid_color(snapshot.color) || !Policy::valid_color(snapshot.baseline))
             return ii::core::fail(ii::core::ErrorCode::invalid_argument, "Color editor returned an invalid snapshot");
@@ -148,6 +152,7 @@ template<class Policy>class BasicNativeColorPicker final {
             if (i < l.channels.size()) { result = step([&] { return state->channels[i]->root().set_frame(rect(l.channels[i].second)); }); if (!result || !*result) return result; }
         }
         result = step([&] { return state->divider.set_frame(rect(l.divider)); }); if (!result || !*result) return result;
+        result = step([&] { return state->divider.request_repaint(); }); if (!result || !*result) return result;
         result = step([&] { return state->values->set_options(value_options(*state)); }); if (!result || !*result) return result;
         result = step([&] { return state->values->root().set_frame({float(l.comparison.x), float(l.comparison.y),
             float(state->authored.configuration.width - state->authored.configuration.padding * 2), 28}); }); if (!result || !*result) return result;
@@ -287,14 +292,18 @@ public:
             auto values = NativeColorPickerValues::create(builder, *root, name("values"), value_options(*state), on_edit);
             if (!values) return std::unexpected(values.error()); state->values = *values;
             auto divider = builder.absolute_stack(*root, name("divider"), {1, 1}); if (!divider) return std::unexpected(divider.error()); state->divider = *divider;
-            if (auto paint = divider->set_paint_handler([](const ii::gui::WidgetPaintState& input) -> ii::core::Result<std::shared_ptr<const ii::gui::WidgetDrawing>> {
-                    auto result = std::make_shared<ii::gui::WidgetDrawing>(); const ii::gui::Color color{1, 1, 1, .11f};
+            if (auto paint = divider->set_paint_handler([weak](const ii::gui::WidgetPaintState& input) -> ii::core::Result<std::shared_ptr<const ii::gui::WidgetDrawing>> {
+                    auto state=weak.lock();if(!state)return ii::core::fail(ii::core::ErrorCode::closed,"Color picker retired");
+                    auto result = std::make_shared<ii::gui::WidgetDrawing>(); ii::gui::Color color{1, 1, 1, .11f};
+                    if constexpr (requires { state->authored.divider_color; })
+                        if(state->authored.divider_color)color=linear(*state->authored.divider_color);
                     result->panels.push_back({{0, 0, float(input.size.width), float(input.size.height)}, color, color, 0});
                     return std::shared_ptr<const ii::gui::WidgetDrawing>(std::move(result));
                 }); !paint) return std::unexpected(paint.error());
             auto label = [&](std::string_view suffix, std::string text) {
                 return builder.label(*root, name(suffix), {.text = std::move(text), .font_size = 11, .selectable = false,
-                    .role = ii::gui::TextRole::caption, .line_height = 11, .font_weight = 400});
+                    .role = ii::gui::TextRole::caption, .line_height = 11, .font_weight = 400,
+                    .theme_typography_role = ii::gui::TextRole::caption, .theme_color_role = ii::gui::TextRole::description});
             };
             auto recent_label = label("recent-label", "Recent"); if (!recent_label) return std::unexpected(recent_label.error()); state->recent_label = *recent_label;
             auto color_space = label("color-space", "sRGB"); if (!color_space) return std::unexpected(color_space.error()); state->color_space = *color_space;

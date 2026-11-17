@@ -46,6 +46,10 @@ public:
         auto paint = object(jni_, env_->NewObject(text_paint_, jni_.method(text_paint_, "<init>", "()V")),
                             "Cannot create Android text paint");
         env_->CallVoidMethod(paint, set_size_, run.font_size); jni_.check();
+        if(run.letter_spacing!=0){
+            if(api_<21)throw std::runtime_error("Android letter spacing requires API 21");
+            env_->CallVoidMethod(paint,jni_.method(paint_,"setLetterSpacing","(F)V"),run.letter_spacing/run.font_size);jni_.check();
+        }
         env_->CallVoidMethod(paint, set_color_, argb(run.color)); jni_.check();
         env_->CallVoidMethod(paint, set_antialias_, JNI_TRUE); jni_.check();
         env_->CallVoidMethod(paint, set_subpixel_, JNI_TRUE); jni_.check();

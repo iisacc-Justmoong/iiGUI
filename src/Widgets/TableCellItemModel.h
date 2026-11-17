@@ -24,7 +24,8 @@ public:
         return Policy::valid_text(c.text)&&Policy::valid_text(c.accessibility_name)&&!c.value_type.empty()&&
             c.value_type.size()<=128&&Policy::valid_text(c.value_type)&&range(c.width,1,8192)&&range(c.height,1,8192)&&
             range(c.padding,0,8192)&&range(c.font_size,1,256)&&range(c.current_border_width,0,8192)&&
-            color(p.background)&&color(p.divider)&&color(p.header_text)&&color(p.cell_text)&&color(p.selection)&&color(p.current);
+            color(p.background)&&color(p.divider)&&color(p.header_text)&&color(p.cell_text)&&color(p.selection)&&color(p.current)&&
+            Policy::valid_typography(c.typography);
     }
     bool set_configuration(TableCellItemConfiguration value){if(!validate(value))return false;configuration_=std::move(value);return true;}
     [[nodiscard]] const TableCellItemConfiguration& configuration()const noexcept{return configuration_;}
