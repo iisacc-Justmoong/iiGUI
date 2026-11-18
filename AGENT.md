@@ -11,6 +11,14 @@ iiGUI는 C++ 그래픽 인터페이스 프레임워크이며 시각 컴포넌트
 
 빌드 산출물은 저장소의 build/에 둔다. 테스트용 임시 데이터와 외부 소스는 resources/ 아래에서 관리하며 테스트 임시 데이터는 검증 후 지운다. 소스 변경 시 관련 docs/와 tests/를 함께 갱신한다. README.md는 영어, docs/ 문서는 한국어로 작성한다. 기존 작업과 사용자 파일을 보존한다. 플랫폼별 소스 이식과 실제 실행 검증을 구분한다.
 
+## 라이선스
+
+이 저장소의 iiGUI 모듈은 Apache License 2.0이다. 자사 소스, 문서, 도구, 테스트가 포함된다. 저작권 표시는 `Copyright (c) 2026 iisacc`이고 고지는 루트 `NOTICE`에 있다. 사람용 한국어 설명은 [docs/License.md](docs/License.md)이다.
+
+iisacc 제품은 GNU Affero General Public License 3.0 이상(AGPL-3.0-or-later)이다.
+
+제3자와 벤더 코드는 원래 라이선스를 유지한다. 문서 재편 중에도 그 라이선스와 외부 원본은 보존한다.
+
 <!-- workspace-docs:agent:start -->
 ## 문서 구조와 에이전트 탐색
 

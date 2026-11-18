@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.31)
 project(iiGUI VERSION 0.6.0 LANGUAGES C CXX)
+set(iiGUI_SPDX_LICENSE "Apache-2.0")
+set(iiGUIPainter_SPDX_LICENSE "Apache-2.0")
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(EMSCRIPTEN AND NOT DEFINED CMAKE_CXX_SCAN_FOR_MODULES)
     # The SDK uses headers and must build with Emscripten without clang-scan-deps.
@@ -98,6 +100,10 @@ endif()
 include(CMakePackageConfigHelpers)
 include(GenerateExportHeader)
 include(CTest)
+if(BUILD_TESTING)
+    add_test(NAME iiGUI.license_notice COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/license_notice.cmake")
+endif()
 include(cmake/SourceHeaders.cmake)
 include(cmake/iiGUIFonts.cmake)
 set(_iigui_user_home "$ENV{HOME}")
@@ -581,7 +587,7 @@ write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfigVersion
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/iiGUIConfigVersion.cmake" DESTINATION "${_package}")
 install(FILES cmake/iiGUILvui.cmake cmake/iiGUIRunLvui.cmake DESTINATION "${_package}")
-install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI)
+install(FILES README.md LICENSE NOTICE DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI)
 install(DIRECTORY docs/ DESTINATION ${CMAKE_INSTALL_DATADIR}/iiGUI/docs)
 install(FILES src/third_party/utf8proc/LICENSE.md src/third_party/utf8proc/provenance.json
     DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/iiGUI/utf8proc)
