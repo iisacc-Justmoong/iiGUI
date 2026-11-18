@@ -15,6 +15,39 @@ void good(ii::core::Result<void> value) {
 void require(bool value, const char* message) {
     if (!value) throw std::runtime_error(message);
 }
+void reveal_embedded_focus() {
+    using namespace ii::gui;
+    auto tree = std::make_shared<detail::WidgetState>([](ii::runtime::Task task) { task(); });
+    auto host = take(tree->content_host({}, "host", {200, 160}));
+    Widget scroll, first, last;
+    int presses = 0;
+    good(host.set_content([&](WidgetBuilder& builder) -> ii::core::Result<void> {
+        scroll = take(builder.scroll_view({}, "scroll", {.width=180, .height=100}));
+        auto page = take(builder.content_host(scroll, "page", {180, 300}));
+        return page.set_content([&](WidgetBuilder& inner) -> ii::core::Result<void> {
+            auto body = take(inner.absolute_stack({}, "body", {180, 300}));
+            first = take(inner.button(body, "first", {.text="First"}, [&] { ++presses; }));
+            last = take(inner.button(body, "last", {.text="Last"}, [] {}));
+            good(first.set_frame({10, 10, 75, 25}));
+            good(last.set_frame({10, 260, 75, 25}));
+            return {};
+        });
+    }));
+    (void)take(tree->drawing_snapshot({200, 160}));
+    good(first.focus());
+    require(take(scroll.snapshot()).scroll_offset == 0, "Focusing a visible embedded child scrolled to the container edge");
+    good(last.focus());
+    require(take(last.snapshot()).visible && take(scroll.snapshot()).scroll_offset > 0,
+            "Focus did not reveal the offscreen embedded child");
+    good(first.focus());
+    good(scroll.set_scroll_offset(0));
+    const auto bounds = take(first.snapshot()).bounds;
+    good(tree->input({.kind=WidgetInputKind::pointer_down, .x=bounds.x+15, .y=bounds.y+10}));
+    good(tree->input({.kind=WidgetInputKind::pointer_up, .x=bounds.x+15, .y=bounds.y+10}));
+    require(presses == 1 && take(scroll.snapshot()).scroll_offset == 0,
+            "Pointer focus moved an already-visible embedded control");
+    tree->close();
+}
 void hover_after_scroll() {
     using namespace ii::gui;
     auto tree=std::make_shared<detail::WidgetState>([](ii::runtime::Task task){task();});
@@ -131,4 +164,5 @@ int main() {
     good(host.clear_content());
     tree->close();
     hover_after_scroll();
+    reveal_embedded_focus();
 }

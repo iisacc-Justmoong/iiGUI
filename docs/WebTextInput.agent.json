@@ -1,0 +1,136 @@
+{
+  "format": "iisacc.agent-document",
+  "schema_version": 1,
+  "document_id": "urn:iisacc:document:40e29c408040dc76b457ead4ce30a07bba9184e7193f503aa143eed93bc5a005",
+  "project": {
+    "id": "urn:iisacc:project:SDK%2FiiGUI",
+    "name": "iiGUI",
+    "root": "SDK/iiGUI",
+    "kind": "sdk"
+  },
+  "source": {
+    "path": "docs/WebTextInput.md",
+    "sha256": "cc2ad57c19bfb1c55740f2bd2dcea2faf9a76f724a3338135339354f92e34c37",
+    "bytes": 1819,
+    "line_count": 21,
+    "encoding": "utf-8",
+    "language": "ko"
+  },
+  "document": {
+    "title": "웹 텍스트 입력과 조합",
+    "role": "guide",
+    "authority": "markdown_source"
+  },
+  "blocks": [
+    {
+      "id": "b000001",
+      "kind": "heading",
+      "start_line": 1,
+      "end_line": 1,
+      "raw": "# 웹 텍스트 입력과 조합\n",
+      "level": 1,
+      "title": "웹 텍스트 입력과 조합"
+    },
+    {
+      "id": "b000002",
+      "kind": "blank",
+      "start_line": 2,
+      "end_line": 2,
+      "raw": "\n"
+    },
+    {
+      "id": "b000003",
+      "kind": "paragraph",
+      "start_line": 3,
+      "end_line": 5,
+      "raw": "웹 호스트는 포커스된 iiGUI 편집 위젯을 브라우저 텍스트 서비스와 연결한다.\n표시·배치·선택과 실제 편집 상태는 iiGUI가 소유하고 GPU 캔버스에 그린다.\n브라우저 입력 요소는 키보드·IME·클립보드를 연결하는 투명한 입력 통로다.\n"
+    },
+    {
+      "id": "b000004",
+      "kind": "blank",
+      "start_line": 6,
+      "end_line": 6,
+      "raw": "\n"
+    },
+    {
+      "id": "b000005",
+      "kind": "paragraph",
+      "start_line": 7,
+      "end_line": 10,
+      "raw": "문자 삽입·삭제·붙여넣기와 선택 범위는 UTF-16 범위로 변환하고 기존 텍스트 서비스에\n전달한다. IME 조합은 후보 변경·확정·취소를 구분한다. 창 또는 편집기가 바뀌면 이전\n세대의 비동기 입력은 폐기한다. 편집 데이터나 선택이 외부에서 바뀌어 브라우저의 기준\n값과 다르면 입력을 적용하지 않고 현재 상태를 다시 게시한다. Tab과 Shift-Tab은 중첩된 콘텐츠 사이에서도 포커스를 이동한다.\n"
+    },
+    {
+      "id": "b000006",
+      "kind": "blank",
+      "start_line": 11,
+      "end_line": 11,
+      "raw": "\n"
+    },
+    {
+      "id": "b000007",
+      "kind": "paragraph",
+      "start_line": 12,
+      "end_line": 17,
+      "raw": "읽기 전용은 편집하지 않으며 비밀번호 입력은 브라우저의 password 입력 통로를 사용한다.\n다중 행 비밀번호와 CR 문자는 지원하지 않으며 단일 행에서는 줄바꿈도 지원하지 않는다.\n포커스를 잃거나 위젯이 제거되면 통로를 비운다. 문서 전체를\n복사할 수 없는 사용자 정의 공급자에는 부분 문서 편집을 잘못 적용하지 않는다. 현재\n웹 통로는 UTF-8 64 KiB 이하의 전체 텍스트와 안정적인 텍스트 리비전이 있는 편집기를\n대상으로 한다. 이 한계는 가상 대용량 편집기를 지원한다는 뜻이 아니다.\n"
+    },
+    {
+      "id": "b000008",
+      "kind": "blank",
+      "start_line": 18,
+      "end_line": 18,
+      "raw": "\n"
+    },
+    {
+      "id": "b000009",
+      "kind": "paragraph",
+      "start_line": 19,
+      "end_line": 21,
+      "raw": "포커스·입력·선택·크기 등 상태 변경 이벤트가 있을 때만 동기화한다. 유휴 상태의 폴링이나\n별도 프레임 타이머를 만들지 않는다. 표준 브라우저의 입력 이벤트 순서는\n[W3C Input Events Level 2](https://w3c.github.io/input-events/)를 따른다.\n"
+    }
+  ],
+  "outline": [
+    {
+      "block_id": "b000001",
+      "parent_id": null,
+      "level": 1,
+      "title": "웹 텍스트 입력과 조합",
+      "anchor": "웹-텍스트-입력과-조합",
+      "start_line": 1
+    }
+  ],
+  "indexes": {
+    "directive_candidates": [
+      {
+        "block_id": "b000007",
+        "line": 15,
+        "text": "복사할 수 없는 사용자 정의 공급자에는 부분 문서 편집을 잘못 적용하지 않는다. 현재",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      },
+      {
+        "block_id": "b000009",
+        "line": 20,
+        "text": "별도 프레임 타이머를 만들지 않는다. 표준 브라우저의 입력 이벤트 순서는",
+        "basis": "lexical_match",
+        "context": "paragraph"
+      }
+    ],
+    "commands": [],
+    "links": [
+      {
+        "block_id": "b000009",
+        "label": "W3C Input Events Level 2",
+        "target": "https://w3c.github.io/input-events/",
+        "kind": "external",
+        "line": 21
+      }
+    ],
+    "tables": []
+  },
+  "provenance": {
+    "generator": "codex-lossless-projection",
+    "version": "1.0.0",
+    "profile": "lossless-blocks-v1",
+    "derived": true
+  }
+}

@@ -256,7 +256,19 @@ struct WidgetState::Impl final {
     static void configure_popup(Popup& p,PopoverOptions o){p.popover=o;p.layout_failure.reset();p.options.left_padding=p.options.right_padding=o.padding;p.options.top_padding=p.options.bottom_padding=o.padding;p.options.edge_margin=o.margins;p.options.corner_radius=o.corner_radius;p.options.opacity=o.surface_opacity;p.options.background=o.surface_color.value_or(WidgetColor{20./255,20./255,20./255,1});p.options.dismiss_on_outside_press=o.dismiss_on_outside_press;p.options.dismiss_on_context_request=o.dismiss_on_context_request.value_or(o.dismiss_on_outside_press);}
     const std::thread::id owner=std::this_thread::get_id();
     bool active=true,building=true,layout_dirty=true,published=false,publishing=false;
-    struct Domain final {std::size_t nodes=0,allowance=0;std::weak_ptr<WidgetState> staged;std::uint64_t pointer_epoch=0,press_epoch=0;bool providing_popup_layout=false,painting=false;};
+    struct PopupRoute final {
+        std::weak_ptr<WidgetState> owner;
+        const Impl* identity;
+        std::size_t index;
+        std::uint64_t epoch;
+    };
+    struct Domain final {
+        std::size_t nodes=0,allowance=0;
+        std::weak_ptr<WidgetState> staged;
+        std::uint64_t pointer_epoch=0,press_epoch=0;
+        bool providing_popup_layout=false,painting=false;
+        std::vector<PopupRoute> popup_routes;
+    };
     std::shared_ptr<Domain> domain=std::make_shared<Domain>();
     bool content_transition=false;
     std::weak_ptr<WidgetState> embedding_owner;
@@ -513,8 +525,12 @@ struct WidgetState::Impl final {
         auto changed=change_focus(next);auto parent=embedding_owner.lock();
         if(!parent||next==absent)return changed;
         const auto slot=embedding_popup;
-        return [parent=std::move(parent),slot,changed=std::move(changed)]{
-            auto result=parent->focus(parent->impl_->content_focus(slot));
+        const auto target=visual_bounds(next);
+        return [parent=std::move(parent),slot,target,changed=std::move(changed)]{
+            if(auto live=parent->ready();!live)return;
+            if(slot>=parent->impl_->nodes.size())return;
+            auto result=parent->impl_->nodes[slot].content?parent->focus_within(slot,target):
+                parent->focus(parent->impl_->content_focus(slot));
             if(!result)throw std::runtime_error(result.error().message);
             if(changed)changed();
         };
@@ -624,10 +640,17 @@ struct WidgetState::Impl final {
         const auto& n=nodes[i];if(!n.menu_item) return false;
         return n.menu_item->state==MenuItemState::selected || (n.menu_item->state==MenuItemState::normal && n.parent!=absent && nodes[n.parent].popup && nodes[n.parent].popup->options.selected_index==n.menu_index);
     }
-    void reveal(std::size_t i) {
+    Rect focus_bounds(std::size_t i,std::optional<Rect> target) const {
+        const auto bounds=nodes[i].bounds;
+        if(!target)return bounds;
+        target->x+=bounds.x;
+        target->y+=bounds.y;
+        return *target;
+    }
+    void reveal(std::size_t i,std::optional<Rect> target={}) {
         const auto owner=owning_popup(i);
         if(i!=owner)for(auto parent=nodes[i].parent;parent!=absent&&parent!=owner;parent=nodes[parent].parent)if(nodes[parent].scroll){
-            auto& view=*nodes[parent].scroll;const auto r=nodes[i].bounds,v=nodes[parent].bounds;auto offset=view.offset,x=view.horizontal_offset;
+            auto& view=*nodes[parent].scroll;const auto r=focus_bounds(i,target),v=nodes[parent].bounds;auto offset=view.offset,x=view.horizontal_offset;
             if(!view.options.virtual_content_height){if(r.y<v.y)offset-=v.y-r.y;else if(r.y+r.height>v.y+v.height)offset+=r.y+r.height-v.y-v.height;}
             if(!view.options.virtual_content_width){if(r.x<v.x)x-=v.x-r.x;else if(r.x+r.width>v.x+v.width)x+=r.x+r.width-v.x-v.width;}
             offset=std::clamp(offset,0.,std::max(0.,view.content_height-v.height));
@@ -635,7 +658,7 @@ struct WidgetState::Impl final {
             if(offset!=view.offset||x!=view.horizontal_offset){view.offset=offset;view.horizontal_offset=x;invalidate(true);layout(viewport);}
         }
         const auto p=owning_popup(i);if(p==absent || p==i) return;
-        auto& popup=*nodes[p].popup;const auto row=nodes[i].bounds;
+        auto& popup=*nodes[p].popup;const auto row=focus_bounds(i,target);
         if(popup.popover && !popup.popover->clip_content)return;
         auto offset=popup.scroll;
         if(row.y<popup.content.y) offset-=popup.content.y-row.y;
@@ -687,6 +710,9 @@ struct WidgetState::Impl final {
             }
         }
         std::erase_if(popups,[&](auto p){return descendant(p,root);});
+        std::erase_if(domain->popup_routes, [&](const PopupRoute &route) {
+            return route.identity == this && descendant(route.index, root);
+        });
         std::erase_if(visual_popups,[&](auto i){return !nodes[i].popup->opened&&!nodes[i].popup->motion.active;});motion_activity();
         const bool preserve=nodes[root].popup->popover&&nodes[root].popup->popover->preserve_input;
         if(!preserve||(hovered!=absent&&descendant(hovered,root)))hovered=absent;
@@ -1069,6 +1095,12 @@ struct WidgetState::Impl final {
         const auto& n=nodes[i];const auto point=logical_point(i,x,y);auto r=n.bounds;
         if(n.popup->popover&&n.popup->popover->input_bounds){r=*n.popup->popover->input_bounds;r.x+=n.bounds.x;r.y+=n.bounds.y;r=intersect(r,n.bounds);}
         return contains(r,point.width,point.height);
+    }
+    bool popup_anchor_contains(const Popup &popup, double x, double y) const {
+        const auto anchor = popup.anchor_widget;
+        if (anchor == absent || !logical_visible(anchor)) return false;
+        const auto point = logical_point(anchor,x,y);
+        return contains(nodes[anchor].bounds,point.width,point.height);
     }
     bool popup_hovered(std::size_t i)const {
         if(!pointer_position||!nodes[i].popup||!nodes[i].popup->opened||blocked(i))return false;
@@ -2041,6 +2073,7 @@ void WidgetState::close() noexcept {
     [[maybe_unused]] const auto retiring_owner = weak_from_this().lock();
     impl_->cancel_touch_context();impl_->horizontal_gesture.reset();++impl_->horizontal_revision;
     auto input_cancel=impl_->cancel_input_capture();auto invoke=impl_->invoke;impl_->active=false;
+    std::erase_if(impl_->domain->popup_routes, [&](const auto &route) { return route.identity == impl_.get(); });
     impl_->font_subscription.reset();
     impl_->publication_hooks.clear();
     auto retirement = std::move(impl_->retirement_hooks);
@@ -3124,12 +3157,24 @@ core::Result<void> WidgetState::reveal_local_rect(std::size_t i,Rect local) {
     return {};
 }
 core::Result<void> WidgetState::focus(std::size_t i) {
+    return focus_within(i,std::nullopt);
+}
+core::Result<void> WidgetState::focus_within(std::size_t i,std::optional<Rect> target) {
     if (auto r=ready();!r) return r;
     if (i>=impl_->nodes.size() || (!interactive(impl_->nodes[i].kind) && !stack_kind(impl_->nodes[i].kind) && !impl_->nodes[i].content && impl_->nodes[i].kind!=WidgetKind::popover) || !impl_->nodes[i].enabled || !impl_->logical_visible(i) || impl_->blocked(i)) return core::fail(core::ErrorCode::invalid_argument,"Widget cannot receive focus");
-    if(auto parent=impl_->embedding_owner.lock()){auto r=parent->focus(parent->impl_->content_focus(impl_->embedding_popup));if(!r)return r;if(auto live=ready();!live)return live;}
+    impl_->reveal(i,target);
+    if(auto parent=impl_->embedding_owner.lock()){
+        // An embedded layout can exceed the outer viewport. Reveal the focused
+        // descendant in the embedding container's local coordinates.
+        const auto slot=impl_->embedding_popup;
+        auto r=parent->impl_->nodes[slot].content?parent->focus_within(slot,impl_->focus_bounds(i,target)):
+            parent->focus(parent->impl_->content_focus(slot));
+        if(!r)return r;
+        if(auto live=ready();!live)return live;
+    }
     auto canceled=impl_->pressed!=absent && impl_->pressed!=i?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
     if(impl_->pressed!=i) impl_->pressed=absent;
-    const bool changed=impl_->focused!=i;auto blur=impl_->change_focus(i);impl_->reveal(i);impl_->invalidate();
+    const bool changed=impl_->focused!=i;auto blur=impl_->change_focus(i);impl_->invalidate();
     if(changed){impl_->accessibility_changed();if(!impl_->active)return {};}
     auto invoke=impl_->invoke;if(canceled) invoke(std::move(canceled));if(blur)invoke(std::move(blur));
     return flush_interactions();
@@ -3293,6 +3338,60 @@ bool WidgetState::touch_scrollable_at(double x,double y){
     }
     return false;
 }
+std::shared_ptr<WidgetState> WidgetState::popup_owner_at(double x, double y) const {
+    const auto &routes = impl_->domain->popup_routes;
+    if (routes.empty()) return {};
+    const auto offset = global_offset();
+    for (auto route = routes.rbegin(); route != routes.rend(); ++route) {
+        auto owner = route->owner.lock();
+        if (!owner || !owner->impl_->active || route->index >= owner->impl_->nodes.size() ||
+            !owner->impl_->logical_visible(route->index) ||
+            !owner->impl_->effective_enabled(route->index)) continue;
+        const auto origin = owner->global_offset();
+        if (owner->impl_->popup_contains(route->index, x + offset.width - origin.width, y + offset.height - origin.height))
+            return owner;
+    }
+    return {};
+}
+
+std::size_t WidgetState::popup_host_at(double x, double y) const {
+    auto owner = popup_owner_at(x,y);
+    while (owner && owner.get() != this) {
+        auto parent = owner->impl_->embedding_owner.lock();
+        if (parent.get() == this) {
+            const auto slot = owner->impl_->embedding_popup;
+            if (slot < impl_->nodes.size() && impl_->nodes[slot].content) return slot;
+            break;
+        }
+        owner = std::move(parent);
+    }
+    return absent;
+}
+
+core::Result<void> WidgetState::dismiss_embedded_popups(const WidgetInput &event) {
+    if (impl_->embedding_popup != absent || impl_->domain->popup_routes.empty()) return {};
+    const bool context = event.kind == WidgetInputKind::context_request;
+    if ((!context && event.kind != WidgetInputKind::pointer_down) || popup_owner_at(event.x,event.y)) return {};
+
+    // A nested non-modal popup can be missed entirely when input goes to a
+    // sibling branch. Retain weak identities and epochs across close callbacks.
+    const auto routes = impl_->domain->popup_routes;
+    for (auto route = routes.rbegin(); route != routes.rend(); ++route) {
+        auto owner = route->owner.lock();
+        if (!owner || !owner->impl_->active || route->index >= owner->impl_->nodes.size()) continue;
+        const auto parent = owner->impl_->embedding_owner.lock();
+        if (!parent || parent.get() == this) continue;
+        const auto &popup = *owner->impl_->nodes[route->index].popup;
+        if (!popup.opened || popup.epoch != route->epoch || !popup.popover || popup.popover->modal ||
+            !owner->impl_->logical_visible(route->index) ||
+            !(context ? popup.options.dismiss_on_context_request : popup.options.dismiss_on_outside_press)) continue;
+        if (popup.anchor_widget != absent &&
+            contains(owner->visual_bounds_in_window(popup.anchor_widget),event.x,event.y)) continue;
+        if (auto result = owner->close_popup(route->index,true); !result || !impl_->active) return result;
+    }
+    return {};
+}
+
 core::Result<void> WidgetState::route_host_content(WidgetInput& event,bool& handled,bool& handler_checked,bool& scroll_normalized){
     handled=false;
     const bool keyboard=event.kind==WidgetInputKind::key_down||event.kind==WidgetInputKind::key_up||event.kind==WidgetInputKind::key_cancel||event.kind==WidgetInputKind::text_selection||event.kind==WidgetInputKind::text_composition_region||event.kind==WidgetInputKind::text_surrounding_delete||event.kind==WidgetInputKind::text||event.kind==WidgetInputKind::composition||event.kind==WidgetInputKind::commit_composition;
@@ -3306,14 +3405,20 @@ core::Result<void> WidgetState::route_host_content(WidgetInput& event,bool& hand
         const auto i=*it;const auto& host=impl_->nodes[i];
         if(auto child=host.content->view;child&&host.enabled&&impl_->visible(i)&&!impl_->blocked(i)&&impl_->owning_popup(i)==scope&&child->impl_->captures_input()){captured_host=i;break;}
     }
+    const bool pointed = event.kind == WidgetInputKind::pointer_down || event.kind == WidgetInputKind::pointer_up ||
+        event.kind == WidgetInputKind::pointer_move || event.kind == WidgetInputKind::scroll ||
+        event.kind == WidgetInputKind::context_request || event.kind == WidgetInputKind::drop;
+    auto popup_host = pointed && captured_host == absent && modal == absent ? popup_host_at(event.x,event.y) : absent;
+    if (popup_host != absent && impl_->owning_popup(popup_host) != scope) popup_host = absent;
     for(auto it=hosts.rbegin();it!=hosts.rend();++it){
         const auto i=*it;if(captured_host!=absent&&i!=captured_host)continue;
+        if(popup_host!=absent&&i!=popup_host)continue;
         const auto& host=impl_->nodes[i];auto child=host.content->view;
         if(!child||!host.enabled||!impl_->visible(i)||impl_->blocked(i)||impl_->owning_popup(i)!=scope)continue;
         const auto r=host.bounds;const auto point=impl_->logical_point(i,event.x,event.y);
         const bool inside=contains(r,point.width,point.height)&&(!impl_->clip_rect(i)||contains(*impl_->clip_rect(i),point.width,point.height));
         const bool capture=child->impl_->captures_input();
-        const auto raw_x=event.x-r.x,raw_y=event.y-r.y;bool in_popup=false;
+        const auto raw_x=event.x-r.x,raw_y=event.y-r.y;bool in_popup=i==popup_host;
         for(auto popup:child->impl_->visual_popups)if(contains(child->impl_->visual_bounds(popup),raw_x,raw_y)){in_popup=true;break;}
         const bool child_modal=child->impl_->modal_content();
         if(keyboard){
@@ -3442,12 +3547,16 @@ core::Result<void> WidgetState::open_at(std::size_t i,double x,double y) {
     auto domain=shared_from_this();while(auto parent=domain->impl_->embedding_owner.lock())domain=parent;
     if(!already && domain->impl_->active_popups()>=8) return core::fail(core::ErrorCode::out_of_range,"At most eight widget popups may be open in a domain");
     if(!already&&std::ranges::find(impl_->visual_popups,i)==impl_->visual_popups.end()&&domain->impl_->active_visual_popups()>=16)return core::fail(core::ErrorCode::full,"At most sixteen open or exiting popups per domain");
+    auto &routes = impl_->domain->popup_routes;
+    routes.reserve(8);
     if(!already){if(auto r=create_popup_content(i);!r)return r;}
     const bool preserve=p.popover&&p.popover->preserve_input;
     auto input_cancel=preserve?runtime::Task{}:impl_->cancel_input_capture();
     auto canceled=preserve||impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
     if(!already) {p.return_focus=impl_->focused;p.scroll=0;}
     p.opened=true;if(!already)impl_->begin_motion(p);p.anchor_x=x;p.anchor_y=y;p.anchor_widget=absent;const auto epoch=++p.epoch;
+    std::erase_if(routes,[&](const auto &route) { return route.identity==impl_.get() && route.index==i; });
+    routes.push_back({weak_from_this(),impl_.get(),i,epoch});
     std::erase(impl_->popups,i);impl_->popups.push_back(i);std::erase(impl_->visual_popups,i);impl_->visual_popups.push_back(i);if(!preserve)impl_->pressed=impl_->hovered=absent;impl_->motion_activity();
     impl_->invalidate(true);impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
     auto selected=p.popover?(p.popover->focus_on_open?impl_->next_content(i,absent,1):impl_->focused):p.options.selected_index>=0?p.entries[std::size_t(p.options.selected_index)]:absent;
@@ -3869,12 +3978,15 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
     }
     impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
     if(auto r=flush_viewports();!r)return r;
+    if(auto r=dismiss_embedded_popups(event);!r||!impl_->active)return r;
+    if(impl_->layout_dirty)impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
     if(event.kind==WidgetInputKind::pointer_up&&impl_->consume_release){impl_->consume_release=false;return {};}
     if(!impl_->popups.empty()){
         const auto top=impl_->popups.back();const auto& popup=*impl_->nodes[top].popup;
         if(popup.popover&&popup.popover->preserve_input){
             if(event.kind==WidgetInputKind::key_down&&event.key==WidgetKey::escape&&popup.popover->dismiss_on_escape)return close_popup(top,true);
-            if(event.kind==WidgetInputKind::pointer_down&&!impl_->popup_contains(top,event.x,event.y)&&popup.popover->dismiss_on_outside_press){auto r=close_popup(top,true);if(!r||!impl_->active)return r;}
+            if(event.kind==WidgetInputKind::pointer_down&&!impl_->popup_contains(top,event.x,event.y)&&
+               !impl_->popup_anchor_contains(popup,event.x,event.y)&&popup.popover->dismiss_on_outside_press){auto r=close_popup(top,true);if(!r||!impl_->active)return r;}
         }
     }
     if(!accessibility_text&&!synthetic_drag_cancel){auto drag=route_horizontal_drag(event);if(!drag)return std::unexpected(drag.error());if(*drag)return {};}
@@ -4156,8 +4268,13 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
             if(impl_->popup_contains(i,event.x,event.y))return true;
             return std::ranges::any_of(impl_->popups,[&](auto child){return child!=i&&impl_->descendant(child,i)&&impl_->popup_contains(child,event.x,event.y);});
         };
-        for(auto i:impl_->popups) if(!inside(i) &&
-            (context?impl_->nodes[i].popup->options.dismiss_on_context_request:impl_->nodes[i].popup->options.dismiss_on_outside_press)) targets.emplace_back(i,impl_->nodes[i].popup->epoch);
+        for (auto i : impl_->popups) {
+            const auto &popup = *impl_->nodes[i].popup;
+            const bool on_anchor = !context && popup.popover && !popup.popover->modal &&
+                impl_->popup_anchor_contains(popup,event.x,event.y);
+            if (!inside(i) && !on_anchor && (context ? popup.options.dismiss_on_context_request : popup.options.dismiss_on_outside_press))
+                targets.emplace_back(i,popup.epoch);
+        }
         for(auto it=targets.rbegin();it!=targets.rend();++it) {
             if(!impl_->active) return {};
             if(impl_->nodes[it->first].popup->opened && impl_->nodes[it->first].popup->epoch==it->second) {auto r=close_popup(it->first,true);if(!r) return r;}

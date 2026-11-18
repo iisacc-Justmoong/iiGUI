@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'Widgets', 'WebTextInputDom.h'), 'utf8');
+if (/\b(?:setInterval|setTimeout|requestAnimationFrame)\s*\(/.test(source)) throw new Error('Text input introduced polling or a frame timer');
 function bridge(name, args) {
   const match = source.match(new RegExp('/\\* IIGUI_' + name + '_BEGIN \\*/([\\s\\S]*?)/\\* IIGUI_' + name + '_END \\*/'));
   if (!match) throw new Error('Missing ' + name + ' bridge');
@@ -48,26 +49,68 @@ publish('account','a',1,events.at(-1).sequence,0,1);
 el.value='a😀';el.setSelectionRange(3,3);el.dispatch('input',{inputType:'insertText',data:'😀',isComposing:false});
 assert(events.at(-1).text==='😀' && events.at(-1).start===1 && events.at(-1).selection===3,'UTF-16 emoji input was split');
 publish('account','a😀',1,events.at(-1).sequence,0,3);
+const sameLowSurrogate=String.fromCodePoint(0x1fa00);
+el.value='a'+sameLowSurrogate;el.setSelectionRange(3,3);el.dispatch('input',{inputType:'insertReplacementText',isComposing:false});
+assert(events.at(-1).text===sameLowSurrogate && events.at(-1).start===1 && events.at(-1).removed===2,'shared low surrogate was split');
+publish('account','a'+sameLowSurrogate,1,events.at(-1).sequence,0,3);
+el.value='a😀';el.setSelectionRange(3,3);el.dispatch('input',{inputType:'insertReplacementText',isComposing:false});
+publish('account','a😀',1,events.at(-1).sequence,0,3);
+el.value='a😁';el.setSelectionRange(3,3);el.dispatch('input',{inputType:'insertReplacementText',data:'😁',isComposing:false});
+assert(events.at(-1).text==='😁' && events.at(-1).start===1 && events.at(-1).removed===2,'surrogate replacement was split');
+publish('account','a😁',1,events.at(-1).sequence,0,3);
+el.value='a😀';el.setSelectionRange(3,3);el.dispatch('input',{inputType:'insertReplacementText',data:'😀',isComposing:false});
+publish('account','a😀',1,events.at(-1).sequence,0,3);
 el.dispatch('compositionstart');el.dispatch('compositionupdate',{data:'ㅎ'});
 assert(events.at(-1).action===1 && events.at(-1).before==='a😀' && (events.at(-1).flags&2),'composition did not start');
 el.value='a😀ㅎ';el.setSelectionRange(4,4);el.dispatch('input',{inputType:'insertCompositionText',data:'ㅎ',isComposing:true});
 el.dispatch('compositionupdate',{data:'하'});
 assert(events.at(-1).action===1 && events.at(-1).text==='하' && events.at(-1).before==='a😀ㅎ','composition update lost its base');
 el.value='a😀하';el.setSelectionRange(4,4);el.dispatch('input',{inputType:'insertCompositionText',data:'하',isComposing:true});
+el.setSelectionRange(3,4);document.dispatch('selectionchange');
+assert(events.at(-1).action===4 && events.at(-1).selection===3 && events.at(-1).selectionLength===1,
+       'selection inside an IME candidate was lost');
+el.setSelectionRange(4,4);
 el.dispatch('compositionend',{data:'하'});const committed=events.length;
 assert(events.at(-1).action===2,'composition did not commit');
 el.dispatch('input',{inputType:'insertCompositionText',data:'하',isComposing:false});
 assert(events.length===committed,'composition was inserted twice');
+publish('account','a😀하',1,events.at(-1).sequence,0,4);
+el.dispatch('compositionstart');el.dispatch('compositionupdate',{data:'ㅎ'});
+el.value='a😀하ㅎ';el.setSelectionRange(5,5);el.dispatch('input',{inputType:'insertCompositionText',data:'ㅎ',isComposing:true});
+el.value='a😀하';el.setSelectionRange(4,4);el.dispatch('compositionend',{data:''});
+assert(events.at(-1).action===3 && events.at(-1).before==='a😀하ㅎ','IME cancellation was not forwarded');
+publish('account','a😀하',1,events.at(-1).sequence,0,4);
+// Some browser/input-method combinations deliver an input before the final
+// compositionend without a matching compositionupdate.
+el.dispatch('compositionstart');el.value='a😀하가';el.setSelectionRange(5,5);
+el.dispatch('input',{inputType:'insertCompositionText',data:'가',isComposing:true});
+el.dispatch('compositionend',{data:'가'});
+assert(events.at(-2).action===1 && events.at(-2).before==='a😀하' && events.at(-2).text==='가' &&
+       events.at(-1).action===2 && events.at(-1).before==='a😀하가',
+       'composition end without an update lost its original revision');
+publish('account','a😀하가',1,events.at(-1).sequence,0,5);
+el.value='a😀하';el.setSelectionRange(4,4);el.dispatch('input',{inputType:'deleteContentBackward',isComposing:false});
 publish('account','a😀하',1,events.at(-1).sequence,0,4);
 el.setSelectionRange(1,3,'backward');document.dispatch('selectionchange');
 assert(events.at(-1).action===4 && events.at(-1).selection===1 && events.at(-1).selectionLength===2 && (events.at(-1).flags&4),
        'backward selection was not delivered');
 const tab=el.dispatch('keydown',{key:'Tab',shiftKey:true,isComposing:false});
 assert(tab.defaultPrevented && events.at(-1).action===5 && (events.at(-1).flags&8),'Tab was not forwarded');
+publish('account','a😀하',1,events.at(-1).sequence,0,4);
+el.value='x'.repeat(65537);el.setSelectionRange(65537,65537);el.dispatch('input',{inputType:'insertFromPaste',isComposing:false});
+assert(events.at(-1).action===9,'oversize input did not request recovery');
+publish('account','a😀하',1,events.at(-1).sequence,0,4);
+assert(el.value==='a😀하','oversize input was not restored from iiGUI');
 publish('secret','secret-value',2,0,1,12);
 const secret=Module.iiGUITextInput.element;
 assert(secret.type==='password' && document.activeElement===secret && el.value==='', 'password transition retained prior text');
 const old=events.length;el.value='retired';el.dispatch('input',{inputType:'insertText'});assert(events.length===old,'retired input sent an event');
-remove(0,2,document,Module,decode,length,alloc,copy,free,deliver);
-assert(!Module.iiGUITextInput && secret.value==='', 'retired input retained its value');
+publish('multiline-secret','secret-value',3,0,3,12);
+assert(!Module.iiGUITextInput && secret.value==='', 'multiline password was exposed through a plain text area');
+publish('account','line1\nline2',5,0,0,0);
+assert(!Module.iiGUITextInput,'a single-line editor silently normalized its text');
+canvas.focus();publish('secret','secret-value',4,0,1,12);
+const lastSecret=Module.iiGUITextInput.element;
+remove(0,4,document,Module,decode,length,alloc,copy,free,deliver);
+assert(!Module.iiGUITextInput && lastSecret.value==='', 'retired input retained its value');
 console.log('WEB_TEXT_DOM_OK');

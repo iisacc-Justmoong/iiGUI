@@ -231,7 +231,11 @@ private:
     core::Result<void> create_popup_content(std::size_t);
     core::Result<void> route_content(WidgetInput&,bool& handled,bool& handler_checked,bool& scroll_normalized);
     core::Result<void> route_host_content(WidgetInput&,bool& handled,bool& handler_checked,bool& scroll_normalized);
+    std::shared_ptr<WidgetState> popup_owner_at(double x, double y) const;
+    std::size_t popup_host_at(double x, double y) const;
+    core::Result<void> dismiss_embedded_popups(const WidgetInput&);
     core::Result<void> focus_content(std::size_t,int);
+    core::Result<void> focus_within(std::size_t,std::optional<Rect>);
     void release_collapsed_focus() noexcept;
     bool has_escape_handler() const;
     void layout_ancestry();

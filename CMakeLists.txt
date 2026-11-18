@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.31)
 project(iiGUI VERSION 0.6.0 LANGUAGES C CXX)
+include(./cmake/ModuleImports.cmake)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(EMSCRIPTEN AND NOT DEFINED CMAKE_CXX_SCAN_FOR_MODULES)
     # The SDK uses headers and must build with Emscripten without clang-scan-deps.
@@ -259,6 +260,9 @@ target_include_directories(iiGUI PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 generate_export_header(iiGUI BASE_NAME IIGUI
     EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/include/iiGUI/Export.h")
+if(BUILD_TESTING)
+    target_compile_definitions(iiGUI PUBLIC "$<BUILD_INTERFACE:IIGUI_FOREGROUND_TEST_EXPORTS>")
+endif()
 
 # This adapter lives outside the painter boundary and is linked by an app that
 # chooses the existing native host and its GPU canvas implementation.
@@ -1463,8 +1467,14 @@ if(BUILD_TESTING)
         set_tests_properties(iiGUI.web_canvas_minimum PROPERTIES TIMEOUT 15)
         add_test(NAME iiGUI.web_accessibility_dom COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_accessibility_dom.cjs")
         set_tests_properties(iiGUI.web_accessibility_dom PROPERTIES TIMEOUT 15)
+        add_test(NAME iiGUI.web_text_input_dom COMMAND "${_iigui_hidpi_node}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/web_text_input_dom.cjs")
+        set_tests_properties(iiGUI.web_text_input_dom PROPERTIES TIMEOUT 15)
     endif()
     if(NOT EMSCRIPTEN)
+        add_executable(iiGUIWebTextInputTests tests/web_text_input.cpp)
+        target_link_libraries(iiGUIWebTextInputTests PRIVATE iiGUI::iiGUI)
+        add_test(NAME iiGUI.web_text_input COMMAND iiGUIWebTextInputTests)
+        set_tests_properties(iiGUI.web_text_input PROPERTIES TIMEOUT 15)
         # This exercises the native headless widget tree. A Web host target
         # requires a real browser canvas rather than CTest's Node runner.
         add_executable(iiGUIWebSurfaceSizeTests tests/web_surface_size.cpp)
@@ -2506,7 +2516,7 @@ if(BUILD_TESTING)
     endforeach()
     add_executable(iiGUITextLineTests tests/text_line.cpp)
     target_link_libraries(iiGUITextLineTests PRIVATE iiGUI::iiGUI)
-    foreach(_case empty ascii utf16 graphemes tabs bidi crop alpha color_font_alpha nul limits owner)
+    foreach(_case empty ascii utf16 graphemes hangul tabs bidi crop alpha color_font_alpha nul limits owner)
         add_test(NAME iiGUI.text_line_${_case} COMMAND iiGUITextLineTests ${_case})
     endforeach()
     add_executable(iiGUITextLineWrapTests tests/text_line_wrap.cpp)

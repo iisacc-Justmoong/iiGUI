@@ -469,7 +469,10 @@ arm64에서 독립 설치 소비자와 LVUI 생성·윈도우 악센트 경로�
 
 `iiGUI/NativeListPanelView.h`는 주입된 목록·도구 모음·푸터의 영역과 위젯 수명을 조합한다. 퇴역 시 진행 중인 갱신이 끝난 뒤 자식과 컨트롤러를 반환한다. macOS arm64의 독립 설치 소비자와 LVUI 생성·헤드리스 경로를 검사했다.
 
-`iiGUI/NativeListView.h`는 주입된 목록 스냅샷·행 그리기·편집 필드로 가상 행, 입력, 편집, 드래그와 수명을 관리한다. 퇴역하면 실행 중인 콜백이 끝난 뒤 원천·행·편집 세션을 반환한다. macOS arm64 독립 설치 소비자와 LVUI 생성·편집·드래그·사용자 행을 창 없이 검사했다.
+`iiGUI/NativeListView.h`는 주입된 키 색인·행 그리기·편집 필드로 가상 행, 입력,
+편집, 드래그와 수명을 관리한다. 리비전 갱신은 표시 구간의 행을 키로 유지하고
+시각 입력이나 행 문맥이 달라진 경우에만 그 위젯을 갱신한다. 퇴역하면 실행 중인
+콜백이 끝난 뒤 원천·행·편집 세션을 반환한다.
 
 `iiGUI/NativeCodeEditorView.h`는 주입된 코드 문서·편집 세션으로 가시 줄 셰이핑·선택·텍스트 입력·그리기와 수명을 관리한다. 퇴역 중인 입력이 끝나면 조합을 취소하고 문서와 콜백을 반환한다. macOS arm64 독립 설치 소비자와 LVUI 문서·생성·헤드리스 입력 경로를 검사했다.
 
@@ -483,7 +486,10 @@ arm64에서 독립 설치 소비자와 LVUI 생성·윈도우 악센트 경로�
 
 `iiGUI/NativeListItemCompositeView.h`는 주입된 컨트롤을 조합해 복합 목록의 입력·그리기와 사용자 정의 뷰 문맥을 처리한다. `ListItemDetailActionsLayout.h`, `ListItemDetailControlsLayout.h`, `ListItemTaskLayout.h`, `ListItemPreviewRowLayout.h`, `ListItemFormLayout.h`, `ListItemQuantityLayout.h`는 각각 배치와 수량 상태를 제공한다. 두 생성 화면을 한 번에 포함하는 컴파일 검사도 제공한다.
 
-`iiGUI/ListViewport.h`와 `iiGUI/ListDrag.h`는 주입된 불변 목록 스냅샷을 사용해 가시 범위와 드래그 후보를 계산한다. 누적 색인과 이진 탐색을 유지하며 스크롤 때 전체 항목을 반복하지 않는다.
+`iiGUI/ListViewport.h`와 `iiGUI/ListDrag.h`는 주입된 불변 행과 키 색인을 공유해
+가시 범위와 드래그 후보를 계산한다. 높이가 일정한 목록은 위치를 산술로 계산한다.
+가변 높이는 측정된 행의 누적 높이와 이진 탐색을 사용한다. 스크롤·선택·편집·드래그가
+전체 행 벡터를 다시 생성할 필요가 없다.
 
 `iiGUI/HierarchyViewport.h`와 `iiGUI/HierarchyDrag.h`는 주입된 불변 계층 투영을 가상화하고 리비전을 검사하는 드래그 후보를 계산한다. macOS arm64에서 계층 모델·호스트·생성 경로와 독립 설치 소비자를 창 없이 검사했다.
 

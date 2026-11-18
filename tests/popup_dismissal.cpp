@@ -6,6 +6,49 @@ namespace {
 void require(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 template<class T>T take(ii::core::Result<T> result){if(!result)throw std::runtime_error(result.error().message);return std::move(*result);}
 void good(ii::core::Result<void> result){if(!result)throw std::runtime_error(result.error().message);}
+
+void nested_popup_routes_beyond_its_host() {
+    using namespace ii::gui;
+    auto tree = std::make_shared<detail::WidgetState>([](ii::runtime::Task task) { task(); });
+    int optionPresses = 0, backgroundPresses = 0;
+    Widget anchor, popup, option;
+    good(tree->construct([&](WidgetBuilder &window) -> ii::core::Result<void> {
+        auto root = take(window.absolute_stack({}, "root", {400,300}));
+        auto host = take(window.content_host(root, "composer", {120,60}));
+        good(host.set_frame({40,30,120,60}));
+        good(host.set_content([&](WidgetBuilder &builder) -> ii::core::Result<void> {
+            auto parent = take(builder.absolute_stack({}, "controls", {120,60}));
+            auto slot = take(builder.content_host(parent, "choice", {100,24}));
+            good(slot.set_frame({0,0,100,24}));
+            return slot.set_content([&](WidgetBuilder &inner) -> ii::core::Result<void> {
+                auto content = take(inner.absolute_stack({}, "control", {100,24}));
+                anchor = take(inner.button(content, "anchor", {.text="Options"}, [] {}));
+                good(anchor.set_frame({0,0,100,24}));
+                popup = take(inner.popover(content, "popup", {
+                    .width=115,.height=120,.padding=0,.margins=0,.focus_on_open=false,.preserve_input=true}));
+                auto body = take(inner.absolute_stack(popup, "body", {115,120}));
+                option = take(inner.button(body, "option", {.text="Pick"}, [&] { ++optionPresses; }));
+                return option.set_frame({6,85,100,22});
+            });
+        }));
+        auto background = take(window.button(root, "background", {.text="Content"}, [&] { ++backgroundPresses; }));
+        return background.set_frame({0,91,400,209});
+    }));
+    (void)take(tree->drawing_snapshot({400,300}));
+    good(popup.open_for(anchor, 0, 24));
+    auto click = [&](double x, double y) {
+        good(tree->input({.kind=WidgetInputKind::pointer_down,.x=x,.y=y,.buttons=1}));
+        good(tree->input({.kind=WidgetInputKind::pointer_up,.x=x,.y=y}));
+    };
+    const auto point = take(option.snapshot()).visual_bounds;
+    require(point.y > 91, "Fixture popup option did not overlap the underlying control");
+    click(point.x + point.width/2, point.y + point.height/2);
+    require(optionPresses == 1 && backgroundPresses == 0, "Pointer missed a visible deeply embedded popup");
+    click(260, 200);
+    require(backgroundPresses == 1 && !take(popup.snapshot()).opened,
+            "Outside press did not dismiss the nested popup before reaching another control");
+    tree->close();
+}
 }
 int main(){
     namespace gui=ii::gui;
@@ -51,4 +94,5 @@ int main(){
     require(closed==3&&canceled==1&&!take(popup.snapshot()).opened,
             "A stale cancellation reached a popup that reopened and closed again");
     tree->close();
+    nested_popup_routes_beyond_its_host();
 }

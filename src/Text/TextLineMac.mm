@@ -13,6 +13,7 @@
 #include <iiGUI/TextLineNative.h>
 #include <iiGUI/NativeText.h>
 #include <iiGUI/FontDatabase.h>
+#include "TextRasterApple.h"
 
 namespace ii::gui::detail {
 namespace {
@@ -129,17 +130,14 @@ public:
     }
     TextBitmap render(double x, double width, Color color, double scale) const override {
         const auto w = std::uint32_t(std::ceil(width * scale)), h = std::uint32_t(std::ceil(metrics_.height * scale));
-        PixelBuffer pixels{w,h,std::vector<std::uint8_t>(std::size_t(w)*h*4)};
-        auto space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-        auto context = CGBitmapContextCreate(pixels.rgba.data(), w, h, 8, std::size_t(w)*4, space,
-            CGBitmapInfo(kCGImageAlphaPremultipliedLast) | kCGBitmapByteOrder32Big); CGColorSpaceRelease(space);
-        if (!context) throw std::runtime_error("CoreText cannot allocate the clipped text viewport");
-        CGContextScaleCTM(context, scale, scale);
-        CGContextSetRGBFillColor(context, encoded_srgb(color.red), encoded_srgb(color.green), encoded_srgb(color.blue), color.alpha);
-        CGContextSetTextMatrix(context, CGAffineTransformIdentity);
-        CGContextSetTextPosition(context, -x, double(h)/scale - metrics_.baseline);
-        CTLineDraw(line_, context); CGContextRelease(context);
-        straight_rgba(pixels, false); return {w,h,std::move(pixels.rgba)};
+        auto pixels=rasterize_apple_text(w,h,scale,[&](CGContextRef context,std::uint32_t height,double sampling_scale){
+            CGContextScaleCTM(context,sampling_scale,sampling_scale);
+            CGContextSetRGBFillColor(context,encoded_srgb(color.red),encoded_srgb(color.green),encoded_srgb(color.blue),color.alpha);
+            CGContextSetTextMatrix(context,CGAffineTransformIdentity);
+            CGContextSetTextPosition(context,-x,double(height)/sampling_scale-metrics_.baseline);
+            CTLineDraw(line_,context);
+        });
+        return {w,h,std::move(pixels.rgba)};
     }
 };
 }

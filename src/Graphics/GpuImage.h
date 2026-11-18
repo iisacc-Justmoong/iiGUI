@@ -1,7 +1,9 @@
 #pragma once
 
 #include <iiGUI/Graphics.h>
+#include <iiGUI/Image.h>
 #include <array>
+#include <cmath>
 
 namespace ii::gui::detail {
 enum class ForegroundPass { text,images };
@@ -19,12 +21,15 @@ static_assert(sizeof(GpuImageUniform)==144);
 [[nodiscard]] inline GpuImageUniform gpu_image_uniform(const ImageRun& image,const ContentTransform& transform,
                                                        double scale,Rect viewport) noexcept {
     const auto factor=float(scale)*transform.scale;
-    const auto x=(transform.origin_x+(image.bounds.x-transform.origin_x)*transform.scale+transform.offset_x)*float(scale);
-    const auto y=(transform.origin_y+(image.bounds.y-transform.origin_y)*transform.scale+transform.offset_y)*float(scale);
+    const Rect bounds{transform.origin_x+(image.bounds.x-transform.origin_x)*transform.scale+transform.offset_x,
+                      transform.origin_y+(image.bounds.y-transform.origin_y)*transform.scale+transform.offset_y,
+                      image.bounds.width*transform.scale,image.bounds.height*transform.scale};
+    const auto aligned=transform.scale==1?device_image_pixels(image,bounds,scale):std::nullopt;
     const auto tint=image.tint.value_or(Color{0,0,0,0});
     const auto gradient=image.gradient.value_or(ImageGradient{});
-    const auto flag=float((image.tint?1:0)|(image.gradient?2:0));
-    return {{x,y,image.bounds.width*factor,image.bounds.height*factor},
+    const auto flag=float((image.tint?1:0)|(image.gradient?2:0)|(aligned?4:0));
+    return {{aligned?float(aligned->x):bounds.x*float(scale),aligned?float(aligned->y):bounds.y*float(scale),
+             aligned?float(aligned->width):image.bounds.width*factor,aligned?float(aligned->height):image.bounds.height*factor},
             {image.source.x,image.source.y,image.source.width,image.source.height},
             {tint.red,tint.green,tint.blue,tint.alpha},
             {image.border.red,image.border.green,image.border.blue,image.border.alpha},

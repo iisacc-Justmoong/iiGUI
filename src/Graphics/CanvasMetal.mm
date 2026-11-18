@@ -56,7 +56,10 @@ float4 premultiplied_read(texture2d<float> image,int2 p) {
 struct ForegroundTransform {float4 local,offset;};
 fragment float4 text_fragment(float4 position [[position]], texture2d<float> glyphs [[texture(0)]],constant ForegroundTransform& values [[buffer(0)]]) {
     const float4 transform=values.local;const float2 destination=position.xy-values.offset.xy;
-    if(transform.z==1&&all(fract(values.offset.xy)==float2(0)))return premultiplied_read(glyphs,int2(destination-values.offset.zw))*transform.w;
+    if(transform.z==1){
+        const float2 device_position=position.xy-floor(values.offset.xy+.5)-values.offset.zw;
+        return premultiplied_read(glyphs,int2(floor(device_position)))*transform.w;
+    }
     float2 source=(destination-transform.xy)/transform.z+transform.xy-values.offset.zw-.5;
     int2 p=int2(floor(source));float2 f=source-float2(p);
     float4 a=mix(premultiplied_read(glyphs,p),premultiplied_read(glyphs,p+int2(1,0)),f.x);
@@ -87,11 +90,17 @@ float4 image_read(texture2d<float> image,int2 point){
 }
 fragment float4 image_fragment(float4 position [[position]],texture2d<float> image [[texture(0)]],constant ImagePaint& p [[buffer(0)]]) {
     float2 local=position.xy-p.bounds.xy;
-    float2 pixel=clamp((p.source.xy+local/p.bounds.zw*p.source.zw)*float2(image.get_width(),image.get_height())-.5,float2(0),float2(image.get_width()-1,image.get_height()-1));
-    int2 index=int2(floor(pixel));float2 f=pixel-float2(index);
-    float4 a=mix(image_read(image,index),image_read(image,index+int2(1,0)),f.x);
-    float4 b=mix(image_read(image,index+int2(0,1)),image_read(image,index+int2(1,1)),f.x);
-    float4 paint=mix(a,b,f.y);uint flags=uint(p.style.w);
+    float2 size=float2(image.get_width(),image.get_height());
+    uint flags=uint(p.style.w);float4 paint;
+    if(flags&4){
+        paint=image_read(image,int2(round(p.source.xy*size))+int2(floor(local)));
+    }else{
+        float2 pixel=clamp((p.source.xy+local/p.bounds.zw*p.source.zw)*size-.5,float2(0),size-1);
+        int2 index=int2(floor(pixel));float2 f=pixel-float2(index);
+        float4 a=mix(image_read(image,index),image_read(image,index+int2(1,0)),f.x);
+        float4 b=mix(image_read(image,index+int2(0,1)),image_read(image,index+int2(1,1)),f.x);
+        paint=mix(a,b,f.y);
+    }
     if(flags&1)paint=float4(p.tint.rgb*paint.a*p.tint.a,paint.a*p.tint.a);
     if((flags&2)&&p.viewport.z>0){
         float t=clamp((local.y-(p.bounds.w-p.viewport.z))/p.viewport.z,0.,1.);

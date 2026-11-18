@@ -58,6 +58,7 @@ EM_JS(int,missing_metrics_use_centered_top,(),{
     return lines.length===1 && lines[0][1]===5 && lines[0][3]==='top';
 });
 EM_JS(void,remove_letter_spacing_support,(),{globalThis.iiGUINoLetterSpacing=true;});
+EM_JS(int,has_document_ranges,(),{return !!globalThis.document?.createRange;});
 #if defined(IIGUI_WEB_TEXT_TEST_SHARED)
 EM_JS(int,heap_is_shared,(),{ return HEAPU8.buffer instanceof SharedArrayBuffer; });
 #endif
@@ -66,8 +67,19 @@ int main(){
     auto index=ii::gui::TextIndex::create("editable text");
     if(!index)throw std::runtime_error("Cannot create text index");
     auto editable=ii::gui::TextLine::create(std::move(*index));
-    if(editable||editable.error().code!=ii::core::ErrorCode::unsupported)
-        throw std::runtime_error("Unavailable browser text layout must report unsupported");
+    if (has_document_ranges()) {
+        if (!editable || editable->metrics()->width != 13 || editable->caret(5) != 5 || editable->hit_test(5.2) != 5)
+            throw std::runtime_error("Browser text line did not preserve caret and hit positions");
+        const auto selection = editable->selection(1, 4);
+        if (!selection || selection->size() != 1 || selection->front().x != 1 || selection->front().width != 3)
+            throw std::runtime_error("Browser text line lost selection geometry");
+        const auto image = editable->render(2, 6, {1, 1, 1, 1}, 2);
+        if (!image || image->width != 12 || image->rgba.size() != image->width * image->height * 4)
+            throw std::runtime_error("Browser text line did not render the requested viewport");
+        clear_painted_lines();
+    } else if (editable || editable.error().code != ii::core::ErrorCode::unsupported) {
+        throw std::runtime_error("Browser text layout without document ranges must report unsupported");
+    }
 #if defined(IIGUI_WEB_TEXT_TEST_SHARED)
     if(!heap_is_shared())throw std::runtime_error("Web text test did not use shared WebAssembly memory");
 #endif

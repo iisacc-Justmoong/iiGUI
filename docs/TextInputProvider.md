@@ -26,4 +26,6 @@ Cocoa 가상 접근성 peer에는 텍스트 영역 역할·길이·선택·제�
 
 `WidgetBuilder::event_loop()`는 호스트의 iiSDKCore 루프를 반환한다. 앱이 외부 루프를 제공했다면 같은 객체이다. 위젯은 이를 빌드 시 가져와 취소 가능한 작업 수명에 연결할 수 있다. 새로운 스레드나 OS 타이머를 만들 필요가 없다.
 
-관련 테스트 소스는 `tests/text_input_provider.cpp`이다. 현재 테스트와 GUI 실행은 사용자의 요청에 따라 전체 이식 마지막으로 보류한다.
+기존 공급자 계약은 `tests/text_input_provider.cpp`에서 검증한다.
+
+웹 호스트의 편집·조합 입력과 제한은 [웹 텍스트 입력과 조합](WebTextInput.md)을 따른다.

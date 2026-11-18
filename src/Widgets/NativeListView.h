@@ -24,13 +24,18 @@ class BasicNativeListView final {
     using ListViewInput=typename Policy::Input;using NativeListViewCallbacks=typename Policy::Callbacks;using ListRowViewFactory=typename Policy::ViewFactory;
     using ListItemDrawing=typename Policy::Drawing;using ListItemConfiguration=typename Policy::ItemConfiguration;using NativeInputField=typename Policy::InputField;
     using InputFieldConfiguration=typename Policy::InputFieldConfiguration;using NativeIconCache=typename Policy::IconCache;using StyleColor=typename Policy::Color;
-    using ListSnapshot=typename Policy::Snapshot;using ListEntry=typename Policy::Entry;using ListController=typename Policy::Controller;
+    using ListIndex=typename Policy::Index;using ListEntry=typename Policy::Entry;using ListController=typename Policy::Controller;
     using ListViewportSource=typename Policy::ViewportSource;using ListViewportAnchor=typename Policy::ViewportAnchor;using ListReveal=typename Policy::Reveal;
     using ListError=typename Policy::Error;using ListErrorCode=typename Policy::ErrorCode;using ListEditEvent=typename Policy::EditEvent;using ListViewEvent=typename Policy::ViewEvent;
     using ListEditing=typename Policy::Editing;using ListDrag=typename Policy::Drag;using ListDragPoint=typename Policy::DragPoint;using ListDragProposal=typename Policy::DragProposal;
     using ListRowContext=typename Policy::RowContext;using ListRowSnapshot=typename Policy::RowSnapshot;
-    struct RowInput final { ListItemDrawing drawing; };
-    struct Measurement final {double width=0,height=0;std::weak_ptr<const ListSnapshot> snapshot;};
+    struct RowInput final {
+        ListItemDrawing drawing;
+        std::shared_ptr<const ListEntry> entry;
+        decltype(ListViewInput::icon_source) icon_source;
+        std::uint64_t icon_revision = 0;
+    };
+    struct Measurement final {double width=0,height=0;std::weak_ptr<const ListEntry> entry;};
     struct Row final {
         std::string key;
         NativeIconCache icons;
@@ -91,28 +96,30 @@ class BasicNativeListView final {
             color(p.disabled_text)&&color(p.idle)&&color(p.hover)&&color(p.pressed)&&color(p.selected)&&color(p.focus);
     }
     [[nodiscard]] static ii::core::Result<std::shared_ptr<const ListViewportSource>> measured_projection(
-            std::shared_ptr<const ListSnapshot> snapshot,const State* state,double width,double fallback){
+            ListIndex index,const State* state,double width,double fallback){
         std::unordered_map<std::string,double> heights;
         if(state&&state->row_view&&width>0){
-            for(const auto& entry:snapshot->entries){auto found=state->measurements.find(entry.key);
-                if(found!=state->measurements.end()&&found->second.snapshot.lock()==snapshot&&
-                   std::abs(found->second.width-width)<1e-6&&found->second.height>fallback)
-                    heights.emplace(entry.key,found->second.height);}
+            for (const auto& [key, measurement] : state->measurements) {
+                if (std::abs(measurement.width - width) >= 1e-6 || measurement.height <= fallback) continue;
+                auto position = index.find(key);
+                if (position && measurement.entry.lock() == index.row(*position))
+                    heights.emplace(key, measurement.height);
+            }
         }
-        auto source=ListViewportSource::create(std::move(snapshot),heights);if(!source)return std::unexpected(convert(source.error()));
+        auto source=ListViewportSource::create(std::move(index),heights);if(!source)return std::unexpected(convert(source.error()));
         return std::make_shared<const ListViewportSource>(std::move(*source));
     }
     [[nodiscard]] static ii::core::Result<std::shared_ptr<const ListViewportSource>> projection(const ListViewInput& input,const State* state=nullptr){
         if(!valid(input))return ii::core::fail(ii::core::ErrorCode::invalid_argument,"Invalid flat list input");
         auto refreshed=input.controller->refresh();if(!refreshed)return std::unexpected(convert(refreshed.error()));
-        auto snapshot=input.controller->snapshot();if(!snapshot)return std::unexpected(convert(snapshot.error()));
-        return measured_projection(std::move(*snapshot),state,state&&state->viewport_seen?state->viewport.bounds.width:0,input.row_height);
+        auto index=input.controller->index();if(!index)return std::unexpected(convert(index.error()));
+        return measured_projection(std::move(*index),state,state&&state->viewport_seen?state->viewport.bounds.width:0,input.row_height);
     }
     [[nodiscard]] static ii::core::Result<bool> controller_changed(const std::shared_ptr<State>& state,
             const std::shared_ptr<ListController>& controller){
         auto refreshed=controller->refresh();if(!refreshed)return std::unexpected(convert(refreshed.error()));
-        auto snapshot=controller->snapshot();if(!snapshot)return std::unexpected(convert(snapshot.error()));
-        return *refreshed||*snapshot!=state->source->snapshot();
+        auto index=controller->index();if(!index)return std::unexpected(convert(index.error()));
+        return *refreshed||*index!=state->source->index();
     }
     [[nodiscard]] static ii::gui::ScrollOptions scroll_options(const State& state){
         return {.width=state.authored.width,.height=state.authored.height,.enabled=true,.show_indicator=state.authored.show_indicator,
@@ -151,11 +158,14 @@ class BasicNativeListView final {
         UpdateGuard guard(state);if(!current(state,row))return {};
         if(!std::isfinite(width)||width<=0||width>8192||!std::isfinite(height)||height<0||height>8192)
             return ii::core::fail(ii::core::ErrorCode::out_of_range,"Invalid flat list delegate measurement");
-        const auto snapshot=state->source->snapshot();const auto found=state->measurements.find(row->key);
-        if(found!=state->measurements.end()&&found->second.snapshot.lock()==snapshot&&
+        const auto& index=state->source->index();
+        const auto position=index.find(row->key);
+        if(!position)return {};
+        const auto entry=index.row(*position);const auto found=state->measurements.find(row->key);
+        if(found!=state->measurements.end()&&found->second.entry.lock()==entry&&
            std::abs(found->second.width-width)<1e-6&&std::abs(found->second.height-height)<1e-6)return {};
         if(state->measurements.size()>=Policy::max_items&&!state->measurements.contains(row->key))state->measurements.clear();
-        state->measurements[row->key]={width,height,snapshot};state->measurement_dirty=true;
+        state->measurements[row->key]={width,height,entry};state->measurement_dirty=true;
         return state->root.set_scroll_handler(state->viewport_handler);
     }
     static void activate(const std::shared_ptr<State>& state,const std::shared_ptr<Row>& row)noexcept;
@@ -168,13 +178,27 @@ class BasicNativeListView final {
     [[nodiscard]] static ii::core::Result<void> clear_drag(const std::shared_ptr<State>& state);
     [[nodiscard]] static ii::core::Result<void> drag_visuals(const std::shared_ptr<State>& state,std::string_view old_target);
     [[nodiscard]] static ii::core::Result<std::shared_ptr<const RowInput>> prepare(const std::shared_ptr<State>& state,
-            const std::shared_ptr<Row>& row,const ListEntry& item,double width,double height){
-        auto result=std::make_shared<RowInput>();ListItemConfiguration c;
-        c.label=Policy::display_text(item.label);c.description=Policy::display_text(item.description);
+            const std::shared_ptr<Row>& row,std::shared_ptr<const ListEntry> entry,double width,double height){
+        const auto& item=*entry;
+        ListItemConfiguration c;
         c.width=width;c.height=height;c.left_padding=state->authored.left_padding;
         c.right_padding=state->authored.right_padding;c.icon_size=state->authored.icon_size;c.spacing=state->authored.spacing;
         c.corner_radius=state->authored.corner_radius;c.enabled=state->authored.enabled&&item.enabled;
         c.selectable=item.selectable;c.interactive=state->authored.interactive;c.selected=state->selected==item.key;c.palette=state->authored.palette;
+        const auto& icons=state->authored.icon_source;
+        const auto icon_revision=icons ? icons->revision() : 0;
+        if (row->input && row->input->entry == entry && row->input->icon_source == icons
+            && row->input->icon_revision == icon_revision) {
+            const auto& previous = row->input->drawing.model.configuration();
+            if (previous.width == c.width && previous.height == c.height && previous.enabled == c.enabled
+                && previous.selected == c.selected && previous.interactive == c.interactive
+                && previous.left_padding == c.left_padding && previous.right_padding == c.right_padding
+                && previous.icon_size == c.icon_size && previous.spacing == c.spacing
+                && previous.corner_radius == c.corner_radius && previous.palette == c.palette) return row->input;
+        }
+        auto result=std::make_shared<RowInput>();
+        result->entry=std::move(entry);result->icon_source=icons;result->icon_revision=icon_revision;
+        c.label=Policy::display_text(item.label);c.description=Policy::display_text(item.description);
         if(!state->row_view&&!item.icon_name.empty()&&c.icon_size>0){auto icon=row->icons.resolve(item.icon_name,state->authored.icon_source,c.icon_size);
             if(!icon)return std::unexpected(icon.error());result->drawing.icon=std::move(*icon);c.has_icon=bool(result->drawing.icon);}
         if(!result->drawing.model.set_configuration(std::move(c)))return ii::core::fail(ii::core::ErrorCode::invalid_argument,"Invalid flat list row");
@@ -183,27 +207,39 @@ class BasicNativeListView final {
     [[nodiscard]] static ii::core::Result<void> frame(const std::shared_ptr<State>& state,const ii::gui::ScrollViewport& viewport){
         const auto revision=state->revision;
         if(state->row_view&&(state->measurement_dirty||std::abs(state->projection_width-viewport.bounds.width)>1e-6)){
-            auto source=measured_projection(state->source->snapshot(),state.get(),viewport.bounds.width,state->authored.row_height);
+            auto source=measured_projection(state->source->index(),state.get(),viewport.bounds.width,state->authored.row_height);
             if(!source)return std::unexpected(source.error());state->source=std::move(*source);
             state->measurement_dirty=false;state->projection_width=viewport.bounds.width;
         }
         auto planned=state->source->frame({.width=double(viewport.bounds.width),.height=double(viewport.bounds.height),.offset=viewport.offset,
             .row_height=state->authored.row_height,.overscan=state->authored.overscan,.movement=state->movement,.anchor=state->anchor});
         if(!planned)return std::unexpected(convert(planned.error()));
-        struct Change final {std::shared_ptr<Row> row;std::shared_ptr<const RowInput> input;std::optional<ListRowSnapshot> snapshot;};
+        struct Change final {
+            std::shared_ptr<Row> row;
+            std::shared_ptr<const RowInput> input;
+            std::optional<ListRowSnapshot> snapshot;
+            bool paint, measure;
+        };
         std::unordered_map<std::string,std::shared_ptr<Row>> next;std::vector<Change> changes;
-        std::vector<ii::gui::KeyedContentItem> items;const auto snapshot=state->source->snapshot();
+        std::vector<ii::gui::KeyedContentItem> items;const auto index=state->source->index();
         next.reserve(planned->rows.size());changes.reserve(planned->rows.size());items.reserve(planned->rows.size());
         std::size_t text_bytes=0;std::weak_ptr<State> weak=state;
         for(const auto& cell:planned->rows){
-            const auto& item=snapshot->entries[cell.index];auto found=state->rows.find(item.key);
+            const auto entry=index.row(cell.index);const auto& item=*entry;auto found=state->rows.find(item.key);
             auto row=found==state->rows.end()?std::make_shared<Row>():found->second;if(row->key.empty())row->key=item.key;
-            auto value=prepare(state,row,item,viewport.bounds.width,cell.height);if(!value)return std::unexpected(value.error());
+            auto value=prepare(state,row,entry,viewport.bounds.width,cell.height);if(!value)return std::unexpected(value.error());
             const auto& configuration=(*value)->drawing.model.configuration();
             const auto bytes=configuration.label.size()+configuration.description.size();
             if(bytes>4*1024*1024-text_bytes)return ii::core::fail(ii::core::ErrorCode::out_of_range,"Visible list text exceeds its frame budget");
             std::optional<ListRowSnapshot> row_snapshot;
-            if(state->row_view){row_snapshot=ListRowSnapshot{.entry=item,.source_index=cell.index,.selected=configuration.selected,
+            bool measure = false;
+            if (state->row_view) {
+                const auto measured = state->measurements.find(item.key);
+                measure = measured == state->measurements.end() || measured->second.entry.lock() != entry
+                    || std::abs(measured->second.width - viewport.bounds.width) >= 1e-6;
+            }
+            if(state->row_view && (!row->context || row->input != *value || row->context->get().source_index != cell.index)){
+                row_snapshot=ListRowSnapshot{.entry=item,.source_index=cell.index,.selected=configuration.selected,
                 .enabled=configuration.enabled,.height=cell.height};
                 if(!row->context){
                     std::weak_ptr<Row> weak_row=row;
@@ -213,9 +249,17 @@ class BasicNativeListView final {
                         return request_activate(owner,generation);
                     });
                     row->context=Policy::make_context(*row_snapshot);
-                }else row_snapshot->trigger=row->context->get().trigger;
+                }else {
+                    row_snapshot->trigger=row->context->get().trigger;
+                    if (*row_snapshot == row->context->get()) row_snapshot.reset();
+                }
             }
-            text_bytes+=bytes;next.emplace(row->key,row);changes.push_back({row,*value,std::move(row_snapshot)});std::weak_ptr<Row> weak_row=row;
+            const bool changed = row->input != *value;
+            const bool needs_paint = changed && (!row->input || row->input->drawing.model.configuration() != configuration
+                || row->input->drawing.icon != (*value)->drawing.icon);
+            if (changed || row_snapshot || measure)
+                changes.push_back({row,*value,std::move(row_snapshot),needs_paint,measure});
+            text_bytes+=bytes;next.emplace(row->key,row);std::weak_ptr<Row> weak_row=row;
             items.push_back({row->key,[weak,weak_row,value=*value](ii::gui::WidgetBuilder& builder)->ii::core::Result<void>{
                 auto state=weak.lock();auto row=weak_row.lock();if(!state||!row||!state->live)return ii::core::fail(ii::core::ErrorCode::closed,"Flat list row retired");
                 row->input=value;row->custom=bool(state->row_view);
@@ -253,8 +297,8 @@ class BasicNativeListView final {
         if(state->editing&&state->edit_event&&!state->committing){
             const auto& key=state->edit_event->entry.key;
             auto visible=std::ranges::find_if(planned->rows,[&](const auto& cell){
-                return snapshot->entries[cell.index].key==key&&cell.y+cell.height>0&&cell.y<viewport.bounds.height&&
-                       snapshot->entries[cell.index].enabled&&snapshot->entries[cell.index].editable;});
+                const auto& entry=index.entry(cell.index);
+                return entry.key==key&&cell.y+cell.height>0&&cell.y<viewport.bounds.height&&entry.enabled&&entry.editable;});
             if(visible==planned->rows.end()||state->selected!=key){
                 if(auto cleared=clear_edit(state,false);!cleared)return cleared;
                 if(state->revision!=revision)return {};
@@ -265,6 +309,7 @@ class BasicNativeListView final {
         for(auto& change:changes){
             if(!change.row->widget.snapshot())return ii::core::fail(ii::core::ErrorCode::closed,"Flat list row did not publish");
             change.row->input=std::move(change.input);
+            if(!change.paint)continue;
             if(auto r=change.row->widget.set_action_options(action_options(*change.row->input));!r)return r;
             if(change.row->delegate){const auto& c=change.row->input->drawing.model.configuration();
                 if(auto r=change.row->delegate->set_enabled(c.enabled);!r)return r;
@@ -282,7 +327,7 @@ class BasicNativeListView final {
             if(change.row->context&&change.snapshot&&current(state,change.row))Policy::publish_context(*change.row->context,std::move(*change.snapshot));
         }
         if(state->revision!=revision)return {};
-        for(const auto& change:changes)if(change.row->content&&current(state,change.row)){
+        for(const auto& change:changes)if(change.row->content && (change.measure || change.snapshot) && current(state,change.row)){
             auto natural=change.row->content->measure(viewport.bounds.width);if(!natural)return std::unexpected(natural.error());
             if(auto r=measurement(state,change.row,viewport.bounds.width,natural->height);!r)return r;
         }
@@ -303,7 +348,7 @@ class BasicNativeListView final {
     [[nodiscard]] static ii::core::Result<void> refresh(const std::shared_ptr<State>& state){
         if(state->revision==(std::numeric_limits<std::uint64_t>::max)())return ii::core::fail(ii::core::ErrorCode::out_of_range,"Flat list revision exhausted");
         auto source=projection(state->authored,state.get());if(!source)return std::unexpected(source.error());
-        if(state->drag&&(*source)->snapshot()!=state->source->snapshot()){
+        if(state->drag&&(*source)->index()!=state->source->index()){
             if(auto cleared=clear_drag(state);!cleared)return cleared;
         }
         auto selected=state->authored.controller->selection();if(!selected)return std::unexpected(convert(selected.error()));
@@ -367,12 +412,13 @@ class BasicNativeListView final {
         auto refreshed=controller_changed(state,controller);if(!refreshed)return std::unexpected(refreshed.error());
         if(!state->live||state->authored.controller!=controller||state->revision!=revision)return true;
         if(*refreshed){if(auto r=refresh(state);!r)return std::unexpected(r.error());return true;}
-        const auto snapshot=state->source->snapshot();if(snapshot->entries.empty())return true;
-        auto index=std::ranges::find_if(snapshot->entries,[&](const auto& item){return item.key==state->selected;});
-        const bool has_selection=index!=snapshot->entries.end();
+        const auto index=state->source->index();
+        if(!index.size())return true;
+        const auto selection=index.find(state->selected);
+        const bool has_selection=selection.has_value();
         const bool backwards=event.key==Key::up||event.key==Key::page_up||event.key==Key::end;
-        auto position=has_selection?std::size_t(index-snapshot->entries.begin()):(backwards?snapshot->entries.size()-1:0);
-        if(event.key==Key::home)position=0;else if(event.key==Key::end)position=snapshot->entries.size()-1;
+        auto position=selection.value_or(backwards?index.size()-1:0);
+        if(event.key==Key::home)position=0;else if(event.key==Key::end)position=index.size()-1;
         else if(has_selection&&(event.key==Key::page_up||event.key==Key::page_down)){
             const auto top=*state->source->row_offset(position,state->authored.row_height);
             const auto total=*state->source->content_extent(state->authored.row_height);
@@ -380,15 +426,15 @@ class BasicNativeListView final {
                 (std::min)(std::nextafter(total,0.),top+state->viewport.bounds.height);
             auto next=state->source->row_at(target,state->authored.row_height).value_or(position);
             if(next==position){if(event.key==Key::page_up&&position)next=position-1;
-                else if(event.key==Key::page_down&&position+1<snapshot->entries.size())next=position+1;}
+                else if(event.key==Key::page_down&&position+1<index.size())next=position+1;}
             position=next;
         }else if(has_selection&&event.key==Key::up)position=position?position-1:0;
-        else if(has_selection&&event.key==Key::down)position=(std::min)(snapshot->entries.size()-1,position+1);
-        while(!snapshot->entries[position].enabled||!snapshot->entries[position].selectable){
-            if(backwards){if(!position)return true;--position;}else{if(position+1==snapshot->entries.size())return true;++position;}
+        else if(has_selection&&event.key==Key::down)position=(std::min)(index.size()-1,position+1);
+        while(!index.entry(position).enabled||!index.entry(position).selectable){
+            if(backwards){if(!position)return true;--position;}else{if(position+1==index.size())return true;++position;}
         }
-        const auto& item=snapshot->entries[position];if(auto r=select(state,item.key);!r)return std::unexpected(r.error());
-        if(!state->live||state->selected!=item.key||state->source->snapshot()!=snapshot)return true;
+        const auto& item=index.entry(position);if(auto r=select(state,item.key);!r)return std::unexpected(r.error());
+        if(!state->live||state->selected!=item.key||state->source->index()!=index)return true;
         const auto top=*state->source->row_offset(position,state->authored.row_height);
         const auto bottom=top+*state->source->row_extent(position,state->authored.row_height);
         auto offset=state->viewport.offset;if(top<offset)offset=top;else if(bottom>offset+state->viewport.bounds.height)offset=bottom-state->viewport.bounds.height;
@@ -406,7 +452,7 @@ class BasicNativeListView final {
             const auto observed=state->revision;auto source=projection(input,state.get());if(!state->live||state->revision!=observed)return {};if(!source)return std::unexpected(source.error());
             auto selected=input.controller->selection();if(!state->live||state->revision!=observed)return {};if(!selected)return std::unexpected(convert(selected.error()));
             if(state->drag&&(!input.enabled||!input.interactive||!input.reorderable||input.editor!=state->authored.editor||
-                             input.controller!=state->authored.controller||(*source)->snapshot()!=state->source->snapshot())){
+                             input.controller!=state->authored.controller||(*source)->index()!=state->source->index())){
                 if(auto cleared=clear_drag(state);!cleared)return cleared;
             }
             if(state->editing&&(!input.enabled||!input.interactive||!input.editable||input.editor!=state->authored.editor||
@@ -554,7 +600,7 @@ inline ii::core::Result<void> BasicNativeListView<Policy>::begin_edit(const std:
     if(*changed||*selected!=state->selected){if(auto updated=refresh(state);!updated)return updated;
         return ii::core::fail(ii::core::ErrorCode::busy,"List changed before editing");}
     if(selected->empty())return ii::core::fail(ii::core::ErrorCode::invalid_argument,"Select a list row before editing");
-    auto candidate=ListEditing::begin(state->source->snapshot(),editor,*selected);if(!candidate)return std::unexpected(convert(candidate.error()));
+    auto candidate=ListEditing::begin(state->source->index(),editor,*selected);if(!candidate)return std::unexpected(convert(candidate.error()));
     auto value=candidate->state();if(!value)return std::unexpected(convert(value.error()));
     auto target=state->source->frame({.width=double(state->viewport.bounds.width),.height=double(state->viewport.bounds.height),
         .offset=state->viewport.offset,.row_height=state->authored.row_height,.overscan=state->authored.overscan,
@@ -643,8 +689,8 @@ inline ii::core::Result<bool> BasicNativeListView<Policy>::pointer(const std::sh
            !state->authored.enabled||!state->authored.interactive||!state->authored.reorderable)return true;
         if(*changed){
             if(auto result=refresh(state);!result)return std::unexpected(result.error());return true;}
-        const auto snapshot=state->source->snapshot();const auto index=state->source->row_at(state->viewport.offset+y,state->authored.row_height);
-        if(!index)return false;const auto& entry=snapshot->entries[*index];
+        const auto rows=state->source->index();const auto index=state->source->row_at(state->viewport.offset+y,state->authored.row_height);
+        if(!index)return false;const auto& entry=rows.entry(*index);
         if(!entry.enabled||!entry.selectable||!entry.draggable)return false;
         auto found=state->rows.find(entry.key);if(found==state->rows.end()||!current(state,found->second))return false;
         auto row=found->second;
@@ -652,9 +698,9 @@ inline ii::core::Result<bool> BasicNativeListView<Policy>::pointer(const std::sh
         row_event.local_position=ii::gui::WidgetPoint{x,y-row_top};
         if(state->authored.editable&&entry.editable&&double_press(*row,row_event))return false;
         auto rename=row_input(state,row,row_event);if(!rename)return std::unexpected(rename.error());if(*rename)return true;
-        auto drag=ListDrag::begin(snapshot,entry.key,{x,y});if(!drag)return std::unexpected(convert(drag.error()));
+        auto drag=ListDrag::begin(rows,entry.key,{x,y});if(!drag)return std::unexpected(convert(drag.error()));
         if(auto selected=select(state,entry.key);!selected)return std::unexpected(selected.error());
-        if(!state->live||state->source->snapshot()!=snapshot||state->authored.controller!=controller||state->authored.editor!=editor||
+        if(!state->live||state->source->index()!=rows||state->authored.controller!=controller||state->authored.editor!=editor||
            !state->authored.enabled||!state->authored.interactive||!state->authored.reorderable||state->editing||state->drag||!current(state,row))return true;
         state->drag=std::move(*drag);state->drag_key=entry.key;
         std::weak_ptr<State> weak=state;
@@ -724,8 +770,10 @@ inline ii::core::Result<bool> BasicNativeListView<Policy>::row_input(const std::
     auto changed=controller_changed(state,controller);if(!changed)return std::unexpected(changed.error());
     if(!state->live||state->authored.controller!=controller||state->revision!=revision||!current(state,row))return true;
     if(*changed){if(auto updated=refresh(state);!updated)return std::unexpected(updated.error());return true;}
-    const auto snapshot=state->source->snapshot();auto found=std::ranges::find_if(snapshot->entries,[&](const auto& entry){return entry.key==row->key;});
-    if(found==snapshot->entries.end()||!found->enabled||!found->selectable||!found->editable)return false;
+    const auto index=state->source->index();const auto found=index.find(row->key);
+    if(!found)return false;
+    const auto& entry=index.entry(*found);
+    if(!entry.enabled||!entry.selectable||!entry.editable)return false;
     if(state->selected!=row->key){if(auto selected=select(state,row->key);!selected)return std::unexpected(selected.error());}
     auto result=begin_edit(state);
     if(!result){if(result.error().code==ii::core::ErrorCode::busy)return true;
@@ -745,10 +793,14 @@ inline ii::core::Result<void> BasicNativeListView<Policy>::request_activate(cons
         auto refreshed=controller_changed(state,controller);if(!refreshed)return std::unexpected(refreshed.error());
         if(!state->live||state->authored.controller!=controller||state->revision!=revision||!current(state,row))return {};
         if(*refreshed)return refresh(state);
-        const auto snapshot=state->source->snapshot();auto found=std::ranges::find_if(snapshot->entries,[&](const auto& item){return item.key==row->key;});
-        if(found==snapshot->entries.end()||!found->enabled||!found->selectable)return ii::core::fail(ii::core::ErrorCode::invalid_argument,"Flat list row cannot be activated");
-        if(auto r=select(state,found->key);!r)return r;
-        if(current(state,row)&&state->selected==row->key&&state->source->snapshot()==snapshot&&state->callbacks.activated){auto callback=state->callbacks.activated;callback(ListViewEvent{*found,std::size_t(found-snapshot->entries.begin())});}
+        const auto index=state->source->index();const auto found=index.find(row->key);
+        if(!found)return ii::core::fail(ii::core::ErrorCode::not_found,"Flat list row was not found");
+        const auto& entry=index.entry(*found);
+        if(!entry.enabled||!entry.selectable)return ii::core::fail(ii::core::ErrorCode::invalid_argument,"Flat list row cannot be activated");
+        if(auto r=select(state,entry.key);!r)return r;
+        if(current(state,row)&&state->selected==row->key&&state->source->index()==index&&state->callbacks.activated){
+            auto callback=state->callbacks.activated;callback(ListViewEvent{entry,*found});
+        }
         return {};
     }catch(...){return ii::core::fail(ii::core::ErrorCode::failed,"Flat list activation failed",std::current_exception());}
 }

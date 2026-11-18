@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/FrameworkBoundary.md",
-    "sha256": "9413cdff4d38d6d08a8248793728040f514a5d854e61cee8b90a136db22f7fd6",
-    "bytes": 51192,
-    "line_count": 507,
+    "sha256": "2b01c878bf6e15470108469230da174b1450e1b557cc817426ec71066980db44",
+    "bytes": 51363,
+    "line_count": 513,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -1389,248 +1389,248 @@
       "raw": "\n"
     },
     {
-      "id": "b000195",
       "kind": "paragraph",
+      "id": "b000195",
       "start_line": 472,
-      "end_line": 472,
-      "raw": "`iiGUI/NativeListView.h`는 주입된 목록 스냅샷·행 그리기·편집 필드로 가상 행, 입력, 편집, 드래그와 수명을 관리한다. 퇴역하면 실행 중인 콜백이 끝난 뒤 원천·행·편집 세션을 반환한다. macOS arm64 독립 설치 소비자와 LVUI 생성·편집·드래그·사용자 행을 창 없이 검사했다.\n"
+      "end_line": 475,
+      "raw": "`iiGUI/NativeListView.h`는 주입된 키 색인·행 그리기·편집 필드로 가상 행, 입력,\n편집, 드래그와 수명을 관리한다. 리비전 갱신은 표시 구간의 행을 키로 유지하고\n시각 입력이나 행 문맥이 달라진 경우에만 그 위젯을 갱신한다. 퇴역하면 실행 중인\n콜백이 끝난 뒤 원천·행·편집 세션을 반환한다.\n"
     },
     {
       "id": "b000196",
       "kind": "blank",
-      "start_line": 473,
-      "end_line": 473,
+      "start_line": 476,
+      "end_line": 476,
       "raw": "\n"
     },
     {
       "id": "b000197",
       "kind": "paragraph",
-      "start_line": 474,
-      "end_line": 474,
+      "start_line": 477,
+      "end_line": 477,
       "raw": "`iiGUI/NativeCodeEditorView.h`는 주입된 코드 문서·편집 세션으로 가시 줄 셰이핑·선택·텍스트 입력·그리기와 수명을 관리한다. 퇴역 중인 입력이 끝나면 조합을 취소하고 문서와 콜백을 반환한다. macOS arm64 독립 설치 소비자와 LVUI 문서·생성·헤드리스 입력 경로를 검사했다.\n"
     },
     {
       "id": "b000198",
       "kind": "blank",
-      "start_line": 475,
-      "end_line": 475,
+      "start_line": 478,
+      "end_line": 478,
       "raw": "\n"
     },
     {
       "id": "b000199",
       "kind": "paragraph",
-      "start_line": 476,
-      "end_line": 476,
+      "start_line": 479,
+      "end_line": 479,
       "raw": "`iiGUI/TooltipModel.h`, `TooltipController.h`, `TooltipOutline.h`는 주입된 값으로 툴팁의 기하·시간 상태와 표시 포트 조정·윤곽을 관리한다. 제어기를 명시적으로 퇴역시키면 포트와 콜백을 해제한다. macOS arm64 독립 설치 소비자와 LVUI 툴팁 모델·윤곽·생성 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000200",
       "kind": "blank",
-      "start_line": 477,
-      "end_line": 477,
+      "start_line": 480,
+      "end_line": 480,
       "raw": "\n"
     },
     {
       "id": "b000201",
       "kind": "paragraph",
-      "start_line": 478,
-      "end_line": 478,
+      "start_line": 481,
+      "end_line": 481,
       "raw": "`iiGUI/NativeTooltipPresentationView.h`의 표시 호스트는 주입된 재질·윤곽과 예약 포트를 조합한다. 퇴역 시 예약을 취소하고 재질과 예약 함수 캡처를 해제하며, 갱신 중 퇴역하면 해당 갱신이 끝난 뒤 해제한다. macOS arm64에서 창 없이 기존 표시·생성 검사와 독립 설치 소비자를 통과했다.\n"
     },
     {
       "id": "b000202",
       "kind": "blank",
-      "start_line": 479,
-      "end_line": 479,
+      "start_line": 482,
+      "end_line": 482,
       "raw": "\n"
     },
     {
       "id": "b000203",
       "kind": "paragraph",
-      "start_line": 480,
-      "end_line": 480,
+      "start_line": 483,
+      "end_line": 483,
       "raw": "`iiGUI/TooltipScheduler.h`, `NativeTooltipTargetView.h`, `NativeTooltipView.h`는 Core 이벤트 루프 기한 예약, 대상 위젯 관찰, 툴팁 조립을 담당한다. 앱이 모델과 표시 정책을 주입하며 대상 변경·재진입·취소와 오래된 알림 차단을 유지한다. macOS arm64에서 창 없이 기존 툴팁 통합 검사와 독립 설치 소비자를 통과했다.\n"
     },
     {
       "id": "b000204",
       "kind": "blank",
-      "start_line": 481,
-      "end_line": 481,
+      "start_line": 484,
+      "end_line": 484,
       "raw": "\n"
     },
     {
       "id": "b000205",
       "kind": "paragraph",
-      "start_line": 482,
-      "end_line": 482,
+      "start_line": 485,
+      "end_line": 485,
       "raw": "`iiGUI/NativeTableView.h`의 `BasicNativeTable`은 데이터 계약을 주입받아 표시 영역의 표 그리기, 입력, 선택, 편집, 클립보드, 접근성 및 사용자 정의 셀을 처리한다. macOS arm64에서 LVUI 표 통합 검사와 독립 설치 소비자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000206",
       "kind": "blank",
-      "start_line": 483,
-      "end_line": 483,
+      "start_line": 486,
+      "end_line": 486,
       "raw": "\n"
     },
     {
       "id": "b000207",
       "kind": "paragraph",
-      "start_line": 484,
-      "end_line": 484,
+      "start_line": 487,
+      "end_line": 487,
       "raw": "`iiGUI/NativeListItemCompositeView.h`는 주입된 컨트롤을 조합해 복합 목록의 입력·그리기와 사용자 정의 뷰 문맥을 처리한다. `ListItemDetailActionsLayout.h`, `ListItemDetailControlsLayout.h`, `ListItemTaskLayout.h`, `ListItemPreviewRowLayout.h`, `ListItemFormLayout.h`, `ListItemQuantityLayout.h`는 각각 배치와 수량 상태를 제공한다. 두 생성 화면을 한 번에 포함하는 컴파일 검사도 제공한다.\n"
     },
     {
       "id": "b000208",
       "kind": "blank",
-      "start_line": 485,
-      "end_line": 485,
+      "start_line": 488,
+      "end_line": 488,
       "raw": "\n"
     },
     {
-      "id": "b000209",
       "kind": "paragraph",
-      "start_line": 486,
-      "end_line": 486,
-      "raw": "`iiGUI/ListViewport.h`와 `iiGUI/ListDrag.h`는 주입된 불변 목록 스냅샷을 사용해 가시 범위와 드래그 후보를 계산한다. 누적 색인과 이진 탐색을 유지하며 스크롤 때 전체 항목을 반복하지 않는다.\n"
+      "id": "b000209",
+      "start_line": 489,
+      "end_line": 492,
+      "raw": "`iiGUI/ListViewport.h`와 `iiGUI/ListDrag.h`는 주입된 불변 행과 키 색인을 공유해\n가시 범위와 드래그 후보를 계산한다. 높이가 일정한 목록은 위치를 산술로 계산한다.\n가변 높이는 측정된 행의 누적 높이와 이진 탐색을 사용한다. 스크롤·선택·편집·드래그가\n전체 행 벡터를 다시 생성할 필요가 없다.\n"
     },
     {
       "id": "b000210",
-      "kind": "blank",
-      "start_line": 487,
-      "end_line": 487,
-      "raw": "\n"
-    },
-    {
-      "id": "b000211",
-      "kind": "paragraph",
-      "start_line": 488,
-      "end_line": 488,
-      "raw": "`iiGUI/HierarchyViewport.h`와 `iiGUI/HierarchyDrag.h`는 주입된 불변 계층 투영을 가상화하고 리비전을 검사하는 드래그 후보를 계산한다. macOS arm64에서 계층 모델·호스트·생성 경로와 독립 설치 소비자를 창 없이 검사했다.\n"
-    },
-    {
-      "id": "b000212",
-      "kind": "blank",
-      "start_line": 489,
-      "end_line": 489,
-      "raw": "\n"
-    },
-    {
-      "id": "b000213",
-      "kind": "paragraph",
-      "start_line": 490,
-      "end_line": 490,
-      "raw": "`iiGUI/TableViewport.h`는 불변 표 스냅샷에서 행·열 누적 위치와 병합 셀의 보이는 범위를 계산한다. 표 헤더와 본문은 같은 교체 가능한 뷰포트 구현을 사용한다.\n"
-    },
-    {
-      "id": "b000214",
-      "kind": "blank",
-      "start_line": 491,
-      "end_line": 491,
-      "raw": "\n"
-    },
-    {
-      "id": "b000215",
-      "kind": "paragraph",
-      "start_line": 492,
-      "end_line": 492,
-      "raw": "`iiGUI/ListItemMenuModel.h`는 주입된 메뉴 항목의 중첩·텍스트·아이콘 한도를 검증한다.\n"
-    },
-    {
-      "id": "b000216",
       "kind": "blank",
       "start_line": 493,
       "end_line": 493,
       "raw": "\n"
     },
     {
-      "id": "b000217",
+      "id": "b000211",
       "kind": "paragraph",
       "start_line": 494,
       "end_line": 494,
-      "raw": "`iiGUI/CollectionNavigation.h`와 `iiGUI/VirtualViewport.h`는 주입된 키·상태 계약으로 컬렉션 선택과 포커스 및 가상 뷰포트의 이벤트 기반 상태를 관리한다. 화면 밖 선택 보존과 위젯 퇴역 시 수명 경계를 유지한다.\n"
+      "raw": "`iiGUI/HierarchyViewport.h`와 `iiGUI/HierarchyDrag.h`는 주입된 불변 계층 투영을 가상화하고 리비전을 검사하는 드래그 후보를 계산한다. macOS arm64에서 계층 모델·호스트·생성 경로와 독립 설치 소비자를 창 없이 검사했다.\n"
     },
     {
-      "id": "b000218",
+      "id": "b000212",
       "kind": "blank",
       "start_line": 495,
       "end_line": 495,
       "raw": "\n"
     },
     {
-      "id": "b000219",
+      "id": "b000213",
       "kind": "paragraph",
       "start_line": 496,
       "end_line": 496,
-      "raw": "`iiGUI/VirtualCollectionPlanner.h`, `iiGUI/VirtualMeasurements.h`, `iiGUI/VirtualLineIndex.h`는 주입된 컬렉션의 표시 셀 배치와 가변 행 높이·누적 위치를 계산한다. 키별 원천과 값 형식은 앱이 제공한다. 동일한 측정치는 다시 알리지 않으며 낡은 세대와 퇴역 후 결과를 무시한다.\n"
+      "raw": "`iiGUI/TableViewport.h`는 불변 표 스냅샷에서 행·열 누적 위치와 병합 셀의 보이는 범위를 계산한다. 표 헤더와 본문은 같은 교체 가능한 뷰포트 구현을 사용한다.\n"
     },
     {
-      "id": "b000220",
+      "id": "b000214",
       "kind": "blank",
       "start_line": 497,
       "end_line": 497,
       "raw": "\n"
     },
     {
-      "id": "b000221",
+      "id": "b000215",
       "kind": "paragraph",
       "start_line": 498,
       "end_line": 498,
-      "raw": "`iiGUI/CodeViewport.h`는 주입된 불변 문서에서 실제 보이는 줄과 열만 읽는다. 읽기 범위와 바이트 예산을 제한하고 유니코드 스칼라 경계를 보존하며 코드 편집기 호스트가 이 계산을 직접 사용한다.\n"
+      "raw": "`iiGUI/ListItemMenuModel.h`는 주입된 메뉴 항목의 중첩·텍스트·아이콘 한도를 검증한다.\n"
     },
     {
-      "id": "b000222",
+      "id": "b000216",
       "kind": "blank",
       "start_line": 499,
       "end_line": 499,
       "raw": "\n"
     },
     {
-      "id": "b000223",
+      "id": "b000217",
       "kind": "paragraph",
       "start_line": 500,
       "end_line": 500,
-      "raw": "`iiGUI/FocusRing.h`와 `iiGUI/NativeFocusRingView.h`는 포커스 윤곽의 유효성, 기하, 선형 색 변환, 상태 전환과 위젯 수명을 소유한다. 앱이 색과 모션을 주입하며 전환 중에만 프레임을 요청한다. 잘못된 입력은 기존 상태를 보존한다.\n"
+      "raw": "`iiGUI/CollectionNavigation.h`와 `iiGUI/VirtualViewport.h`는 주입된 키·상태 계약으로 컬렉션 선택과 포커스 및 가상 뷰포트의 이벤트 기반 상태를 관리한다. 화면 밖 선택 보존과 위젯 퇴역 시 수명 경계를 유지한다.\n"
     },
     {
-      "id": "b000224",
+      "id": "b000218",
       "kind": "blank",
       "start_line": 501,
       "end_line": 501,
       "raw": "\n"
     },
     {
-      "id": "b000225",
+      "id": "b000219",
       "kind": "paragraph",
       "start_line": 502,
+      "end_line": 502,
+      "raw": "`iiGUI/VirtualCollectionPlanner.h`, `iiGUI/VirtualMeasurements.h`, `iiGUI/VirtualLineIndex.h`는 주입된 컬렉션의 표시 셀 배치와 가변 행 높이·누적 위치를 계산한다. 키별 원천과 값 형식은 앱이 제공한다. 동일한 측정치는 다시 알리지 않으며 낡은 세대와 퇴역 후 결과를 무시한다.\n"
+    },
+    {
+      "id": "b000220",
+      "kind": "blank",
+      "start_line": 503,
       "end_line": 503,
+      "raw": "\n"
+    },
+    {
+      "id": "b000221",
+      "kind": "paragraph",
+      "start_line": 504,
+      "end_line": 504,
+      "raw": "`iiGUI/CodeViewport.h`는 주입된 불변 문서에서 실제 보이는 줄과 열만 읽는다. 읽기 범위와 바이트 예산을 제한하고 유니코드 스칼라 경계를 보존하며 코드 편집기 호스트가 이 계산을 직접 사용한다.\n"
+    },
+    {
+      "id": "b000222",
+      "kind": "blank",
+      "start_line": 505,
+      "end_line": 505,
+      "raw": "\n"
+    },
+    {
+      "id": "b000223",
+      "kind": "paragraph",
+      "start_line": 506,
+      "end_line": 506,
+      "raw": "`iiGUI/FocusRing.h`와 `iiGUI/NativeFocusRingView.h`는 포커스 윤곽의 유효성, 기하, 선형 색 변환, 상태 전환과 위젯 수명을 소유한다. 앱이 색과 모션을 주입하며 전환 중에만 프레임을 요청한다. 잘못된 입력은 기존 상태를 보존한다.\n"
+    },
+    {
+      "id": "b000224",
+      "kind": "blank",
+      "start_line": 507,
+      "end_line": 507,
+      "raw": "\n"
+    },
+    {
+      "id": "b000225",
+      "kind": "paragraph",
+      "start_line": 508,
+      "end_line": 509,
       "raw": "`iiGUI/MobileTabPainter.h`와 `iiGUI/NativeMobileTabView.h`는 독립 모바일 탭의 그리기·입력·배지·선택 모션을 소유하며 기존 모바일 탐색 막대와 그리기 계산을 공유한다. 입력 검증 실패는 기존 상태를 보존하고, 시스템 모션 설정과 위젯 퇴역을 반영해 불필요한 프레임과 참조를 해제한다.\n아이콘 조회 중 발생한 재진입과 퇴역은 리비전과 수명 확인으로 처리하므로 오래된 결과가 최신 입력을 덮어쓰지 않는다.\n"
     },
     {
       "id": "b000226",
       "kind": "blank",
-      "start_line": 504,
-      "end_line": 504,
+      "start_line": 510,
+      "end_line": 510,
       "raw": "\n"
     },
     {
       "id": "b000227",
       "kind": "paragraph",
-      "start_line": 505,
-      "end_line": 505,
+      "start_line": 511,
+      "end_line": 511,
       "raw": "`iiGUI/WindowNoiseTexture.h`와 `iiGUI/NativeWindowNoiseTextureView.h`는 256×256의 결정적 노이즈 텍스처와 보관형 이미지 타일을 제공한다. 색·노이즈·블러·그레인이 바뀔 때만 CPU에서 타일을 다시 만들고 크기만 바뀌면 재사용한다. 블러는 반복 경계가 있는 세 차례의 선형 시간 상자 필터로 근사한다. 통상적인 화면에서는 그레인을 장치 픽셀에 맞추고 매우 큰 뷰포트에서는 그리기 명령 수를 제한한다. 실제 화면의 GPU 합성은 호스트 렌더러에 달려 있으며 실기기 실행으로 확인하지 않았다.\n"
     },
     {
       "id": "b000228",
       "kind": "blank",
-      "start_line": 506,
-      "end_line": 506,
+      "start_line": 512,
+      "end_line": 512,
       "raw": "\n"
     },
     {
       "id": "b000229",
       "kind": "paragraph",
-      "start_line": 507,
-      "end_line": 507,
+      "start_line": 513,
+      "end_line": 513,
       "raw": "`iiGUI/NativeWheelScrollGuard.h`는 자신 안의 스크롤 뷰에 정규화된 휠을 전달한다. 경계에서 이벤트를 소비할지 상위 스크롤로 넘길지를 설정할 수 있으며 비활성화 시 기본 스크롤 경로를 유지한다. 대상을 바꾸거나 퇴역한 뒤 오래된 관찰 결과는 보내지 않는다.\n"
     }
   ],
@@ -1898,13 +1898,6 @@
         "block_id": "b000177",
         "line": 454,
         "text": "`iiGUI/ColorPickerLayout.h`는 앱이 주입한 디자인 치수를 사용해 선택기 배치를 계산한다. `iiGUI/NativeColorPickerView.h`는 표면·채널·값·버튼을 조합하고 세션·콜백·취소 수명을 관리한다. iiGUI는 LVUI나 색상 SDK에 의존하지 않는다.",
-        "basis": "lexical_match",
-        "context": "paragraph"
-      },
-      {
-        "block_id": "b000209",
-        "line": 486,
-        "text": "`iiGUI/ListViewport.h`와 `iiGUI/ListDrag.h`는 주입된 불변 목록 스냅샷을 사용해 가시 범위와 드래그 후보를 계산한다. 누적 색인과 이진 탐색을 유지하며 스크롤 때 전체 항목을 반복하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"
       }

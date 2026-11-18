@@ -217,7 +217,7 @@
       "document_id": "urn:iisacc:document:228490d61d89dc03bf37bd4b772f46ea78cbb883cef259c451b732cc16836cee",
       "source": "docs/FrameworkBoundary.md",
       "agent_json": "docs/FrameworkBoundary.agent.json",
-      "source_sha256": "9413cdff4d38d6d08a8248793728040f514a5d854e61cee8b90a136db22f7fd6",
+      "source_sha256": "2b01c878bf6e15470108469230da174b1450e1b557cc817426ec71066980db44",
       "role": "guide"
     },
     {
@@ -420,7 +420,7 @@
       "document_id": "urn:iisacc:document:4ed8bef7c9aa17c56e7df434fe27fd39931b3425427a7f80f4346c0bc68dc5fb",
       "source": "docs/ScrollViews.md",
       "agent_json": "docs/ScrollViews.agent.json",
-      "source_sha256": "3dc1e32cf037f9910a0fdfe5318b093724d8f817953f03a3497536b2a200d5cc",
+      "source_sha256": "2619edc7c0dc29d27c511c408bedc9b3046a6c5d72c0b860905bcaff1c43d3e9",
       "role": "guide"
     },
     {
@@ -469,14 +469,14 @@
       "document_id": "urn:iisacc:document:e59e85c311db04ca6a90364294e741c6b44f641dfd99ae4a1ba760a4a83f2fd2",
       "source": "docs/TextInputProvider.md",
       "agent_json": "docs/TextInputProvider.agent.json",
-      "source_sha256": "2c9cf5fc5f26b1a419271ceb0c1ee2241b5b9c25543d009d1823527ce65c01a7",
+      "source_sha256": "b3d0923383f811141513c2365b38d97350d3f7add909fb854cc187c8fc2afe53",
       "role": "guide"
     },
     {
       "document_id": "urn:iisacc:document:ca0d0b8d1f716a08bb6f2a0c92fe0bf8438042495e81d9d834498362552d57f5",
       "source": "docs/TextLine.md",
       "agent_json": "docs/TextLine.agent.json",
-      "source_sha256": "a3266bb2e1fef1860e6ad888d9e8d100ee114ba44599a68c99028636129dc31d",
+      "source_sha256": "322e21ddd0a0db6caafb8f872b2817acca7854d3ede17384388e3ea73813545c",
       "role": "guide"
     },
     {
@@ -525,7 +525,7 @@
       "document_id": "urn:iisacc:document:780b7c07bb3bb9d820dc6cee29af33dd4c7440aa24a1c9d0bd1e6e904f994481",
       "source": "docs/WidgetInteraction.md",
       "agent_json": "docs/WidgetInteraction.agent.json",
-      "source_sha256": "b180ffe51723d9e58b0fb0f94a54b05203ab53816674a88d051fe1211395c651",
+      "source_sha256": "1118d4f552e9db408e29793d2d5d82eb571757a51b3be76accc4e45875816505",
       "role": "guide"
     },
     {
@@ -631,6 +631,13 @@
       "source": "docs/TextTracking.md",
       "agent_json": "docs/TextTracking.agent.json",
       "source_sha256": "da8606693fd4d6feb530f276f9eca51a3af242c0e82c26d4351dd9fe24c9936d",
+      "role": "guide"
+    },
+    {
+      "document_id": "urn:iisacc:document:40e29c408040dc76b457ead4ce30a07bba9184e7193f503aa143eed93bc5a005",
+      "source": "docs/WebTextInput.md",
+      "agent_json": "docs/WebTextInput.agent.json",
+      "source_sha256": "cc2ad57c19bfb1c55740f2bd2dcea2faf9a76f724a3338135339354f92e34c37",
       "role": "guide"
     }
   ],

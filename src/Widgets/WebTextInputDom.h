@@ -16,11 +16,16 @@ inline void web_text_publish(void* owner,std::uint32_t generation,std::uint32_t 
             const selection=$4>>>0,selectionLength=$5>>>0,flags=$6|0,ack=$10>>>0;
             const canvas=document.querySelector('#canvas');if(!canvas)return;
             let state=Module['iiGUITextInput'];
+            if((flags&3)===3||value.indexOf('\r')!==-1||(!(flags&2)&&value.indexOf('\n')!==-1)){
+                if(state){state.dispose();delete Module['iiGUITextInput'];}return;
+            }
             if(!state){
                 state={active:true,element:null,generation:0,sent:0,shadow:'',composing:false,transfer:false,lastSelection:''};
                 state.send=(action,text,before,start,removed,selected,selectedLength,eventFlags)=>{
                     if(!state.active||!state.element||state.sent===0xffffffff)return false;
-                    if([state.id,text,before].some(item=>item.indexOf('\0')!==-1||lengthBytesUTF8(item)>65536))return false;
+                    if([state.id,text,before].some(item=>item.indexOf('\0')!==-1||lengthBytesUTF8(item)>65536)){
+                        if(action!==9)state.send(9,'','',0,0,0,0,0);return false;
+                    }
                     const sizes=[state.id,text,before].map(item=>lengthBytesUTF8(item)+1),ptrs=[];
                     try{
                         for(const size of sizes){const ptr=_malloc(size);if(!ptr)return false;ptrs.push(ptr);}
@@ -32,7 +37,7 @@ inline void web_text_publish(void* owner,std::uint32_t generation,std::uint32_t 
                     } finally { for(const ptr of ptrs)_free(ptr); }
                 };
                 state.selection=()=>{
-                    const el=state.element;if(!state.active||!el||document.activeElement!==el||state.composing)return;
+                    const el=state.element;if(!state.active||!el||document.activeElement!==el||el.value!==state.shadow)return;
                     const start=el.selectionStart||0,end=el.selectionEnd||0,reverse=el.selectionDirection==='backward'&&end>start;
                     const signature=start+':'+end+':'+reverse;if(signature===state.lastSelection)return;
                     state.lastSelection=signature;state.send(4,'',state.shadow,0,0,start,end-start,1|(reverse?4:0));
@@ -53,12 +58,12 @@ inline void web_text_publish(void* owner,std::uint32_t generation,std::uint32_t 
                 state.shadow='';state.original='';state.candidate='';state.lastSelection='';
                 if(!old||state.kind!==kind){
                     const el=document.createElement(multiline?'textarea':'input');
-                    if(!multiline)el.type=password?'password':'text';el.tabIndex=-1;el.autocomplete='off';
+                    if(!multiline)el.type=password?'password':'text';el.tabIndex=-1;
                     el.style.position='fixed';el.style.opacity='0';el.style.pointerEvents='none';
                     el.style.width='1px';el.style.margin='0';el.style.padding='0';el.style.border='0';el.style.zIndex='-1';
                     el.addEventListener('input',event=>{
                         if(!state.active||state.element!==el)return;
-                        if(state.composing||event.isComposing){state.shadow=el.value;return;}
+                        if(state.composing||event.isComposing)return;
                         const before=state.shadow,after=el.value;if(before===after)return;
                         let first=0,oldEnd=before.length,newEnd=after.length;
                         while(first<oldEnd&&first<newEnd&&before.charCodeAt(first)===after.charCodeAt(first))++first;
@@ -80,8 +85,10 @@ inline void web_text_publish(void* owner,std::uint32_t generation,std::uint32_t 
                     el.addEventListener('compositionupdate',event=>{
                         if(!state.active||state.element!==el||!state.composing)return;
                         const candidate=event.data||'';
-                        state.send(1,candidate,state.shadow,state.start,state.removed,candidate.length,0,1|(state.first?2:0));
-                        state.first=false;state.candidate=candidate;
+                        if(state.send(1,candidate,state.shadow,state.start,state.removed,candidate.length,0,1|(state.first?2:0))){
+                            state.shadow=state.original.slice(0,state.start)+candidate+state.original.slice(state.start+state.removed);
+                            state.first=false;state.candidate=candidate;
+                        }
                     });
                     el.addEventListener('compositionend',event=>{
                         if(!state.active||state.element!==el||!state.composing)return;
@@ -89,7 +96,10 @@ inline void web_text_publish(void* owner,std::uint32_t generation,std::uint32_t 
                         if(!candidate)state.send(3,'',state.shadow,0,0,0,0,1);
                         else{
                             if(candidate!==state.candidate||state.first){
-                                state.send(1,candidate,state.shadow,state.start,state.removed,candidate.length,0,1|(state.first?2:0));
+                                if(!state.send(1,candidate,state.shadow,state.start,state.removed,candidate.length,0,1|(state.first?2:0))){
+                                    if(!state.first)state.send(3,'',state.shadow,0,0,0,0,1);
+                                    state.composing=false;state.original='';state.candidate='';return;
+                                }
                                 state.shadow=state.original.slice(0,state.start)+candidate+state.original.slice(state.start+state.removed);
                             }
                             state.send(2,'',state.shadow,0,0,0,0,1);

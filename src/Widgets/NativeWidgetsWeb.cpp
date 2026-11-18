@@ -107,16 +107,19 @@ struct NativeWidgetSurface::Impl final {
         web_text_remove(retired);
     }
     std::optional<TextContent> editor_text(const WidgetSnapshot& editor){
-        if(editor.text_length>web_text_limit)return {};
+        if(editor.text_length>web_text_limit||!editor.text_revision)return {};
         auto content=callbacks.text_content(editor.id,{0,editor.text_length});
         if(!content||content->range!=TextRange{0,editor.text_length}||content->text.size()>web_text_limit)return {};
+        auto current=callbacks.focused_editor();
+        if(!live||!current||current->id!=editor.id||!current->text_revision||*current->text_revision!=*editor.text_revision)return {};
         return std::move(*content);
     }
     void publish_text(){
         auto editor=callbacks.focused_editor();if(!live)return;
-        if(!editor||!editor->attached||!editor->enabled||!editor->visible||!editor->focused||editor->input_blocked||!editor->text_revision){retire_text();return;}
+        if(!editor||!editor->attached||!editor->enabled||!editor->visible||!editor->focused||editor->input_blocked||
+           !editor->text_revision||(editor->password&&editor->multiline)){retire_text();return;}
         auto content=editor_text(*editor);if(!live)return;
-        if(!content){retire_text();return;}
+        if(!content||!web_text_representable(editor->password,editor->multiline,content->text)){retire_text();return;}
         if(!text_generation||!text_focus||!web_text_same_focus(*editor,text_id,*text_focus)){
             retire_text();
             if(parent.text_serial==(std::numeric_limits<std::uint32_t>::max)())throw std::overflow_error("Web text generation exhausted");
@@ -130,18 +133,16 @@ struct NativeWidgetSurface::Impl final {
         const bool ordered=message.sequence==text_acknowledged+1;text_acknowledged=message.sequence;text_dirty=true;
         if(!ordered||message.id!=text_id||!text_focus)return;
         auto editor=callbacks.focused_editor();if(!live||!editor||!web_text_same_focus(*editor,text_id,*text_focus))return;
-        const bool mutation=message.action==WebTextAction::replace||message.action==WebTextAction::composition||
-                            message.action==WebTextAction::commit||message.action==WebTextAction::cancel;
-        if(editor->read_only&&mutation)return;
-        if((mutation||message.action==WebTextAction::selection)&&!message.has_before)return;
-        if(message.has_before){auto current=editor_text(*editor);if(!live||!current||current->text!=message.before)return;}
+        std::optional<TextContent> current;
+        if(message.has_before){current=editor_text(*editor);if(!live||!current)return;}
+        if(!web_text_admissible(message,*editor,text_id,*text_focus,current?std::string_view(current->text):std::string_view{}))return;
         auto input=web_text_input(message);if(!input)return;
-        if(input->text_service){if(callbacks.text_service)(void)callbacks.text_service(std::move(*input));}
+        if(input->text_service){input->expected_text_revision=*editor->text_revision;if(callbacks.text_service)(void)callbacks.text_service(std::move(*input));}
         else callbacks.input(std::move(*input));
     }
     void flush(){if(!live||!dirty||lost||!parent.visible||!canvas)return;auto frame=callbacks.frame(parent.size);if(!live)return;canvas->draw(frame,parent.scale,parent.size.height);
         if(text_dirty){text_dirty=false;publish_text();if(!live)return;}
-        if(parent.accessibility_enabled&&accessibility_dirty){accessibility_dirty=false;accessibility();}dirty=accessibility_dirty&&parent.accessibility_enabled;}
+        if(parent.accessibility_enabled&&accessibility_dirty){accessibility_dirty=false;accessibility();}dirty=text_dirty||(accessibility_dirty&&parent.accessibility_enabled);}
 };
 NativeWidgetSurface::NativeWidgetSurface(void* parent,WidgetSurfaceCallbacks callbacks):impl_(std::make_unique<Impl>(*static_cast<WebSurfaceParent*>(parent),std::move(callbacks))){}
 NativeWidgetSurface::~NativeWidgetSurface(){impl_->live=false;impl_->retire_text();if(impl_->parent.accessibility_enabled)impl_->retire_accessibility();}

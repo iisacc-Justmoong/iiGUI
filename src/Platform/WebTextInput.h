@@ -17,12 +17,24 @@ struct WebTextMessage final {
     bool has_before=false, first_composition=false, selection_reversed=false, shift=false;
 };
 inline constexpr std::size_t web_text_limit=65536;
+[[nodiscard]] inline bool web_text_representable(bool password,bool multiline,std::string_view text) noexcept {
+    return !(password&&multiline) && text.find('\r')==text.npos && (multiline||text.find('\n')==text.npos);
+}
 
 [[nodiscard]] inline bool web_text_same_focus(const WidgetSnapshot& current,std::string_view id,
                                                const TextInputRevision& published) noexcept {
     return current.id==id && current.attached && current.visible && current.enabled && current.focused &&
            !current.input_blocked && current.text_input && current.text_revision &&
            current.text_revision->identity==published.identity && current.text_revision->focus==published.focus;
+}
+[[nodiscard]] inline bool web_text_admissible(const WebTextMessage& message,const WidgetSnapshot& current,
+        std::string_view id,const TextInputRevision& published,std::string_view text) noexcept {
+    if(message.id!=id || !web_text_same_focus(current,id,published))return false;
+    const bool mutation=message.action==WebTextAction::replace||message.action==WebTextAction::composition||
+                        message.action==WebTextAction::commit||message.action==WebTextAction::cancel;
+    if(current.read_only && mutation)return false;
+    if((mutation||message.action==WebTextAction::selection)&&!message.has_before)return false;
+    return !message.has_before || message.before==text;
 }
 
 [[nodiscard]] inline std::optional<WidgetInput> web_text_input(const WebTextMessage& message) {
@@ -54,9 +66,11 @@ inline constexpr std::size_t web_text_limit=65536;
         result.kind=WidgetInputKind::text_selection;result.text_service=true;
         result.replacement_range=TextRange{message.selection_start,message.selection_length};
         result.selection_reversed=message.selection_reversed;break;
-    case WebTextAction::tab:result.kind=WidgetInputKind::key_down;result.key=WidgetKey::tab;break;
-    case WebTextAction::enter:result.kind=WidgetInputKind::key_down;result.key=WidgetKey::enter;break;
-    case WebTextAction::escape:result.kind=WidgetInputKind::key_down;result.key=WidgetKey::escape;break;
+    // Keyboard navigation must traverse the whole focused hierarchy, including
+    // content hosts and popovers. The sender is validated before routing.
+    case WebTextAction::tab:result.kind=WidgetInputKind::key_down;result.key=WidgetKey::tab;result.target.clear();break;
+    case WebTextAction::enter:result.kind=WidgetInputKind::key_down;result.key=WidgetKey::enter;result.target.clear();break;
+    case WebTextAction::escape:result.kind=WidgetInputKind::key_down;result.key=WidgetKey::escape;result.target.clear();break;
     case WebTextAction::blur:result.kind=WidgetInputKind::focus_lost;result.target.clear();break;
     case WebTextAction::refresh:return {};
     default:return {};

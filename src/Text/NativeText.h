@@ -153,9 +153,15 @@ struct ForegroundKey final {
     void assign(Rect r,double s,CanvasLayerView l,bool transformed=false) { images_before_text=l.images_before_text;transform=transformed?l.content_transform:ContentTransform{};valid=true;viewport=r;scale=s;texts.assign(l.texts.begin(),l.texts.end());images.assign(l.images.begin(),l.images.end()); }
 };
 struct ForegroundRaster final {PixelBuffer pixels;PixelClip region;};
-ForegroundRaster rasterize_foreground_region(Rect,CanvasLayerView,double,bool transformed=false);
-PixelBuffer rasterize_foreground(Rect viewport,CanvasLayerView,double scale);
-PixelBuffer rasterize_transformed_foreground(Rect viewport,CanvasLayerView,double scale);
+#if defined(IIGUI_FOREGROUND_TEST_EXPORTS)
+#define IIGUI_TEST_FOREGROUND_API IIGUI_EXPORT
+#else
+#define IIGUI_TEST_FOREGROUND_API
+#endif
+IIGUI_TEST_FOREGROUND_API ForegroundRaster rasterize_foreground_region(Rect,CanvasLayerView,double,bool transformed=false);
+IIGUI_TEST_FOREGROUND_API PixelBuffer rasterize_foreground(Rect viewport,CanvasLayerView,double scale);
+IIGUI_TEST_FOREGROUND_API PixelBuffer rasterize_transformed_foreground(Rect viewport,CanvasLayerView,double scale);
+#undef IIGUI_TEST_FOREGROUND_API
 inline float encoded_srgb(float linear) {
     return linear<=0.0031308f ? linear*12.92f : 1.055f*std::pow(linear,1.f/2.4f)-0.055f;
 }

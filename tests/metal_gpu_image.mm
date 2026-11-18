@@ -45,11 +45,12 @@ int main(){
         auto queue=[device newCommandQueue];check(queue!=nil,"Cannot create Metal test queue");
         std::vector<std::uint8_t> pixels{255,0,0,255, 0,255,0,0, 0,0,255,128, 255,255,255,255};
         auto image=rgba_image(2,2,pixels);check(bool(image),"Cannot create image test input");
+        auto device_image=device_rgba_image(2,2,pixels);check(bool(device_image),"Cannot create device raster input");
         auto source_desc=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB width:2 height:2 mipmapped:NO];
         source_desc.usage=MTLTextureUsageShaderRead;source_desc.storageMode=MTLStorageModeShared;
         auto source=[device newTextureWithDescriptor:source_desc];check(source!=nil,"Cannot create Metal image input");
         [source replaceRegion:MTLRegionMake2D(0,0,2,2) mipmapLevel:0 withBytes:pixels.data() bytesPerRow:8];
-        for(int variant=0;variant<6;++variant){
+        for(int variant=0;variant<7;++variant){
             CanvasFrame frame{.viewport={0,0,16,16}};
             ImageRun run{.bounds={2,2,12,12},.image=*image};
             if(variant==1){run.tint=Color{.2f,.8f,.3f,.6f};run.opacity=.75f;}
@@ -57,8 +58,24 @@ int main(){
             if(variant==3){run.source={.25f,0,.5f,1};run.gradient=ImageGradient{.height=12,.middle_position=.3f};}
             if(variant==4){run.bounds={2.75f,2.75f,10.5f,10.5f};}
             if(variant==5){run.bounds={2.75f,2.75f,10.5f,10.5f};run.radius=3.5f;run.border_width=6;run.border={0,1,0,.8f};}
+            const double scale=variant==6?2.:1.;
+            if(variant==6){frame.viewport={0,0,8,8};run={.bounds={.32f,.31f,.5f,1},.image=*device_image,.source={0,0,.5f,1}};}
             frame.images.push_back(run);
-            const auto expected=rasterize_foreground(frame.viewport,canvas_layers(frame).front(),1);
+            const auto layer=canvas_layers(frame).front();
+            const auto expected=rasterize_foreground(frame.viewport,layer,scale);
+            if(variant==6){
+                for(unsigned y=0;y<16;++y)for(unsigned x=0;x<16;++x){
+                    const auto offset=(y*16+x)*4;
+                    const auto alpha=x==1?(y==1?255:y==2?128:0):0;
+                    check(expected.rgba[offset+3]==alpha,"A raster texel was blurred, clipped, or placed at the wrong physical pixel");
+                }
+                const auto region=rasterize_foreground_region(frame.viewport,layer,scale,false);
+                check(region.region.x==1&&region.region.y==1&&region.region.width==1&&region.region.height==2,
+                      "Raster region included an extra column or row");
+                check(!device_image_pixels(run,run.bounds,scale*1.5),"A genuinely scaled raster was treated as device sized");
+                const auto photo=ImageRun{.bounds=run.bounds,.image=*image,.source=run.source};
+                check(!device_image_pixels(photo,photo.bounds,scale),"A regular image was treated as a device raster");
+            }
             auto output_desc=[MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB width:16 height:16 mipmapped:NO];
             output_desc.usage=MTLTextureUsageRenderTarget;output_desc.storageMode=MTLStorageModeShared;
             auto output=[device newTextureWithDescriptor:output_desc];check(output!=nil,"Cannot create Metal image output");
@@ -67,7 +84,7 @@ int main(){
             pass.colorAttachments[0].clearColor=MTLClearColorMake(0,0,0,0);
             auto command=[queue commandBuffer];auto encoder=[command renderCommandEncoderWithDescriptor:pass];
             check(command!=nil&&encoder!=nil,"Cannot encode Metal image test");
-            const auto uniform=gpu_image_uniform(run,{},1,frame.viewport);
+            const auto uniform=gpu_image_uniform(run,{},scale,frame.viewport);
             [encoder setRenderPipelineState:pipeline];[encoder setVertexBytes:&uniform length:sizeof(uniform) atIndex:0];
             [encoder setFragmentTexture:source atIndex:0];[encoder setFragmentBytes:&uniform length:sizeof(uniform) atIndex:0];
             [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];[encoder endEncoding];

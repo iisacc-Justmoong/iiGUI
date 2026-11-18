@@ -3,6 +3,7 @@
 #include <iiSDKCore/Core/Result/Result.h>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -26,6 +27,7 @@ private:
     RasterImage(std::uint32_t w,std::uint32_t h,std::vector<std::uint8_t> p):width_(w),height_(h),pixels_(std::move(p)) {}
     friend core::Result<std::shared_ptr<const RasterImage>> rgba_image(std::uint32_t,std::uint32_t,std::vector<std::uint8_t>);
     friend core::Result<std::shared_ptr<const RasterImage>> rgba_image(std::uint32_t,std::uint32_t,std::vector<std::uint8_t>,ImageBudget);
+    friend core::Result<std::shared_ptr<const RasterImage>> device_rgba_image(std::uint32_t,std::uint32_t,std::vector<std::uint8_t>);
     std::uint32_t width_,height_;
     std::vector<std::uint8_t> pixels_;
 };
@@ -33,6 +35,21 @@ private:
     std::uint32_t width,std::uint32_t height,std::vector<std::uint8_t> rgba);
 [[nodiscard]] IIGUI_EXPORT core::Result<std::shared_ptr<const RasterImage>> rgba_image(
     std::uint32_t width,std::uint32_t height,std::vector<std::uint8_t> rgba,ImageBudget);
+// An RGBA raster already sampled to device pixels, e.g. shaped glyph coverage.
+// At 1:1 with a whole-pixel source crop, the painter aligns it to the display
+// grid. Ordinary images and scaled rasters still use the normal image filter.
+[[nodiscard]] IIGUI_EXPORT core::Result<std::shared_ptr<const RasterImage>> device_rgba_image(
+    std::uint32_t width,std::uint32_t height,std::vector<std::uint8_t> rgba);
+struct ImageRun;
+struct Rect;
+struct DeviceImagePixels final {
+    int x, y, source_x, source_y, width, height;
+};
+// For external painters: resolve an already sampled run to integer destination
+// and source pixels. Pass bounds after the content transform; only use this
+// path without a zoom/rotation. A null result retains ordinary image filtering.
+[[nodiscard]] IIGUI_EXPORT std::optional<DeviceImagePixels> device_image_pixels(
+    const ImageRun&, Rect transformed_bounds, double scale) noexcept;
 // Memory-only PNG, <=8 MiB and 1..2048 pixels per dimension. No file/network I/O.
 [[nodiscard]] IIGUI_EXPORT core::Result<std::shared_ptr<const RasterImage>> png_image(std::span<const std::uint8_t>);
 // Static native SVG assets, <=1 MiB input, 1..8192 pixels per output dimension and at most 16 Mi pixels.

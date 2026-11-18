@@ -112,7 +112,10 @@ class BasicNativeInputField final {
         return {code,error.message};
     }
     [[nodiscard]] static ii::gui::TextLineStyle line_style(const InputFieldConfiguration& value,std::string_view inherited){
-        return {.font_family=value.font_family.empty()?std::string(inherited):value.font_family,.font_size=value.font_size,.line_height=value.line_height};
+        ii::gui::TextLineStyle style{.font_family=value.font_family.empty()?std::string(inherited):value.font_family,
+            .font_size=value.font_size,.line_height=value.line_height};
+        if constexpr(requires{value.font_weight;})style.font_weight=value.font_weight;
+        return style;
     }
     [[nodiscard]] static double clear_reservation(const InputFieldConfiguration& value,ii::gui::Size size)noexcept{
         if(!value.clear_button_visible||value.multiline)return 0;
@@ -213,9 +216,10 @@ class BasicNativeInputField final {
                 if(auto bounded=clip(rectangle,area)){const auto ink=color(material_surface?Defaults::description:options.palette.caret,view.enabled);drawing->panels.push_back({*bounded,ink,ink,0});}}
             if(state->input->text().empty()&&!options.placeholder.empty()){
                 const auto line_height=state->layout.lines().front().height;
+                const auto style=line_style(options,state->inherited_font);
                 ii::gui::TextRun run{{float(area.x),float(area.y),float(area.width),float((std::min)(area.height,line_height))},options.placeholder,
-                    material_surface?text_ink:color(options.palette.placeholder,view.enabled),float(options.font_size),400,ii::gui::TextAlignment::left,options.font_family.empty()?state->inherited_font:options.font_family};
-                run.line_height=float(options.line_height);run.clip=ii::gui::Rect{float(area.x),float(area.y),float(area.width),float(area.height)};
+                    material_surface?text_ink:color(options.palette.placeholder,view.enabled),float(style.font_size),style.font_weight,ii::gui::TextAlignment::left,style.font_family};
+                run.line_height=float(style.line_height);run.clip=ii::gui::Rect{float(area.x),float(area.y),float(area.width),float(area.height)};
                 drawing->texts.push_back(std::move(run));
             }else{
                 const auto ink=text_ink;
@@ -223,10 +227,23 @@ class BasicNativeInputField final {
                     const auto& line=state->layout.lines()[i];const auto y=area.y+line.y-state->scroll_y;
                     const auto top=(std::max)(y,area.y),bottom=(std::min)(y+line.height,area.y+area.height);
                     if(bottom<=top||state->layout.display_text(i).empty())continue;
-                    auto bitmap=state->layout.render_line(i,state->scroll_x,area.width,ink,view.backing_scale);if(!bitmap)return std::unexpected(bitmap.error());
-                    auto image=ii::gui::rgba_image(bitmap->width,bitmap->height,std::move(bitmap->rgba));if(!image)return std::unexpected(image.error());
-                    ii::gui::ImageRun run;run.bounds={float(area.x),float(top),float(area.width),float(bottom-top)};run.image=std::move(*image);
-                    run.source={0,float((top-y)/line.height),1,float((bottom-top)/line.height)};drawing->images.push_back(std::move(run));
+                    const auto scale=view.backing_scale;
+                    auto bitmap=state->layout.render_line(i,state->scroll_x,area.width,ink,scale);if(!bitmap)return std::unexpected(bitmap.error());
+                    // Crop in physical pixels. Fitting a ceil-sized glyph
+                    // mask into fractional logical bounds filters it twice.
+                    const auto pixel=[scale](double edge){return std::floor(edge*scale+.5);};
+                    const auto row=[&](double edge){return std::uint32_t(std::clamp(pixel(edge)-pixel(y),0.,double(bitmap->height)));};
+                    const auto first=row(top),last=row(bottom);
+                    const auto columns=std::uint32_t(std::clamp(pixel(area.x+area.width)-pixel(area.x),0.,double(bitmap->width)));
+                    if(last<=first||!columns)continue;
+                    const auto pixels=bitmap->height;
+                    const auto source_width=float(double(columns)/bitmap->width);
+                    auto image=ii::gui::device_rgba_image(bitmap->width,bitmap->height,std::move(bitmap->rgba));if(!image)return std::unexpected(image.error());
+                    ii::gui::ImageRun run;
+                    run.bounds={float(area.x),float(y+first/scale),float(columns/scale),float((last-first)/scale)};
+                    run.image=std::move(*image);
+                    run.source={0,float(double(first)/pixels),source_width,float(double(last-first)/pixels)};
+                    drawing->images.push_back(std::move(run));
                 }
             }
             return std::shared_ptr<const ii::gui::WidgetDrawing>(std::move(drawing));

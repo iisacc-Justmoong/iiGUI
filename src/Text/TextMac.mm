@@ -11,6 +11,7 @@
 #endif
 #include <iiGUI/NativeText.h>
 #include <iiGUI/FontDatabase.h>
+#include "TextRasterApple.h"
 
 namespace ii::gui::detail {
 namespace {
@@ -77,40 +78,33 @@ float measure_text_width(const TextRun& run) {
 PixelBuffer rasterize_text(const CanvasFrame& frame, double scale) {
     @autoreleasepool {
         const auto [width,height]=canvas_pixels(frame,scale);
-        PixelBuffer result{width,height,std::vector<std::uint8_t>(std::size_t(width)*height*4)};
-        auto space=CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-        auto context=CGBitmapContextCreate(result.rgba.data(),width,height,8,std::size_t(width)*4,space,
-            CGBitmapInfo(kCGImageAlphaPremultipliedLast)|kCGBitmapByteOrder32Big);
-        CGColorSpaceRelease(space);
-        if (!context) throw std::runtime_error("Cannot allocate native LVUI text surface");
-        CGContextTranslateCTM(context,0,height);
-        CGContextScaleCTM(context,scale,-scale);
+        return rasterize_apple_text(width,height,scale,[&](CGContextRef context,std::uint32_t sample_height,double sampling_scale){
+            CGContextTranslateCTM(context,0,sample_height);
+            CGContextScaleCTM(context,sampling_scale,-sampling_scale);
 #if TARGET_OS_IOS
-        UIGraphicsPushContext(context);
+            UIGraphicsPushContext(context);
 #else
-        [NSGraphicsContext saveGraphicsState];
-        NSGraphicsContext.currentContext=[NSGraphicsContext graphicsContextWithCGContext:context flipped:YES];
+            [NSGraphicsContext saveGraphicsState];
+            NSGraphicsContext.currentContext=[NSGraphicsContext graphicsContextWithCGContext:context flipped:YES];
 #endif
-        for (const auto& run:frame.texts) {
-            CGContextSaveGState(context);
-            const auto r=run.bounds;
-            CGContextClipToRect(context,CGRectMake(r.x,r.y,r.width,r.height));
-            if(run.clip){const auto c=*run.clip;CGContextClipToRect(context,CGRectMake(c.x,c.y,c.width,c.height));}
+            for (const auto& run:frame.texts) {
+                CGContextSaveGState(context);
+                const auto r=run.bounds;
+                CGContextClipToRect(context,CGRectMake(r.x,r.y,r.width,r.height));
+                if(run.clip){const auto c=*run.clip;CGContextClipToRect(context,CGRectMake(c.x,c.y,c.width,c.height));}
 #if TARGET_OS_IOS
-            [attributed(run) drawWithRect:CGRectMake(r.x,r.y,r.width,r.height) options:run.line_height>0?NSStringDrawingUsesLineFragmentOrigin:options context:nil];
+                [attributed(run) drawWithRect:CGRectMake(r.x,r.y,r.width,r.height) options:run.line_height>0?NSStringDrawingUsesLineFragmentOrigin:options context:nil];
 #else
-            [attributed(run) drawWithRect:CGRectMake(r.x,r.y,r.width,r.height) options:run.line_height>0?NSStringDrawingUsesLineFragmentOrigin:options];
+                [attributed(run) drawWithRect:CGRectMake(r.x,r.y,r.width,r.height) options:run.line_height>0?NSStringDrawingUsesLineFragmentOrigin:options];
 #endif
-            CGContextRestoreGState(context);
-        }
+                CGContextRestoreGState(context);
+            }
 #if TARGET_OS_IOS
-        UIGraphicsPopContext();
+            UIGraphicsPopContext();
 #else
-        [NSGraphicsContext restoreGraphicsState];
+            [NSGraphicsContext restoreGraphicsState];
 #endif
-        CGContextRelease(context);
-        straight_rgba(result,false);
-        return result;
+        });
     }
 }
 } // namespace ii::gui::detail

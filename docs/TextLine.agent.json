@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/TextLine.md",
-    "sha256": "a3266bb2e1fef1860e6ad888d9e8d100ee114ba44599a68c99028636129dc31d",
-    "bytes": 5413,
-    "line_count": 29,
+    "sha256": "322e21ddd0a0db6caafb8f872b2817acca7854d3ede17384388e3ea73813545c",
+    "bytes": 7065,
+    "line_count": 41,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -43,7 +43,7 @@
       "kind": "paragraph",
       "start_line": 3,
       "end_line": 3,
-      "raw": "`TextLine`은 줄 바꿈 없는 한 단락을 CoreText(macOS·iPadOS), DirectWrite(Windows), Pango(Linux), StaticLayout(Android)에 배치한다. OS 편집 컨트롤은 생성하지 않는다. 글꼴 배치·커서 위치·시각 선택 구간·잘린 글리프 이미지를 자체 C++ 위젯이 사용한다.\n"
+      "raw": "`TextLine`은 줄 바꿈 없는 한 단락을 CoreText(macOS·iPadOS), DirectWrite(Windows), Pango(Linux), StaticLayout(Android), 브라우저 DOM과 Canvas(WebAssembly)에 배치한다. OS 편집 컨트롤은 생성하지 않는다. 글꼴 배치·커서 위치·시각 선택 구간·잘린 글리프 이미지를 자체 C++ 위젯이 사용한다.\n"
     },
     {
       "id": "b000004",
@@ -157,7 +157,95 @@
       "kind": "paragraph",
       "start_line": 29,
       "end_line": 29,
-      "raw": "`tests/text_line.cpp`와 `tests/text_line_wrap.cpp`는 자소·UTF-16·탭·양방향 선택·문단 방향이 이어지는 줄바꿈·긴 줄의 잘린 이미지·스레드·수명·한계를 검사한다. Android는 별도의 모의 운영체제 검사와 NDK 크로스 빌드·링크로 JNI 경계를 확인한다. 웹의 편집용 native text line은 아직 지원되지 않는다. 이 검사들은 Android OS의 실제 문자 조합, 입력기, 화면 또는 접근성 실행 결과가 아니다. Windows·Linux는 소스 경로를 작성했으며 실제 컴파일·실행을 이번 단계에서 확인하지 않았다.\n"
+      "raw": "`tests/text_line.cpp`와 `tests/text_line_wrap.cpp`는 자소·UTF-16·탭·양방향 선택·문단 방향이 이어지는 줄바꿈·긴 줄의 잘린 이미지·스레드·수명·한계를 검사한다. Android는 별도의 모의 운영체제 검사와 NDK 크로스 빌드·링크로 JNI 경계를 확인한다. 이 검사들은 Android OS의 실제 문자 조합, 입력기, 화면 또는 접근성 실행 결과가 아니다. Windows·Linux는 소스 경로를 작성했으며 실제 컴파일·실행을 이번 단계에서 확인하지 않았다.\n"
+    },
+    {
+      "id": "b000020",
+      "kind": "blank",
+      "start_line": 30,
+      "end_line": 30,
+      "raw": "\n"
+    },
+    {
+      "id": "b000021",
+      "kind": "heading",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "## 웹 단일 행 입력\n",
+      "level": 2,
+      "title": "웹 단일 행 입력"
+    },
+    {
+      "id": "b000022",
+      "kind": "blank",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "id": "b000023",
+      "kind": "paragraph",
+      "start_line": 33,
+      "end_line": 33,
+      "raw": "브라우저의 임시 비표시 DOM Range가 UTF-16 커서와 선택 영역을 구한다. 포인터로 위치를 찾을 때 확장 자소 경계의 커서 좌표를 준비하고 같은 텍스트가 유지되는 동안 재사용한다. 실제 글자는 기존 Canvas 글꼴 래스터 경로에서 그리며 iiGUI 위젯이 이미지와 선택을 표시한다. 비밀번호 입력은 위젯이 마스킹한 글자만 줄 배치에 전달한다.\n"
+    },
+    {
+      "id": "b000024",
+      "kind": "blank",
+      "start_line": 34,
+      "end_line": 34,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 35,
+      "end_line": 35,
+      "raw": "이 경로에는 브라우저 문서에 접근하는 UI 스레드가 필요하다. 웹의 단락 줄바꿈은 `TextLine::wrap`에서 지원되지 않는다. `tests/web_text_backend.cpp`는 모의 DOM에서 좌표와 뷰포트 래스터를 확인하고 DOM이 없는 환경에서는 기존의 미지원 결과를 확인한다.\n"
+    },
+    {
+      "id": "b000026",
+      "kind": "blank",
+      "start_line": 36,
+      "end_line": 36,
+      "raw": "\n"
+    },
+    {
+      "id": "b000027",
+      "kind": "heading",
+      "start_line": 37,
+      "end_line": 37,
+      "raw": "## 화면 배율과 글리프 품질\n",
+      "level": 2,
+      "title": "화면 배율과 글리프 품질"
+    },
+    {
+      "id": "b000028",
+      "kind": "blank",
+      "start_line": 38,
+      "end_line": 38,
+      "raw": "\n"
+    },
+    {
+      "id": "b000029",
+      "kind": "paragraph",
+      "start_line": 39,
+      "end_line": 39,
+      "raw": "macOS와 iOS의 자체 렌더러는 CoreText로 한글 자소 조합, 폴백 글꼴 및 영문 혼용을 조판한다. 반투명 배경에 올리는 글자는 RGB 서브픽셀 색상이 없는 회색조 커버리지로 처리한다. 배율에 따라 글자 래스터만 추가 샘플링하고, 8 MiB를 넘기는 추가 작업 버퍼는 만들지 않는다.\n"
+    },
+    {
+      "id": "b000030",
+      "kind": "blank",
+      "start_line": 40,
+      "end_line": 40,
+      "raw": "\n"
+    },
+    {
+      "id": "b000031",
+      "kind": "paragraph",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "Metal과 외부 페인터는 `device_rgba_image`로 만들어진 글자 래스터를 화면 배율에서 정수 픽셀에 배치한다. `device_image_pixels`는 화면과 원본의 픽셀 수가 일치하고 잘라낼 영역이 픽셀 경계에 놓일 때만 좌표를 반환한다. 확대·축소가 있는 글자와 일반 이미지의 필터링은 그대로 유지된다. 이 경로는 장면 전체를 초과 샘플링하거나 새 프레임 타이머를 사용하지 않는다.\n"
     }
   ],
   "outline": [
@@ -176,6 +264,22 @@
       "title": "Android 구현 계약",
       "anchor": "android-구현-계약",
       "start_line": 15
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "웹 단일 행 입력",
+      "anchor": "웹-단일-행-입력",
+      "start_line": 31
+    },
+    {
+      "block_id": "b000027",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "화면 배율과 글리프 품질",
+      "anchor": "화면-배율과-글리프-품질",
+      "start_line": 37
     }
   ],
   "indexes": {
@@ -183,7 +287,7 @@
       {
         "block_id": "b000003",
         "line": 3,
-        "text": "`TextLine`은 줄 바꿈 없는 한 단락을 CoreText(macOS·iPadOS), DirectWrite(Windows), Pango(Linux), StaticLayout(Android)에 배치한다. OS 편집 컨트롤은 생성하지 않는다. 글꼴 배치·커서 위치·시각 선택 구간·잘린 글리프 이미지를 자체 C++ 위젯이 사용한다.",
+        "text": "`TextLine`은 줄 바꿈 없는 한 단락을 CoreText(macOS·iPadOS), DirectWrite(Windows), Pango(Linux), StaticLayout(Android), 브라우저 DOM과 Canvas(WebAssembly)에 배치한다. OS 편집 컨트롤은 생성하지 않는다. 글꼴 배치·커서 위치·시각 선택 구간·잘린 글리프 이미지를 자체 C++ 위젯이 사용한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
@@ -236,7 +340,7 @@
     "tables": []
   },
   "provenance": {
-    "generator": "workspace-docs",
+    "generator": "manual-lossless-update",
     "version": "1.0.0",
     "profile": "lossless-blocks-v1",
     "derived": true
