@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/KeyedContent.md",
-    "sha256": "d5d3a59d756ca67b7fb132bda01603a88ccb6ff2a6b5fa5be765a25ad654c231",
-    "bytes": 19103,
+    "sha256": "1b21fc3612ce7651d2d29881622807b2f36658e55377cf7141bbd2a3114092d8",
+    "bytes": 19066,
     "line_count": 210,
     "encoding": "utf-8",
     "language": "ko"
@@ -103,7 +103,7 @@
       "kind": "paragraph",
       "start_line": 22,
       "end_line": 27,
-      "raw": "`iiGUI.collection_widget_navigation`은 옵트인, 플랫폼 클릭 횟수, 대체 시간 판정,\n드래그·보조키·취소를 창 없이 검사한다. 선택적\n`iiGUI.native_double_click_generated`는 LVUI에서 생성한 실제 위젯과 반응형\n활성화 설정을 연결해 검사한다. 이 검사는 실제 OS 포인터 입력이나 제품 실행을\n의미하지 않는다. 현재 macOS 검사 타깃은 LVUI 컴파일러와 네이티브 공유 라이브러리가\n빌드된 상태에서 `IIGUI_BUILD_LVUI_INTEGRATION_TESTS=ON`으로 활성화한다.\n"
+      "raw": "`iiGUI.collection_widget_navigation`은 옵트인, 플랫폼 클릭 횟수, 대체 시간 판정,\n드래그·보조키·취소를 창 없이 검사한다. 선택적\n`iiGUI.native_double_click_generated`는 LVUI에서 생성한 실제 위젯과 반응형\n활성화 설정을 연결해 검사한다. 이 검사는 실제 OS 포인터 입력이나 제품 실행을\n의미하지 않는다. macOS 검사 타깃은 iiGUI 설치본을 선택한 LVUI 프로젝트에서\n`LVUI_BUILD_IIGUI_INTEGRATION_TESTS=ON`으로 활성화한다.\n"
     },
     {
       "id": "b000012",
@@ -488,13 +488,6 @@
         "block_id": "b000009",
         "line": 18,
         "text": "자식 컨트롤, 취소 또는 폐기는 활성화하지 않는다. 플랫폼이 제공한 클릭 횟수를",
-        "basis": "lexical_match",
-        "context": "paragraph"
-      },
-      {
-        "block_id": "b000011",
-        "line": 26,
-        "text": "의미하지 않는다. 현재 macOS 검사 타깃은 LVUI 컴파일러와 네이티브 공유 라이브러리가",
         "basis": "lexical_match",
         "context": "paragraph"
       },

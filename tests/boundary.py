@@ -34,8 +34,9 @@ for base in (root / 'src',):
         if re.search(r'\b(?:ofstream|fopen|freopen|creat)\s*\(', source):
             violations.append(f'{file}: file creation bypasses iiFileProvider')
 cmake_files = [root / 'CMakeLists.txt'] + sorted(
-    file for file in (root / 'cmake').rglob('*')
-    if file.is_file() and (file.name.endswith('.cmake') or file.name.endswith('.cmake.in')))
+    file for area in ('cmake', 'examples', 'tests') for file in (root / area).rglob('*')
+    if 'build' not in file.relative_to(root / area).parts and file.is_file()
+    and (file.name == 'CMakeLists.txt' or file.name.endswith(('.cmake', '.cmake.in'))))
 for file in cmake_files:
     violations.extend(f'{file}: {issue}' for issue in forbidden_cmake_dependencies(file.read_text()))
 manifest = json.loads((root / 'examples/HelloGUI/iiSDKBuilder.json').read_text())

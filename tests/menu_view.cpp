@@ -38,8 +38,84 @@ struct Policy final {
     using Direction=MenuDirection;using PopupPort=::PopupPort;using SectionPort=::SectionPort;using SectionAccess=::SectionAccess;
     using RegistrationPort=::RegistrationPort;
 };
+
+// A context menu keeps hit testing and keyboard focus without publishing
+// pointer or key feedback to the item or its presentation.
+void context_menu_uses_stable_item_appearance() {
+    auto tree=std::make_shared<detail::WidgetState>([](ii::runtime::Task task){task();});
+    const auto host=take(tree->content_host({},"host",{320,180}));
+    Widget menu,first,second;
+    int first_clicks=0,second_clicks=0,presses=0,releases=0;
+    good(host.set_content([&](WidgetBuilder& builder)->Result<void>{
+        menu=take(builder.menu({},"context",{.style=MenuStyle::context,.auto_close_on_trigger=false}));
+        first=take(builder.menu_item(menu,"first",{.label="First",.has_child_items=false},[&]{++first_clicks;}));
+        second=take(builder.menu_item(menu,"second",{.label="Second",.has_child_items=false},[&]{++second_clicks;}));
+        return second.set_control_events({.pressed=[&]{++presses;},.released=[&]{++releases;}});
+    }));
+    good(menu.open_at(16,16));
+    const auto idle=take(tree->drawing_snapshot({320,180}));
+    const auto second_bounds=take(second.snapshot()).visual_bounds;
+    const auto x=second_bounds.x+second_bounds.width/2;
+    const auto y=second_bounds.y+second_bounds.height/2;
+    good(tree->input({.kind=WidgetInputKind::pointer_move,.x=x,.y=y}));
+    require(!take(second.snapshot()).hovered&&take(first.snapshot()).focused,"Context menu hover changed the item state");
+    good(tree->input({.kind=WidgetInputKind::pointer_down,.x=x,.y=y}));
+    require(!take(second.snapshot()).pressed&&presses==0,"Context menu published a transient press");
+    const auto pressed=take(tree->drawing_snapshot({320,180}));
+    require(idle.overlays.size()==pressed.overlays.size(),"Context menu press changed the drawing layers");
+    for(std::size_t i=0;i<idle.overlays.size();++i)
+        require(idle.overlays[i].panels==pressed.overlays[i].panels,"Context menu press changed the rendered panels");
+    good(tree->input({.kind=WidgetInputKind::pointer_up,.x=x,.y=y}));
+    require(second_clicks==1&&releases==0,"Context menu pointer activation did not complete exactly once");
+    good(tree->input({.kind=WidgetInputKind::key_down,.key=WidgetKey::up}));
+    good(tree->input({.kind=WidgetInputKind::key_down,.key=WidgetKey::enter}));
+    good(tree->input({.kind=WidgetInputKind::key_up,.key=WidgetKey::enter}));
+    require(first_clicks==1,"Context menu keyboard activation was lost");
+    tree->close();
+}
+
+// New content generations inherit the policy even though their widget indices
+// are local to a separate state tree.
+void popup_policy_reaches_embedded_content() {
+    auto tree=std::make_shared<detail::WidgetState>([](ii::runtime::Task task){task();});
+    const auto host=take(tree->content_host({},"host",{320,180}));
+    Widget popup,section,action;
+    good(host.set_content([&](WidgetBuilder& builder)->Result<void>{
+        popup=take(builder.popover({},"context",{.width=160,.height=64,.padding=0}));
+        good(popup.suppress_popup_transient_feedback());
+        section=take(builder.content_host(popup,"section",{160,64}));
+        return {};
+    }));
+    int clicks=0,hover_events=0;
+    std::optional<WidgetPaintState> painted;
+    good(section.set_content([&](WidgetBuilder& builder)->Result<void>{
+        action=take(builder.action_surface({},"action",{.text="Run",.width=140,.height=22},[&]{++clicks;}));
+        good(action.set_input_handler([&](const auto& event)->Result<bool>{
+            if(event.kind==WidgetInputKind::pointer_move)++hover_events;
+            return false;
+        }));
+        return action.set_paint_handler([&](const WidgetPaintState& state)->Result<std::shared_ptr<const WidgetDrawing>>{
+            painted=state;
+            return std::make_shared<const WidgetDrawing>();
+        });
+    }));
+    good(popup.open_at(24,24));
+    (void)take(tree->drawing_snapshot({320,180}));
+    const auto bounds=take(action.snapshot()).visual_bounds;
+    const auto x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
+    good(tree->input({.kind=WidgetInputKind::pointer_move,.x=x,.y=y}));
+    good(tree->input({.kind=WidgetInputKind::pointer_down,.x=x,.y=y}));
+    (void)take(tree->drawing_snapshot({320,180}));
+    require(painted&&!painted->hovered&&!painted->pressed&&!painted->focused&&hover_events==0,
+            "An embedded popup control received transient feedback");
+    good(tree->input({.kind=WidgetInputKind::pointer_up,.x=x,.y=y}));
+    require(clicks==1,"The embedded popup action lost its click");
+    tree->close();
+}
 }
 int main(){
+    context_menu_uses_stable_item_appearance();
+    popup_policy_reaches_embedded_content();
     using Menu=ii::gui::BasicNativeMenu<Policy>;
     auto tree=std::make_shared<ii::gui::detail::WidgetState>([](ii::runtime::Task task){task();});
     auto host=take(tree->content_host({},"host",{320,100}));std::optional<Menu> menu;

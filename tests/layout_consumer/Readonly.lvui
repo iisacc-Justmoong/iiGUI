@@ -1,3 +1,0 @@
-import vm LayoutModel
-let record = vm.record
-Window { Label(text: record.title) }

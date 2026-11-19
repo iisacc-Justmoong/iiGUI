@@ -183,9 +183,51 @@ void reentrant_release(){
           "A declined pointer press retained provisional capture");
     good(host.clear_content());state->close();
 }
+
+// A mounted child requests the cursor on its owning surface. Replacing the
+// content must invalidate the old handle before it can affect that surface.
+void native_pointer(){
+    struct PointerSurface final : gui::detail::WidgetSurface {
+        explicit PointerSurface(std::vector<bool>& changes) : changes(changes) {}
+        void invalidate() override {}
+        void accessibility_changed() override {}
+        void accessibility_value_changed(std::string_view) override {}
+        void set_frame_paced(bool) override {}
+        void flush() override {}
+        gui::Size size() const override { return {640,420}; }
+        double backing_scale() const override { return 1; }
+        std::string resolve_font_family(std::string_view requested) const override { return std::string(requested); }
+        gui::GraphicsInfo info() override { return {}; }
+        gui::PixelBuffer capture() override { return {}; }
+        bool native_event(const void*) override { return false; }
+#if defined(_WIN32)
+        std::optional<std::intptr_t> native_result(const void*) override { return std::nullopt; }
+#endif
+        void set_native_pointer_hidden(bool hidden) override { changes.push_back(hidden); }
+        std::vector<bool>& changes;
+    };
+    std::vector<bool> changes;
+    Fixture f;
+    good(f.state->attach(&changes,[&](void*,gui::detail::WidgetSurfaceCallbacks){
+        return std::make_unique<PointerSurface>(changes);
+    }));
+    using K=gui::WidgetInputKind;
+    good(f.custom_slider.set_input_handler([&](const gui::WidgetInput& event) -> core::Result<bool> {
+        if (event.kind==K::pointer_move || event.kind==K::pointer_leave)
+            good(f.custom_slider.set_native_pointer_hidden(event.kind==K::pointer_move));
+        return false;
+    }));
+    const auto bounds=take(f.custom_slider.snapshot()).bounds;
+    good(f.state->input({.kind=K::pointer_move,.x=bounds.x+1,.y=bounds.y+1}));
+    good(f.state->input({.kind=K::pointer_leave,.x=1000,.y=900}));
+    const auto retired=f.custom_slider;
+    good(f.host.clear_content());
+    check(!retired.set_native_pointer_hidden(true),"A retired widget changed the native cursor");
+    check(changes==std::vector<bool>{true,false},"Nested cursor requests did not reach the owning surface");
+}
 }
 int main(int argc,char** argv){try{
     const std::string name=argc>1?argv[1]:"ancestor";
-    if(name=="ancestor")ancestor();else if(name=="text")text();else if(name=="adjustment")adjustment();else if(name=="passthrough")passthrough();else if(name=="reentrant_release")reentrant_release();else throw std::runtime_error("Unknown ancestor input test");
+    if(name=="ancestor")ancestor();else if(name=="text")text();else if(name=="adjustment")adjustment();else if(name=="passthrough")passthrough();else if(name=="reentrant_release")reentrant_release();else if(name=="native_pointer")native_pointer();else throw std::runtime_error("Unknown ancestor input test");
     std::cout<<"Native ancestor input "<<name<<" passed without a window\n";
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}

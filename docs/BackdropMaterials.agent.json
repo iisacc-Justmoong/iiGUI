@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/BackdropMaterials.md",
-    "sha256": "530e4c62c6c271a1c82b9ea89436ec3c64e44f781b3fa101e2e2d902da9adf95",
-    "bytes": 10236,
+    "sha256": "7bc6817237981455ccc4722841d5eacbaf344511a3a6860531f35ae81fd7b46d",
+    "bytes": 10234,
     "line_count": 141,
     "encoding": "utf-8",
     "language": "ko"
@@ -57,7 +57,7 @@
       "kind": "paragraph",
       "start_line": 8,
       "end_line": 12,
-      "raw": "기본 위젯 호스트의 창 바탕은 악센트와 독립적인 중립색이다. LVUI 애플리케이션은\n실제 `Panel/window` 토큰을 창 appearance와 창 재질 정책에 전달한다. 창 재질의\nDense 75와 Glass 25는 각각 75%·25% 채색과 64·16 논리 px 블러를 유지한다.\nLVUI 창 재질 정책은 악센트 방사형을 사용하지 않는다. 방사형이 없는 재질은\n빈 밑그림 이미지를 생성하지 않으며 패널 재질의 악센트 동작은 유지한다.\n"
+      "raw": "기본 위젯 호스트의 창 바탕은 악센트와 독립적인 중립색이다. LVUI 애플리케이션은\n실제 `Panel/window` 토큰을 창 appearance와 창 재질 정책에 전달한다. 창 재질의\nDense 75와 Glass 85는 각각 75%·85% 틴트와 64·16 논리 px 블러를 사용한다.\nGlass 85는 검정 틴트 아래에 강조색 밑그림을 합성해 그 기여를 최대 15%로 제한한다.\nDense 75 창은 중립색을 유지한다. `glass25`는 기존 소스 호환 별칭이다.\n"
     },
     {
       "id": "b000006",

@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/AOTDesktop.md",
-    "sha256": "64ac9fdd8c3cd7abf79c7b0a6a030b135f4579d8e14ac6e1305c25bfbd0986d5",
-    "bytes": 6423,
+    "sha256": "7cb3781d89639cfc61756af67eeffa919e24870437545234ecd3e3996ed9ebaa",
+    "bytes": 6445,
     "line_count": 102,
     "encoding": "utf-8",
     "language": "ko"
@@ -43,7 +43,7 @@
       "kind": "paragraph",
       "start_line": 3,
       "end_line": 6,
-      "raw": "`examples/HelloWorld`는 한 개의 `HelloWorld.lvui`와 C++23 앱을 macOS, Windows,\nLinux에서 함께 사용한다. `lvui-compile`은 빌드 호스트에서 LVUI를 C++ 위젯 생성\n코드로 바꾼다. 대상 컴파일러가 생성 코드, C++ 백엔드, iiSDKCore 진입점을 최종\n실행 파일에 링크한다. 앱은 LVUI 소스나 컴파일러를 실행 시 읽지 않는다.\n"
+      "raw": "`../LVUI/example/HelloWorld`는 한 개의 `HelloWorld.lvui`와 C++23 앱을 macOS, Windows,\nLinux에서 함께 사용한다. `lvui-compile`은 빌드 호스트에서 LVUI를 C++ 위젯 생성\n코드로 바꾼다. 대상 컴파일러가 생성 코드, C++ 백엔드, iiSDKCore 진입점을 최종\n실행 파일에 링크한다. 앱은 LVUI 소스나 컴파일러를 실행 시 읽지 않는다.\n"
     },
     {
       "id": "b000004",
@@ -155,9 +155,9 @@
       "kind": "fenced_code",
       "start_line": 29,
       "end_line": 31,
-      "raw": "```sh\nctest --test-dir build --output-on-failure -R '^HelloWorld\\.'\n```\n",
+      "raw": "```sh\nctest --test-dir ../LVUI/build --output-on-failure -R '^HelloWorld\\.'\n```\n",
       "language": "sh",
-      "code": "ctest --test-dir build --output-on-failure -R '^HelloWorld\\.'\n",
+      "code": "ctest --test-dir ../LVUI/build --output-on-failure -R '^HelloWorld\\.'\n",
       "closed": true
     },
     {
@@ -202,9 +202,9 @@
       "kind": "fenced_code",
       "start_line": 38,
       "end_line": 48,
-      "raw": "```sh\npython3 tools/verify_aot_desktop.py \\\n  --platform linux \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --toolchain /absolute/path/to/linux-toolchain.cmake \\\n  --llvm-readobj /absolute/path/to/llvm-readobj \\\n  --llvm-nm /absolute/path/to/llvm-nm \\\n  --cache Vulkan_INCLUDE_DIR=/target/vulkan/include \\\n  --cache Vulkan_LIBRARY=/target/lib/libvulkan.so\n```\n",
+      "raw": "```sh\npython3 ../LVUI/tools/verify_aot_desktop.py \\\n  --platform linux \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --toolchain /absolute/path/to/linux-toolchain.cmake \\\n  --llvm-readobj /absolute/path/to/llvm-readobj \\\n  --llvm-nm /absolute/path/to/llvm-nm \\\n  --cache Vulkan_INCLUDE_DIR=/target/vulkan/include \\\n  --cache Vulkan_LIBRARY=/target/lib/libvulkan.so\n```\n",
       "language": "sh",
-      "code": "python3 tools/verify_aot_desktop.py \\\n  --platform linux \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --toolchain /absolute/path/to/linux-toolchain.cmake \\\n  --llvm-readobj /absolute/path/to/llvm-readobj \\\n  --llvm-nm /absolute/path/to/llvm-nm \\\n  --cache Vulkan_INCLUDE_DIR=/target/vulkan/include \\\n  --cache Vulkan_LIBRARY=/target/lib/libvulkan.so\n",
+      "code": "python3 ../LVUI/tools/verify_aot_desktop.py \\\n  --platform linux \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --toolchain /absolute/path/to/linux-toolchain.cmake \\\n  --llvm-readobj /absolute/path/to/llvm-readobj \\\n  --llvm-nm /absolute/path/to/llvm-nm \\\n  --cache Vulkan_INCLUDE_DIR=/target/vulkan/include \\\n  --cache Vulkan_LIBRARY=/target/lib/libvulkan.so\n",
       "closed": true
     },
     {
@@ -219,7 +219,7 @@
       "kind": "paragraph",
       "start_line": 50,
       "end_line": 53,
-      "raw": "Windows는 `--platform windows`와 Windows C/C++23 툴체인, Vulkan 헤더 및 import\nlibrary를 전달한다. 대상용 LVUI 컴파일러를 빌드 호스트에서 실행하지 않도록\n`--host-compiler`는 항상 빌드 호스트의 실행 파일을 지정한다. 네이티브 빌드에서는\n`--toolchain`을 생략할 수 있다. `--build-root`는 iiGUI의 `build/` 안이어야 한다.\n"
+      "raw": "Windows는 `--platform windows`와 Windows C/C++23 툴체인, Vulkan 헤더 및 import\nlibrary를 전달한다. 대상용 LVUI 컴파일러를 빌드 호스트에서 실행하지 않도록\n`--host-compiler`는 항상 빌드 호스트의 실행 파일을 지정한다. 네이티브 빌드에서는\n`--toolchain`을 생략할 수 있다. `--build-root`는 LVUI의 `build/` 안이어야 한다.\n"
     },
     {
       "id": "b000024",
@@ -513,12 +513,12 @@
       {
         "block_id": "b000015",
         "language": "sh",
-        "code": "ctest --test-dir build --output-on-failure -R '^HelloWorld\\.'\n"
+        "code": "ctest --test-dir ../LVUI/build --output-on-failure -R '^HelloWorld\\.'\n"
       },
       {
         "block_id": "b000021",
         "language": "sh",
-        "code": "python3 tools/verify_aot_desktop.py \\\n  --platform linux \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --toolchain /absolute/path/to/linux-toolchain.cmake \\\n  --llvm-readobj /absolute/path/to/llvm-readobj \\\n  --llvm-nm /absolute/path/to/llvm-nm \\\n  --cache Vulkan_INCLUDE_DIR=/target/vulkan/include \\\n  --cache Vulkan_LIBRARY=/target/lib/libvulkan.so\n"
+        "code": "python3 ../LVUI/tools/verify_aot_desktop.py \\\n  --platform linux \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --toolchain /absolute/path/to/linux-toolchain.cmake \\\n  --llvm-readobj /absolute/path/to/llvm-readobj \\\n  --llvm-nm /absolute/path/to/llvm-nm \\\n  --cache Vulkan_INCLUDE_DIR=/target/vulkan/include \\\n  --cache Vulkan_LIBRARY=/target/lib/libvulkan.so\n"
       }
     ],
     "links": [

@@ -24,6 +24,8 @@ struct NativeWidgetSurface::Impl final {
     Display* display;Window parent;WidgetSurfaceCallbacks callbacks;std::function<double()> scale;NativeCanvas canvas;
     Window drag_source=0;double drag_x=0,drag_y=0;bool drag_supported=false;
     bool dirty=true,frame_paced=false,xi=false;int xi_opcode=0;XIM method=nullptr;XIC context=nullptr;
+    Cursor transparent_pointer=0;
+    bool native_pointer_hidden=false;
     struct Axis final {
         int pressure=-1,tilt_x=-1,tilt_y=-1,rotation=-1;
         double pressure_min=0,pressure_max=1;
@@ -33,13 +35,37 @@ struct NativeWidgetSurface::Impl final {
     std::map<int,Axis> axes;
     Impl(const X11WidgetParent& native,WidgetSurfaceCallbacks value):display(static_cast<Display*>(native.display)),parent(native.window),callbacks(std::move(value)),scale(native.scale),canvas(reinterpret_cast<void*>(parent),display,Acceleration::prefer_hardware,callbacks.renderer,callbacks.presentations){
         XWindowAttributes attributes{};XGetWindowAttributes(display,parent,&attributes);
-        XSelectInput(display,parent,attributes.your_event_mask|ExposureMask|KeyPressMask|KeyReleaseMask|FocusChangeMask|ButtonPressMask|ButtonReleaseMask|PointerMotionMask|PropertyChangeMask);
+        XSelectInput(display,parent,attributes.your_event_mask|ExposureMask|KeyPressMask|KeyReleaseMask|FocusChangeMask|ButtonPressMask|ButtonReleaseMask|PointerMotionMask|LeaveWindowMask|PropertyChangeMask);
         int event=0,error=0;if(XQueryExtension(display,"XInputExtension",&xi_opcode,&event,&error)){int major=2,minor=2;if(XIQueryVersion(display,&major,&minor)==Success){unsigned char mask[XIMaskLen(XI_TouchEnd)]{};for(int code:{XI_ButtonPress,XI_ButtonRelease,XI_Motion,XI_TouchBegin,XI_TouchUpdate,XI_TouchEnd})XISetMask(mask,code);XIEventMask selection{XIAllMasterDevices,int(sizeof(mask)),mask};xi=XISelectEvents(display,parent,&selection,1)==Success;}}
         std::setlocale(LC_CTYPE,"");XSetLocaleModifiers("");method=XOpenIM(display,nullptr,nullptr,nullptr);
         if(method){context=XCreateIC(method,XNInputStyle,XIMPreeditPosition|XIMStatusNothing,XNClientWindow,parent,XNFocusWindow,parent,nullptr);if(!context)context=XCreateIC(method,XNInputStyle,XIMPreeditNothing|XIMStatusNothing,XNClientWindow,parent,XNFocusWindow,parent,nullptr);}
         const unsigned long version=5;XChangeProperty(display,parent,XInternAtom(display,"XdndAware",False),XA_ATOM,32,PropModeReplace,reinterpret_cast<const unsigned char*>(&version),1);
     }
-    ~Impl(){if(context)XDestroyIC(context);if(method)XCloseIM(method);}
+    ~Impl(){
+        if(parent)set_pointer_hidden(false);
+        if(transparent_pointer)XFreeCursor(display,transparent_pointer);
+        if(context)XDestroyIC(context);
+        if(method)XCloseIM(method);
+    }
+    // Use a cursor local to the X11 drawing window and restore inheritance
+    // when the widget no longer draws the pointer.
+    void set_pointer_hidden(bool hidden){
+        if(!parent||native_pointer_hidden==hidden)return;
+        if(hidden){
+            if(!transparent_pointer){
+                constexpr char empty[1]={0};
+                const auto bitmap=XCreateBitmapFromData(display,parent,empty,1,1);
+                if(!bitmap)return;
+                XColor color{};
+                transparent_pointer=XCreatePixmapCursor(display,bitmap,bitmap,&color,&color,0,0);
+                XFreePixmap(display,bitmap);
+            }
+            if(!transparent_pointer)return;
+            XDefineCursor(display,parent,transparent_pointer);
+        }else XUndefineCursor(display,parent);
+        native_pointer_hidden=hidden;
+        XFlush(display);
+    }
     double dpi()const{return scale?scale():1;}
     Size size()const{XWindowAttributes value{};if(!XGetWindowAttributes(display,parent,&value))return {};return {value.width/dpi(),value.height/dpi()};}
     void flush(){if(!dirty)return;auto extent=size();if(extent.width<=0||extent.height<=0)return;canvas.draw(callbacks.frame(extent),dpi(),extent.height);dirty=false;}
@@ -134,6 +160,14 @@ struct NativeWidgetSurface::Impl final {
         case ConfigureNotify:dirty=true;return false;
         case FocusIn:if(context)XSetICFocus(context);return false;
         case FocusOut:if(context)XUnsetICFocus(context);send(input(WidgetInputKind::focus_lost,0,event.xfocus.serial));return false;
+        case LeaveNotify:{
+            if(event.xcrossing.mode!=NotifyNormal)return false;
+            set_pointer_hidden(false);
+            auto value=input(WidgetInputKind::pointer_leave,event.xcrossing.state,event.xcrossing.time);
+            value.x=event.xcrossing.x/dpi();value.y=event.xcrossing.y/dpi();
+            send(std::move(value));return false;
+        }
+        case DestroyNotify:if(event.xdestroywindow.window==parent)parent=0;return false;
         case MotionNotify:{if(xi)return true;auto value=input(WidgetInputKind::pointer_move,event.xmotion.state,event.xmotion.time);value.x=event.xmotion.x/dpi();value.y=event.xmotion.y/dpi();value.buttons=((event.xmotion.state&Button1Mask)?1:0)|((event.xmotion.state&Button3Mask)?2:0)|((event.xmotion.state&Button2Mask)?4:0);send(std::move(value));return true;}
         case ButtonPress:case ButtonRelease:{if(xi)return true;const bool down=event.type==ButtonPress;const auto button=event.xbutton.button;auto value=input(button>=4&&button<=7?WidgetInputKind::scroll:down?WidgetInputKind::pointer_down:WidgetInputKind::pointer_up,event.xbutton.state,event.xbutton.time);value.x=event.xbutton.x/dpi();value.y=event.xbutton.y/dpi();if(button>=4&&button<=7){if(!down)return true;if(button<6)value.scroll_y=button==4?48:-48;else value.scroll_x=button==6?48:-48;}else{value.buttons=down?(button==1?1:button==3?2:4):0;if(down){XSetInputFocus(display,parent,RevertToParent,CurrentTime);XGrabPointer(display,parent,False,PointerMotionMask|ButtonReleaseMask,GrabModeAsync,GrabModeAsync,None,None,CurrentTime);}else XUngrabPointer(display,CurrentTime);}send(std::move(value));return true;}
         case KeyPress:case KeyRelease:{KeySym symbol=0;Status status=0;std::vector<char> bytes(128);int count=0;if(context&&event.type==KeyPress){count=Xutf8LookupString(context,&event.xkey,bytes.data(),int(bytes.size()),&symbol,&status);if(status==XBufferOverflow&&(count<=0||count>65536))return true;if(status==XBufferOverflow&&count<=65536){bytes.resize(std::size_t(count)+1);count=Xutf8LookupString(context,&event.xkey,bytes.data(),int(bytes.size()),&symbol,&status);}}else count=XLookupString(&event.xkey,bytes.data(),int(bytes.size()),&symbol,nullptr);
@@ -148,6 +182,7 @@ struct NativeWidgetSurface::Impl final {
 };
 NativeWidgetSurface::NativeWidgetSurface(void* parent,WidgetSurfaceCallbacks callbacks):impl_(std::make_unique<Impl>(*static_cast<X11WidgetParent*>(parent),std::move(callbacks))){}
 NativeWidgetSurface::~NativeWidgetSurface()=default;void NativeWidgetSurface::invalidate(){impl_->invalidate();}
+void NativeWidgetSurface::set_native_pointer_hidden(bool hidden){impl_->set_pointer_hidden(hidden);}
 void NativeWidgetSurface::accessibility_changed(){}void NativeWidgetSurface::accessibility_value_changed(std::string_view){}
 void NativeWidgetSurface::set_frame_paced(bool value){impl_->frame_paced=value;}void NativeWidgetSurface::flush(){impl_->flush();}
 Size NativeWidgetSurface::size()const{return impl_->size();}double NativeWidgetSurface::backing_scale()const{return impl_->dpi();}

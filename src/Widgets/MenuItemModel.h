@@ -76,6 +76,8 @@ public:
         const auto& p=value_.palette;const bool enabled=value_.enabled&&state.enabled&&value_.state!=MenuEntryState::inactive;
         MenuItemVisual result{.background={0,0,0,0},.text=enabled?p.text:p.disabled_text,.detail=enabled?p.detail:p.disabled_text,
                               .focus=p.focus,.enabled=enabled,.focused=enabled&&state.focused};
+        // Context-menu items keep their surface transparent in every state.
+        if(value_.compact){result.focused=false;return result;}
         if(value_.state==MenuEntryState::selected)result.background=p.selected;
         else if(enabled&&state.pressed)result.background=p.pressed;
         else if(enabled&&state.hovered)result.background=p.hover;

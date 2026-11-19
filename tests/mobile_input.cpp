@@ -52,6 +52,15 @@ int main() {
         WidgetInput arrow{.kind=WidgetInputKind::key_down,.key=WidgetKey::up};
         check(mobile_widget_key(arrow,false) && mobile_widget_key(arrow,true),
               "UIKit dropped a non-character key");
+        // A held hardware key repeats. A second physical press of the same key is fresh.
+        MobileHeldKeys held;
+        check(!held.press(31) && held.press(31) && !held.press(38),
+              "UIKit hardware repeat state did not distinguish separate keys");
+        held.release(31);
+        check(!held.press(31) && held.press(38), "UIKit released the wrong hardware key");
+        held.clear();
+        check(!held.press(31) && !held.press(38) && !held.press(300),
+              "UIKit retained held keys after cancellation");
         const auto nan = std::numeric_limits<double>::quiet_NaN();
         auto invalid = touch_input(WidgetInputKind::focus_lost,
                                    {.x=nan, .y=nan, .force=nan,

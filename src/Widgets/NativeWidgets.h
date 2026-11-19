@@ -507,6 +507,10 @@ struct WidgetInput final {
     // Hide the caret of this composing candidate while retaining its marked
     // text, selection and caret geometry. Valid only for composition input.
     bool composition_cursor_hidden=false;
+    // Keyboard origin and repeat are orthogonal to the logical key and text.
+    // The host sets repeat on a held-key key_down and identifies keypad keys
+    // when the native event provides the distinction.
+    bool key_repeat=false, numeric_keypad=false;
 };
 // Touch scroll displacement follows the fingers; wheel deltas retain the
 // host's scroll convention. A pinch is an incremental log-scale encoded as a
@@ -689,6 +693,9 @@ public:
     [[nodiscard]] core::Result<void> set_menu_state(MenuItemState) const;
     [[nodiscard]] core::Result<void> set_menu_expanded(bool) const;
     [[nodiscard]] core::Result<void> set_context_menu(Widget popup) const;
+    // Suppress hover and press feedback in this popup and its owned views.
+    // Hit testing, keyboard focus, and completed actions remain available.
+    [[nodiscard]] core::Result<void> suppress_popup_transient_feedback() const;
     [[nodiscard]] core::Result<void> set_touch_context_options(TouchContextOptions) const;
     [[nodiscard]] core::Result<TouchContextOptions> touch_context_options() const;
     [[nodiscard]] core::Result<void> set_color_model(std::shared_ptr<ColorPickerModel>) const;
@@ -729,6 +736,9 @@ public:
     // Reports preferred content size even when allocated bounds stay unchanged.
     [[nodiscard]] core::Result<void> set_measure_handler(std::function<void(const WidgetMeasurement&)>) const;
     [[nodiscard]] core::Result<void> set_drawing(WidgetDrawing) const;
+    // Hide the system pointer on the containing desktop surface while this
+    // view draws a pointer. Restore it on pointer exit, focus loss or removal.
+    [[nodiscard]] core::Result<void> set_native_pointer_hidden(bool hidden) const;
     [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler) const;
     [[nodiscard]] core::Result<void> set_paint_handler(WidgetPaintHandler,Widget interaction_owner) const;
     // Weak source handles on a container's backdrop drawing. Background is

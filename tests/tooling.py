@@ -65,7 +65,7 @@ class VerifierTests(unittest.TestCase):
 
     def test_package_verifier_rejects_escaped_locations(self):
         with verify.verification_workspace.temporary(root, 'package-') as workspace:
-            common = ['cmake', '-DSOURCE='+str(root), '-DCORE_BUILD=missing', '-DLVUI_BUILD=missing',
+            common = ['cmake', '-DSOURCE='+str(root), '-DCORE_BUILD=missing',
                       '-DGUI_BUILD=missing', '-P', str(root/'tests/package.cmake')]
             for build, resources in ((root/'outside-build', workspace), (root/'build/fixture', root/'resources')):
                 command = common[:1] + ['-DBUILD='+str(build), '-DRESOURCE_ROOT='+str(resources)] + common[1:]
@@ -78,7 +78,7 @@ class VerifierTests(unittest.TestCase):
             build = root/'build'/'package-verifier-tests'/workspace.name
             command = ['cmake', '-DSOURCE='+str(root), '-DBUILD='+str(build),
                        '-DRESOURCE_ROOT='+str(workspace), '-DCORE_BUILD='+str(workspace/'missing'),
-                       '-DLVUI_BUILD=missing', '-DGUI_BUILD=missing', '-P', str(root/'tests/package.cmake')]
+                       '-DGUI_BUILD=missing', '-P', str(root/'tests/package.cmake')]
             result = subprocess.run(command, text=True, capture_output=True, check=False)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Install failed', result.stderr)
@@ -143,9 +143,9 @@ class VerifierTests(unittest.TestCase):
             self.assertEqual(len(manifest['kits']), 1)
             self.assertEqual(manifest['kits'][0]['platform'], platform)
             self.assertEqual(Path(manifest['app']['source']), root/'examples/HelloGUI')
-            self.assertEqual({sdk['name'] for sdk in manifest['sdks']}, {'iiSDKCore', 'LVUI', 'iiGUI'})
+            self.assertEqual({sdk['name'] for sdk in manifest['sdks']}, {'iiSDKCore', 'iiGUI'})
             self.assertTrue(all(not sdk.get('depends') for sdk in manifest['sdks']))
-            self.assertEqual(set(manifest['app']['depends']), {'iiGUI', 'LVUI'})
+            self.assertEqual(set(manifest['app']['depends']), {'iiGUI'})
             self.assertEqual(manifest['kits'][0]['environment']['CPLUS_INCLUDE_PATH'], '')
             self.assertEqual(manifest['kits'][0]['cache']['CMAKE_DISABLE_FIND_PACKAGE_Qt6'], 'ON')
 
@@ -156,7 +156,6 @@ class VerifierTests(unittest.TestCase):
         self.assertEqual(manifest['kits'][0]['prefixes'], [str(prefix.resolve())])
         paths = verify.kit_builds(build, 'linux')
         self.assertEqual(paths['iiGUI'], build/'kits/linux/Release/sdk/iiGUI/isolated/build')
-        self.assertEqual(paths['LVUI'], build/'kits/linux/Release/sdk/LVUI/isolated/build')
         self.assertEqual(paths['app'], build/'kits/linux/Release/app/isolated/build')
 
 

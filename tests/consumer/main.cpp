@@ -1,5 +1,4 @@
 #include <iiGUI/iiGUI.h>
-#include <LVUI/NativeDocument.h>
 #include <iiSDKCore/Runtime/Runtime.h>
 #include <iiSDKCore/Runtime/Operation.h>
 #include <iiSDKCore/Runtime/FrameLoop.h>
@@ -23,7 +22,7 @@ int main(int argc,char** argv) {
         ii::runtime::TaskScope view;
         std::unique_ptr<ii::runtime::FrameLoop> frames;
         int ticks = 0, value = 0;
-        bool resized = false, closed = false, gpu = false, scoped = false, lvui_rendered = false;
+        bool resized = false, closed = false, gpu = false, scoped = false;
         int frame_updates=0;
         auto result = host.run({
             .opened=[&] {
@@ -34,14 +33,6 @@ int main(int argc,char** argv) {
                     throw std::runtime_error("Installed structural timed scope failed");
                 if (!host.set_text("Installed iiGUI consumer\nC++23 · no source-tree headers") ||
                     !host.set_content_size({760, 480})) throw std::runtime_error("Native setup failed");
-                auto document=lvui::parse("<view style='padding:20px; background:#123456'><p style='color:white'>Installed LVUI 한글</p></view>");
-                if (!document || !host.set_view(*document,renderer)) throw std::runtime_error("Installed LVUI package failed");
-                auto view_pixels=host.capture_canvas();
-                if (!view_pixels) throw std::runtime_error("Installed LVUI rendering failed");
-                std::size_t glyph_pixels=0;
-                for (std::size_t i=0;i<view_pixels->rgba.size();i+=4)
-                    if (view_pixels->rgba[i]>200 && view_pixels->rgba[i+1]>200 && view_pixels->rgba[i+2]>200) ++glyph_pixels;
-                lvui_rendered=glyph_pixels>20;
                 ii::gui::CanvasFrame frame{.viewport={28,150,320,180},.background={0,0,0,1}};
                 frame.renderer=renderer;
                 frame.panels.push_back({.bounds={16,16,288,148},.top={0.02f,0.1f,0.9f,1},
@@ -73,11 +64,11 @@ int main(int argc,char** argv) {
         });
         const auto stopped=operations.close(); const auto released=view.close();
         frames.reset();
-        if (!workers.join() || !stopped || !released || !result || ticks < 3 || value != 42 || !resized || !closed || !gpu || !scoped || !lvui_rendered)
+        if (!workers.join() || !stopped || !released || !result || ticks < 3 || value != 42 || !resized || !closed || !gpu || !scoped)
             throw std::runtime_error("Installed consumer acceptance failed");
         std::cout << "INSTALLED_GUI_OK ticks=" << ticks << " background=" << value
                   << " resize=" << std::boolalpha << resized << " closed=" << closed << " gpu=" << gpu
-                  << " core_frames=" << frame_updates << " scoped=" << scoped << " lvui=" << lvui_rendered << " vulkan=" << vulkan << '\n';
+                  << " core_frames=" << frame_updates << " scoped=" << scoped << " vulkan=" << vulkan << '\n';
         return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

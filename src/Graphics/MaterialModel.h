@@ -12,7 +12,7 @@
 #include <utility>
 namespace ii::gui {
 enum class MaterialKind {surface,panel,window};
-enum class MaterialDensity {glass25,dense75};
+enum class MaterialDensity {glass85,dense75,glass25=glass85};
 enum class MaterialBackdrop {none,content,previous_layers};
 [[nodiscard]] inline bool valid_material_outline(std::string_view path)noexcept {
     if(path.empty())return true;
@@ -140,15 +140,15 @@ public:
     }
     [[nodiscard]] static ResolvedMaterial resolve(const MaterialConfiguration& c)noexcept {
         const bool window=c.kind==MaterialKind::window;
-        const auto density=c.density.value_or(window?MaterialDensity::dense75:MaterialDensity::glass25);
+        const auto density=c.density.value_or(window?MaterialDensity::dense75:MaterialDensity::glass85);
         const bool dense=density==MaterialDensity::dense75;
         constexpr bool neutral_window_policy=[] {
             if constexpr(requires { Policy::neutral_window; }) return bool(Policy::neutral_window);
             return false;
         }();
-        const bool neutral_window=window&&neutral_window_policy;
-        auto tint=c.color.value_or(Policy::default_tint());
-        tint.alpha*=c.tint_opacity.value_or(dense?.75:.25);
+        const bool neutral_window=window&&neutral_window_policy&&dense;
+        auto tint=c.color.value_or(dense?Policy::default_tint():StyleColor{0,0,0,1});
+        tint.alpha*=c.tint_opacity.value_or(dense?.75:.85);
         return {density,c.backdrop,neutral_window?Policy::default_tint():c.primary_color.value_or(Policy::default_primary()),tint,
             c.border_color.value_or(StyleColor{1,1,1,dense?.12:.22}),c.backdrop_base_color.value_or(StyleColor{0,0,0,0}),
             c.blur_enabled?c.blur_radius.value_or(dense?64:16):0,c.radius.value_or(window?16:12),

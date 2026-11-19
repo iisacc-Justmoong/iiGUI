@@ -1,9 +1,9 @@
 # LVUI views rendered by iiGUI
 
 The compiled component-language route is documented separately in
-[NativeWidgets.md](NativeWidgets.md). `examples/HelloWorld` AOT-compiles `.lvui`
-into native C++23 and mounts iiGUI's own C++ widgets on a Cocoa surface. The document below describes
-the earlier HTML-shaped runtime-parsed GPU canvas API, which remains available.
+[NativeWidgets.md](NativeWidgets.md). `../LVUI/example/HelloWorld` AOT-compiles `.lvui`
+into native C++23 and mounts iiGUI's widgets on a native surface. The earlier
+HTML-shaped runtime-parsed canvas example is retained as API history.
 
 LVUI는 별도 모듈이다. 앱이 LVUI 문서 어댑터와 iiGUI 호스트를 조합하면
 LVUI가 계산한 프레임을 iiGUI가 표시한다. 데스크톱 경로에 브라우저 엔진,
@@ -21,7 +21,7 @@ LVUI 타입을 참조하거나 LVUI를 찾지 않는다. 전체 문서 규칙은
 이전 `Host::set_view(lvui::Document, ...)` 이진 심볼을 사용하던 앱은 LVUI
 어댑터 헤더와 명시적 LVUI 링크로 다시 빌드해야 한다.
 
-## Application usage
+## Prior document API example
 
 ```cpp
 #include <iiGUI/iiGUI.h>
@@ -88,36 +88,25 @@ data binding, CSS selectors and arbitrary HTML compatibility are not implemented
 
 ## Build and verify
 
-기본 iiGUI 빌드에는 LVUI가 필요하지 않다. 별도 HelloLVUI 앱까지 빌드하려면
-앱이 사용할 LVUI 패키지를 준비하고 선택적 예제를 활성화한다. LVUI 생성 위젯의
-기존 통합 검사를 iiGUI 빌드에 추가하려면 `IIGUI_BUILD_LVUI_INTEGRATION_TESTS=ON`을
-명시하고 LVUI의 빌드된 컴파일러와 런타임을 제공한다.
+iiGUI의 라이브러리, 패키지, 네이티브 예제와 테스트는 독립적으로 구성한다.
+HelloWorld와 생성 뷰 검사는 iiGUI 0.6.0 이상을 설치한 뒤 LVUI 저장소에서 구성한다.
+LVUI 0.1.1은 생성 코드에서 사용하는 최소 호스트 API를
+LVUI_IIGUI_MIN_VERSION으로 공개한다.
 
 ```sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+cmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \
   -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \
-  -DIIGUI_BUILD_LVUI_EXAMPLES=ON \
-  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \
-  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
-cmake --build build --parallel 4
-ctest --test-dir build --output-on-failure
-./build/examples/HelloLVUI/HelloLVUI --self-test
+  -DLVUI_BUILD_HOST_EXAMPLES=ON -DLVUI_BUILD_IIGUI_INTEGRATION_TESTS=ON
+cmake --build ../LVUI/build --target HelloWorld --parallel 4
 ```
 
-HelloLVUI's `main.lvui` is embedded by CMake, so changing it triggers regeneration
-and rebuilding. The executable uses no runtime file I/O or source-tree lookup.
-Run without flags for an ordinary resizable window. `--capture` emits one ASCII PPM
-GPU capture to stdout and closes; redirection/export belongs to the caller.
-The application source has no platform conditionals. It can also be built
-standalone with installed Core/LVUI/iiGUI packages.
-
-LVUI의 창 없는 조합 검사는 박스·백분율·패딩·글꼴·줄바꿈과 잘못된 입력을
-확인한다. 플랫폼 GPU·창·스크린 리더 실행은 이 검사와 별도로 보고한다.
+현재 데스크톱 예제는 CMake에서 `HelloWorld.lvui`를 C++로 생성한다.
+창 없는 조합 검사는 생성된 팩토리와 iiGUI 네이티브 위젯을 연결해
+레이아웃·입력·콜백·수명을 확인한다.
 
 Native API references: [AppKit attributed text drawing](https://developer.apple.com/documentation/foundation/nsattributedstring/draw%28in%3A%29)
 and [Direct2D rendering into a WIC bitmap](https://learn.microsoft.com/en-us/windows/win32/direct2d/server-side-rendering-overview).
 
 Renderer selection defaults to the platform accelerator with Vulkan fallback.
-Use `host.set_view(document, ii::gui::Renderer::vulkan)` to force Vulkan.
-HelloLVUI accepts `--vulkan` or `--native`; `--capture --vulkan` captures the
-same view through Vulkan. See [renderer contracts](Renderers.md).
+See [renderer contracts](Renderers.md) for Vulkan selection.

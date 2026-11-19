@@ -1,6 +1,6 @@
 # LVUI Hello World의 네이티브 데스크톱 빌드 계약
 
-`examples/HelloWorld`는 한 개의 `HelloWorld.lvui`와 C++23 앱을 macOS, Windows,
+`../LVUI/example/HelloWorld`는 한 개의 `HelloWorld.lvui`와 C++23 앱을 macOS, Windows,
 Linux에서 함께 사용한다. `lvui-compile`은 빌드 호스트에서 LVUI를 C++ 위젯 생성
 코드로 바꾼다. 대상 컴파일러가 생성 코드, C++ 백엔드, iiSDKCore 진입점을 최종
 실행 파일에 링크한다. 앱은 LVUI 소스나 컴파일러를 실행 시 읽지 않는다.
@@ -27,7 +27,7 @@ Windows·Linux의 등록 이름은 `HelloWorld.aot_native`이다.
 실행 검사를 요청할 때만 대상 OS의 로그인된 데스크톱에서 다음을 실행한다.
 
 ```sh
-ctest --test-dir build --output-on-failure -R '^HelloWorld\.'
+ctest --test-dir ../LVUI/build --output-on-failure -R '^HelloWorld\.'
 ```
 
 교차 빌드 성공은 OS 창 생성, GPU 드라이버, 입력 또는 실제 타이머 동작의 실증이
@@ -36,7 +36,7 @@ ctest --test-dir build --output-on-failure -R '^HelloWorld\.'
 ## 재현 가능한 빌드와 설치 소비자 검사
 
 ```sh
-python3 tools/verify_aot_desktop.py \
+python3 ../LVUI/tools/verify_aot_desktop.py \
   --platform linux \
   --host-compiler "$HOME/.local/SDK/LVUI/bin/lvui-compile" \
   --builder "$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder" \
@@ -50,7 +50,7 @@ python3 tools/verify_aot_desktop.py \
 Windows는 `--platform windows`와 Windows C/C++23 툴체인, Vulkan 헤더 및 import
 library를 전달한다. 대상용 LVUI 컴파일러를 빌드 호스트에서 실행하지 않도록
 `--host-compiler`는 항상 빌드 호스트의 실행 파일을 지정한다. 네이티브 빌드에서는
-`--toolchain`을 생략할 수 있다. `--build-root`는 iiGUI의 `build/` 안이어야 한다.
+`--toolchain`을 생략할 수 있다. `--build-root`는 LVUI의 `build/` 안이어야 한다.
 
 도구는 다음을 검증한다.
 

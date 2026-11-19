@@ -51,7 +51,7 @@ def make_manifest(source, output, platform, toolchain=None, cache=None, prefixes
 
 def kit_builds(output, platform):
     kit = output/'kits'/platform/'Release'
-    return {name: kit/'sdk'/name/'isolated/build' for name in ('iiSDKCore', 'LVUI', 'iiGUI')} | {
+    return {name: kit/'sdk'/name/'isolated/build' for name in ('iiSDKCore', 'iiGUI')} | {
         'app': kit/'app/isolated/build'}
 
 
@@ -147,7 +147,6 @@ def run_verification(source, args, output, run, cache):
         package = [cmake, '-DSOURCE='+source.as_posix(), '-DBUILD='+consumer_build.as_posix(),
                    '-DRESOURCE_ROOT='+run.as_posix(),
                    '-DCORE_BUILD='+builds['iiSDKCore'].as_posix(),
-                   '-DLVUI_BUILD='+builds['LVUI'].as_posix(),
                    '-DGUI_BUILD='+gui_build.as_posix()]
         if args.toolchain:
             package.append('-DTOOLCHAIN='+args.toolchain.resolve().as_posix())

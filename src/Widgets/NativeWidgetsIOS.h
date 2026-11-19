@@ -2,6 +2,7 @@
 #import <UIKit/UIKit.h>
 #include <iiGUI/WidgetSurface.h>
 #include <iiSDKCore/Runtime/TouchInput.h>
+#include "../Platform/MobileInput.h"
 #include "../Platform/UIKitTextInputProtocol.h"
 
 @class IIGUIIOSElement;
@@ -17,6 +18,7 @@
     bool editingReadOnly,editingSecure,editingMultiline,syncingInputViews,pendingInputViews;
     UIView* hiddenKeyboard;
     ii::runtime::touch::TouchRouter touchRouter;
+    ii::gui::detail::MobileHeldKeys hardwareKeys;
     std::shared_ptr<ii::gui::detail::UIKitTextInputProtocol> textProtocol;
     __weak id<UITextInputDelegate> textDelegate;
     NSDictionary<NSAttributedStringKey,id>* markedStyle;

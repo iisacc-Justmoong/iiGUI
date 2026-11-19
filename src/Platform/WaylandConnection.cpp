@@ -67,6 +67,7 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
     WaylandImeCapture text_pending;
     wl_shm* shm=nullptr;wl_cursor_theme* cursor_theme=nullptr;wl_surface* cursor_surface=nullptr;
     int cursor_scale=0;std::uint32_t pointer_serial=0;
+    bool native_pointer_hidden=false;
     wl_data_device_manager* manager=nullptr;wl_data_device* device=nullptr;wl_callback* frame=nullptr;
     xkb_context* xkb=nullptr;xkb_keymap* keymap=nullptr;xkb_state* keys=nullptr;
     struct Output {Impl* owner;wl_output* native;int scale=1;int width=0,height=0,transform=0;
@@ -103,9 +104,13 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
         if(keys){value.shift=xkb_state_mod_name_is_active(keys,XKB_MOD_NAME_SHIFT,XKB_STATE_MODS_EFFECTIVE)>0;value.control=xkb_state_mod_name_is_active(keys,XKB_MOD_NAME_CTRL,XKB_STATE_MODS_EFFECTIVE)>0;value.alt=xkb_state_mod_name_is_active(keys,XKB_MOD_NAME_ALT,XKB_STATE_MODS_EFFECTIVE)>0;value.meta=xkb_state_mod_name_is_active(keys,XKB_MOD_NAME_LOGO,XKB_STATE_MODS_EFFECTIVE)>0;}return value;}
     void emit_touch(std::optional<WidgetInput> value){if(!value)return;const auto modifiers=input(value->kind);
         value->shift=modifiers.shift;value->control=modifiers.control;value->alt=modifiers.alt;value->meta=modifiers.meta;emit(std::move(*value));}
-    void key_event(std::uint32_t code,bool down,double time){
+    // Compositor events describe physical presses. Locally generated repeats
+    // carry the same logical text and a separate repeat flag.
+    void key_event(std::uint32_t code,bool down,double time,bool repeating=false){
         if(!keys)return;const auto symbol=xkb_state_key_get_one_sym(keys,code+8);
         auto value=input(down?WidgetInputKind::key_down:WidgetInputKind::key_up,time);value.key=key(symbol);
+        value.key_repeat=repeating;
+        value.numeric_keypad=symbol>=XKB_KEY_KP_Space&&symbol<=XKB_KEY_KP_Equal;
         char name[64]{};const auto name_count=xkb_keysym_to_utf8(symbol,name,sizeof(name));
         if(name_count>1&&name_count<=int(sizeof(name))&&static_cast<unsigned char>(name[0])>=32)value.text.assign(name,std::size_t(name_count-1));
         std::string text;
@@ -116,7 +121,12 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
         emit(std::move(value));if(!text.empty())emit({.kind=WidgetInputKind::text,.text=std::move(text)});
     }
     void cursor(){
-        if(!pointer||!pointer_serial||!compositor||!shm)return;
+        if(!pointer||!pointer_serial)return;
+        if(native_pointer_hidden){
+            wl_pointer_set_cursor(pointer,pointer_serial,nullptr,0,0);
+            return;
+        }
+        if(!compositor||!shm)return;
         const int density=display_scale.cursor_scale();
         if(!cursor_theme||cursor_scale!=density){if(cursor_theme)wl_cursor_theme_destroy(cursor_theme);cursor_theme=wl_cursor_theme_load(nullptr,24*density,shm);cursor_scale=density;}
         if(!cursor_theme)return;auto* cursor=wl_cursor_theme_get_cursor(cursor_theme,"left_ptr");if(!cursor||!cursor->image_count)return;
@@ -224,7 +234,7 @@ struct WaylandConnection::Impl final : WaylandWaitSource {
         // Defer no-redraw commits until all pending xdg configure events have
         // been acknowledged; never commit halfway through a protocol batch.
         if(std::exchange(commit_pending,false)&&configured&&surface)wl_surface_commit(surface);
-        expire_transfers();if(repeat_key&&runtime::Clock::now()>=repeat_at){key_event(*repeat_key,true,0);repeat_at=runtime::Clock::now()+std::chrono::milliseconds(std::max(1,1000/repeat_rate));}if(failure)throw std::runtime_error(*failure);}
+        expire_transfers();if(repeat_key&&runtime::Clock::now()>=repeat_at){key_event(*repeat_key,true,0,true);repeat_at=runtime::Clock::now()+std::chrono::milliseconds(std::max(1,1000/repeat_rate));}if(failure)throw std::runtime_error(*failure);}
     void prepare() override { require();while(wl_display_prepare_read(display)!=0)dispatch(); }
     bool flush() override {
         require();
@@ -360,6 +370,11 @@ void WaylandConnection::begin_move(std::uint32_t serial){
     xdg_toplevel_move(impl_->top,impl_->seat,serial);wl_display_flush(impl_->display);
 }
 void WaylandConnection::request_frame(){impl_->request_frame();}
+void WaylandConnection::set_native_pointer_hidden(bool hidden){
+    if(impl_->native_pointer_hidden==hidden)return;
+    impl_->native_pointer_hidden=hidden;
+    impl_->cursor();
+}
 void WaylandConnection::cancel_frame(){impl_->cancel_frame();}
 std::uint64_t WaylandConnection::claim_text_input(){
     impl_->require();

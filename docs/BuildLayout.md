@@ -31,8 +31,8 @@ SVG 처리에 사용하는 LunaSVG 소스는 `resources/dependencies/lunasvg`에
 `resources/.state/`의 고유한 임시 공간에 생성하고 성공·실패 시 정리한다.
 이 검사는 실제 앱이나 기기를 실행하지 않는다.
 
-HelloGUI의 Builder 매니페스트는 Core·LVUI·iiGUI를 개별 선택하고 앱에서
-LVUI와 iiGUI를 조합하며, SDK 항목에 다른 SDK의 `depends`를 넣지 않는다.
+HelloGUI의 Builder 매니페스트는 Core와 iiGUI를 준비하고 앱을 iiGUI에 연결한다.
+LVUI 생성 예제와 조합 검사는 LVUI 저장소에서 구성한다.
 데스크톱 도구는 Builder의 `isolated/build` 경로와 명시적 `--prefix` 옵션을
 사용한다. 현재 iiGUI와 LVUI의 실제 CMake 구현은 여전히 다른 SDK 패키지를
 찾으므로, 대상 플랫폼에 맞는 호환 prefix를 별도로 제공해야 한다. 매니페스트
@@ -43,15 +43,15 @@ LVUI와 iiGUI를 조합하며, SDK 항목에 다른 SDK의 `depends`를 넣지 �
 수행한 뒤 소유한 임시 자료를 정리하고 보고서를 표준 출력으로 내보낸다.
 종료 코드와 실패 로그도 출력하며 실패 시에도 임시 작업 공간을 정리한다.
 경로와 성공·실패 처리는 실제 앱을 실행하지 않는 모의 검사로 검증한다.
-`tools/verify_aot_desktop.py`도 동일한 리소스 작업 공간을 사용하며, 별도
+`../LVUI/tools/verify_aot_desktop.py`도 동일한 리소스 작업 공간을 사용하며, 별도
 소비자 컴파일 디렉터리는 `build/`에 두고 정리한다. 보고서는 표준 출력으로
 제공한다. Builder가 생성한 iiGUI 컴파일 정보는 `isolated/build/`에서 읽는다.
-`tools/verify_host_consumer.py`는 설치 prefix와 예제 입력을 같은 임시 리소스
+`../LVUI/tools/verify_host_consumer.py`는 설치 prefix와 예제 입력을 같은 임시 리소스
 영역에 복사하고 컴파일 디렉터리는 `build/`에 만든 후 성공·실패 시 둘 다
 정리한다. 실제 호스트 소비자를 실행하지 않는 단위 검사가 정리를 확인한다.
 정리 중 파일 공급자의 미리보기 부속 파일이 늦게 생성된 경우에는 소유한
 임시 디렉터리만 다시 정리하며, 다른 접근 오류는 숨기지 않는다.
-`tools/android_hello.py`는 최종 APK만 빌드 산출물로 유지하고 매니페스트,
+`../LVUI/tools/android_hello.py`는 최종 APK만 빌드 산출물로 유지하고 매니페스트,
 패키지 조립 파일, 디버그 키와 로그는 소유한 임시 리소스 영역에서 정리한다.
 기존 APK를 덮어쓰지 않으며, 사용자가 명시적으로 기기 실행을 요청했을 때의
 화면 이미지는 `resources/outputs/android-hello/`에 저장한다. 보고서는 표준

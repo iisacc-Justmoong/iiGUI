@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/AndroidHello.md",
-    "sha256": "50785dee56dd26f34153f0be6862700bb07e086079ca772cfe1a5d39fdf30192",
-    "bytes": 16217,
+    "sha256": "295d1e93b201919d2829d20ddd812477e4984549c842bd549b3cf1f43b1096f3",
+    "bytes": 16247,
     "line_count": 225,
     "encoding": "utf-8",
     "language": "ko"
@@ -57,7 +57,7 @@
       "kind": "paragraph",
       "start_line": 7,
       "end_line": 10,
-      "raw": "`examples/HelloAndroid`는 Android 10/API 29 이상에서 실행하는 최소 Hello World이다.\nLVUI의 `ApplicationWindow`, `VStack`, `Label`을 빌드 호스트의 `lvui-compile`로\nC++23 코드에 변환하고 Android NDK로 컴파일한다. 앱 런타임은 iiSDKCore의\n`Application`·이벤트 루프·타이머이며, iiGUI의 C++ 위젯을 Vulkan으로 표시한다.\n"
+      "raw": "`../LVUI/example/HelloAndroid`는 Android 10/API 29 이상에서 실행하는 최소 Hello World이다.\nLVUI의 `ApplicationWindow`, `VStack`, `Label`을 빌드 호스트의 `lvui-compile`로\nC++23 코드에 변환하고 Android NDK로 컴파일한다. 앱 런타임은 iiSDKCore의\n`Application`·이벤트 루프·타이머이며, iiGUI의 C++ 위젯을 Vulkan으로 표시한다.\n"
     },
     {
       "id": "b000006",
@@ -273,9 +273,9 @@
       "kind": "fenced_code",
       "start_line": 82,
       "end_line": 90,
-      "raw": "```sh\npython3 tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n```\n",
+      "raw": "```sh\npython3 ../LVUI/tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n```\n",
       "language": "sh",
-      "code": "python3 tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n",
+      "code": "python3 ../LVUI/tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n",
       "closed": true
     },
     {
@@ -318,7 +318,7 @@
       "kind": "paragraph",
       "start_line": 104,
       "end_line": 109,
-      "raw": "설치된 `examples/HelloAndroid`는 선택적 OS·렌더 검사에 필요한 소스를 함께 제공한다.\nOS 검사는 Activity를 직접 빌려 공개 SDK만 사용하며 원래 클립보드를 복원한다.\nAPI 24–27에서 원래 클립이 없으면 빈 상태를 복원할 공개 API가 없으므로,\n클립보드를 변경하기 전에 검사를 중단한다. 2026-11-05 정적·공유 iiGUI 설치본의\n소비자에서 두 선택적 검사를 켜고 Android NDK arm64/API 24로 각각 컴파일·링크했다.\n이때 앱은 실행하지 않았다.\n"
+      "raw": "설치된 `../LVUI/example/HelloAndroid`는 선택적 OS·렌더 검사에 필요한 소스를 함께 제공한다.\nOS 검사는 Activity를 직접 빌려 공개 SDK만 사용하며 원래 클립보드를 복원한다.\nAPI 24–27에서 원래 클립이 없으면 빈 상태를 복원할 공개 API가 없으므로,\n클립보드를 변경하기 전에 검사를 중단한다. 2026-11-05 정적·공유 iiGUI 설치본의\n소비자에서 두 선택적 검사를 켜고 Android NDK arm64/API 24로 각각 컴파일·링크했다.\n이때 앱은 실행하지 않았다.\n"
     },
     {
       "id": "b000042",
@@ -390,9 +390,9 @@
       "kind": "fenced_code",
       "start_line": 132,
       "end_line": 141,
-      "raw": "```sh\npython3 tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n```\n",
+      "raw": "```sh\npython3 ../LVUI/tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n```\n",
       "language": "sh",
-      "code": "python3 tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n",
+      "code": "python3 ../LVUI/tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n",
       "closed": true
     },
     {
@@ -849,12 +849,12 @@
       {
         "block_id": "b000035",
         "language": "sh",
-        "code": "python3 tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n"
+        "code": "python3 ../LVUI/tools/android_hello.py \\\n  --sdk /absolute/path/to/android-sdk \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --install --serial DEVICE_SERIAL\n"
       },
       {
         "block_id": "b000051",
         "language": "sh",
-        "code": "python3 tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n"
+        "code": "python3 ../LVUI/tools/android_hello.py \\\n  --sdk \"$PWD/build/android-emulator-20261027/sdk\" \\\n  --ndk /absolute/path/to/android-ndk \\\n  --jdk /absolute/path/to/jdk \\\n  --builder \"$HOME/.local/SDK/iiSDKBuilder/bin/iisdk-builder\" \\\n  --host-compiler \"$HOME/.local/SDK/LVUI/bin/lvui-compile\" \\\n  --build-root \"$PWD/build/android-emulator-20261027/app\" \\\n  --device-kind emulator --serial emulator-5580 --install\n"
       }
     ],
     "links": [

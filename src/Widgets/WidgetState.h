@@ -139,6 +139,7 @@ public:
     [[nodiscard]] core::Result<void> menu_state(std::size_t,MenuItemState);
     [[nodiscard]] core::Result<void> menu_expanded(std::size_t,bool);
     [[nodiscard]] core::Result<void> context_menu(std::size_t,Widget);
+    [[nodiscard]] core::Result<void> suppress_popup_transient_feedback(std::size_t);
     [[nodiscard]] core::Result<void> touch_context_options(std::size_t,TouchContextOptions);
     [[nodiscard]] core::Result<TouchContextOptions> touch_context_options(std::size_t) const;
     [[nodiscard]] core::Result<void> color_model(std::size_t,std::shared_ptr<ColorPickerModel>);
@@ -158,6 +159,7 @@ public:
     [[nodiscard]] core::Result<void> layout_handler(std::size_t,std::function<void(Rect)>);
     [[nodiscard]] core::Result<void> measurement_handler(std::size_t,std::function<void(const WidgetMeasurement&)>);
     [[nodiscard]] core::Result<void> drawing(std::size_t,WidgetDrawing);
+    [[nodiscard]] core::Result<void> set_native_pointer_hidden(bool);
     [[nodiscard]] core::Result<void> paint_handler(std::size_t,WidgetPaintHandler,Widget);
     [[nodiscard]] core::Result<void> backdrop_sources(std::size_t,Widget,Widget);
     [[nodiscard]] core::Result<void> repaint(std::size_t);

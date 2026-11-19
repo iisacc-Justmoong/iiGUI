@@ -233,7 +233,20 @@ struct Host::Impl final {
         if(surface.visible&&!lost&&phase==Phase::running&&!close_pending){if(widgets)widgets->present();canvas.flush(surface.scale,surface.size.height);}
     });if(close_pending)close();}
     static EM_BOOL mouse(int kind,const EmscriptenMouseEvent* e,void* raw){auto& self=*static_cast<Impl*>(raw);WidgetInput input;input.kind=kind==EMSCRIPTEN_EVENT_MOUSEDOWN?WidgetInputKind::pointer_down:kind==EMSCRIPTEN_EVENT_MOUSEUP?WidgetInputKind::pointer_up:kind==EMSCRIPTEN_EVENT_MOUSELEAVE?WidgetInputKind::pointer_leave:WidgetInputKind::pointer_move;input.x=e->targetX;input.y=e->targetY;input.buttons=e->buttons;input.shift=e->shiftKey;input.control=e->ctrlKey;input.alt=e->altKey;input.meta=e->metaKey;input.timestamp=e->timestamp/1000.;self.push(std::move(input));return EM_FALSE;}
-    static EM_BOOL keyboard(int kind,const EmscriptenKeyboardEvent* e,void* raw){auto& self=*static_cast<Impl*>(raw);WidgetInput input;input.kind=kind==EMSCRIPTEN_EVENT_KEYDOWN?WidgetInputKind::key_down:WidgetInputKind::key_up;input.key=key(e->key);input.shift=e->shiftKey;input.control=e->ctrlKey;input.alt=e->altKey;input.meta=e->metaKey;input.timestamp=e->timestamp/1000.;if(input.key==WidgetKey::character&&!input.control&&!input.alt&&!input.meta&&std::strlen(e->key)<=4)input.text=e->key;self.push(std::move(input));return EM_FALSE;}
+    // DOM key location and repeat describe the press, while key describes
+    // the logical value after applying the keyboard layout.
+    static EM_BOOL keyboard(int kind,const EmscriptenKeyboardEvent* e,void* raw){
+        auto& self=*static_cast<Impl*>(raw);
+        WidgetInput input;
+        input.kind=kind==EMSCRIPTEN_EVENT_KEYDOWN?WidgetInputKind::key_down:WidgetInputKind::key_up;
+        input.key=key(e->key);input.shift=e->shiftKey;input.control=e->ctrlKey;input.alt=e->altKey;input.meta=e->metaKey;
+        input.timestamp=e->timestamp/1000.;
+        constexpr unsigned long numpad_location = 3; // DOM_KEY_LOCATION_NUMPAD.
+        input.numeric_keypad=e->location==numpad_location;
+        input.key_repeat=kind==EMSCRIPTEN_EVENT_KEYDOWN && e->repeat;
+        if(input.key==WidgetKey::character&&!input.control&&!input.alt&&!input.meta&&std::strlen(e->key)<=4)input.text=e->key;
+        self.push(std::move(input));return EM_FALSE;
+    }
     void callbacks_install(){
         // Synchronous callbacks proxied to the application pthread can deadlock
         // against its synchronous browser calls. Only enqueue on the browser

@@ -46,16 +46,15 @@ general reactive property tracking remain outside this macOS implementation.
 
 ## Build and verify
 
-First build/install the updated Core and LVUI into their `build/install` prefixes,
-then configure iiGUI using those package directories and the existing Vulkan kit.
-Build and run CTest in `iiGUI/build`. The standalone example and installed copy
-both use the Core entrypoint.
+Build and install Core and iiGUI, then configure the host examples in LVUI.
+Build and run the example tests from `LVUI/build`. The source and installed
+examples both use the Core entrypoint.
 
 ```sh
-cmake -DSOURCE="$PWD" -DBUILD_ROOT="$PWD/build/core-widget-consumer" \
+cmake -DSOURCE="$PWD/../LVUI" -DBUILD_ROOT="$PWD/../LVUI/build/core-widget-consumer" \
   -DCORE_PREFIX=/path/to/iiSDKCore/build/install \
   -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD="$PWD/build" \
-  -P tests/aot_package.cmake
+  -P ../LVUI/tests/aot_package.cmake
 ```
 
 The verifier requires a fresh destination. It relocates installed packages,

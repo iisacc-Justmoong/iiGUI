@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/AndroidIME.md",
-    "sha256": "b832ee0a974af82e0b6ac156291f54003c2e00041f5a981737a6f19591507363",
-    "bytes": 10444,
+    "sha256": "cc3d721f07c69bda6e37068c6025c5b1992b3e4a103632f6c3f94959ce8002a4",
+    "bytes": 10452,
     "line_count": 126,
     "encoding": "utf-8",
     "language": "ko"
@@ -57,7 +57,7 @@
       "kind": "paragraph",
       "start_line": 11,
       "end_line": 15,
-      "raw": "Android용 iiGUI 설치본은 `share/iiGUI/android/AndroidImeBridge.java`와\n`AndroidImeBridge.pro`를 제공한다. 앱은 Java 파일을 Android API 24 이상 대상으로\n컴파일해 DEX에 포함하고 매니페스트의 `android:hasCode`를 `true`로 설정한다.\nR8 등으로 앱을 축소하면 함께 제공된 규칙을 적용해 JNI에서 찾는 클래스와 메서드\n이름을 보존한다. `tools/android_hello.py`는 축소 없이 이를 패키징하는 예제이다.\n"
+      "raw": "Android용 iiGUI 설치본은 `share/iiGUI/android/AndroidImeBridge.java`와\n`AndroidImeBridge.pro`를 제공한다. 앱은 Java 파일을 Android API 24 이상 대상으로\n컴파일해 DEX에 포함하고 매니페스트의 `android:hasCode`를 `true`로 설정한다.\nR8 등으로 앱을 축소하면 함께 제공된 규칙을 적용해 JNI에서 찾는 클래스와 메서드\n이름을 보존한다. `../LVUI/tools/android_hello.py`는 축소 없이 이를 패키징하는 예제이다.\n"
     },
     {
       "id": "b000006",

@@ -104,6 +104,7 @@ void WaylandConnection::minimum(Size){}
 void WaylandConnection::resize(Size){}
 void WaylandConnection::action(WindowAction){}
 void WaylandConnection::begin_move(std::uint32_t serial){move_serial=serial;}
+void WaylandConnection::set_native_pointer_hidden(bool){}
 void WaylandConnection::request_frame(){}
 void WaylandConnection::cancel_frame(){}
 wl_display* WaylandConnection::display()const{return nullptr;}

@@ -104,13 +104,11 @@ driver library. Install a target Vulkan SDK, or pass explicit target paths:
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \
-  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \
   -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \
   -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \
   -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
 cmake --build build --parallel 4
-ctest --test-dir build --output-on-failure
-./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan
+ctest --test-dir build -R '^iiGUI\.vulkan_' --output-on-failure
 ```
 
 Use the target's Vulkan loader on Windows/Linux and MoltenVK on macOS; the

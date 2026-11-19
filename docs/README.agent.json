@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/README.md",
-    "sha256": "37d2cc92934ec3387f0ca6c93f2dad7812c38be183768e4416e3a23a57ba3f1a",
-    "bytes": 7942,
-    "line_count": 103,
+    "sha256": "367b1d985096532df3cd8ce3c9a998399dfbe90dee1226b7692371479049e35b",
+    "bytes": 7680,
+    "line_count": 101,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -125,8 +125,8 @@
       "id": "b000010",
       "kind": "table",
       "start_line": 15,
-      "end_line": 102,
-      "raw": "| Document | Agent JSON |\n| --- | --- |\n| [`AGENT.md`](../AGENT.md) | [JSON](entrypoints/AGENT.agent.json) |\n| [`README.md`](../README.md) | [JSON](entrypoints/README.agent.json) |\n| [`docs/AOTDesktop.md`](AOTDesktop.md) | [JSON](AOTDesktop.agent.json) |\n| [`docs/AccessibilitySemantics.md`](AccessibilitySemantics.md) | [JSON](AccessibilitySemantics.agent.json) |\n| [`docs/ActionSurfaces.md`](ActionSurfaces.md) | [JSON](ActionSurfaces.agent.json) |\n| [`docs/AndroidHello.md`](AndroidHello.md) | [JSON](AndroidHello.agent.json) |\n| [`docs/AndroidIME.md`](AndroidIME.md) | [JSON](AndroidIME.agent.json) |\n| [`docs/AndroidKeyboard.md`](AndroidKeyboard.md) | [JSON](AndroidKeyboard.agent.json) |\n| [`docs/Architecture.md`](Architecture.md) | [JSON](Architecture.agent.json) |\n| [`docs/BackdropMaterials.md`](BackdropMaterials.md) | [JSON](BackdropMaterials.agent.json) |\n| [`docs/Bindings.md`](Bindings.md) | [JSON](Bindings.agent.json) |\n| [`docs/BuildLayout.md`](BuildLayout.md) | [JSON](BuildLayout.agent.json) |\n| [`docs/CallableFields.md`](CallableFields.md) | [JSON](CallableFields.agent.json) |\n| [`docs/CellEditors.md`](CellEditors.md) | [JSON](CellEditors.agent.json) |\n| [`docs/ClipboardCapacity.md`](ClipboardCapacity.md) | [JSON](ClipboardCapacity.agent.json) |\n| [`docs/Colors.md`](Colors.md) | [JSON](Colors.agent.json) |\n| [`docs/Composition.md`](Composition.md) | [JSON](Composition.agent.json) |\n| [`docs/ContainerLayout.md`](ContainerLayout.md) | [JSON](ContainerLayout.agent.json) |\n| [`docs/ContentHosts.md`](ContentHosts.md) | [JSON](ContentHosts.agent.json) |\n| [`docs/CoreApplication.md`](CoreApplication.md) | [JSON](CoreApplication.agent.json) |\n| [`docs/CustomWindowChrome.md`](CustomWindowChrome.md) | [JSON](CustomWindowChrome.agent.json) |\n| [`docs/DialogLayout.md`](DialogLayout.md) | [JSON](DialogLayout.agent.json) |\n| [`docs/DisplayFrames.md`](DisplayFrames.md) | [JSON](DisplayFrames.agent.json) |\n| [`docs/DynamicLinking.md`](DynamicLinking.md) | [JSON](DynamicLinking.agent.json) |\n| [`docs/EditorColorSwatch.md`](EditorColorSwatch.md) | [JSON](EditorColorSwatch.agent.json) |\n| [`docs/EditorViewports.md`](EditorViewports.md) | [JSON](EditorViewports.agent.json) |\n| [`docs/ExternalPainter.md`](ExternalPainter.md) | [JSON](ExternalPainter.agent.json) |\n| [`docs/FactoryCaptures.md`](FactoryCaptures.md) | [JSON](FactoryCaptures.agent.json) |\n| [`docs/Fonts.md`](Fonts.md) | [JSON](Fonts.agent.json) |\n| [`docs/FrameworkBoundary.md`](FrameworkBoundary.md) | [JSON](FrameworkBoundary.agent.json) |\n| [`docs/GpuSceneComposition.md`](GpuSceneComposition.md) | [JSON](GpuSceneComposition.agent.json) |\n| [`docs/Graphics.md`](Graphics.md) | [JSON](Graphics.agent.json) |\n| [`docs/HostPlatforms.md`](HostPlatforms.md) | [JSON](HostPlatforms.agent.json) |\n| [`docs/IPADOS.md`](IPADOS.md) | [JSON](IPADOS.agent.json) |\n| [`docs/ImageBudgets.md`](ImageBudgets.md) | [JSON](ImageBudgets.agent.json) |\n| [`docs/ImageComposition.md`](ImageComposition.md) | [JSON](ImageComposition.agent.json) |\n| [`docs/Images.md`](Images.md) | [JSON](Images.agent.json) |\n| [`docs/IncrementalWidgetUpdates.md`](IncrementalWidgetUpdates.md) | [JSON](IncrementalWidgetUpdates.agent.json) |\n| [`docs/InferredValues.md`](InferredValues.md) | [JSON](InferredValues.agent.json) |\n| [`docs/KeyedContent.md`](KeyedContent.md) | [JSON](KeyedContent.agent.json) |\n| [`docs/LVUI.md`](LVUI.md) | [JSON](LVUI.agent.json) |\n| [`docs/MaterialInputs.md`](MaterialInputs.md) | [JSON](MaterialInputs.agent.json) |\n| [`docs/Menus.md`](Menus.md) | [JSON](Menus.agent.json) |\n| [`docs/MethodQueries.md`](MethodQueries.md) | [JSON](MethodQueries.agent.json) |\n| [`docs/NativeMotion.md`](NativeMotion.md) | [JSON](NativeMotion.agent.json) |\n| [`docs/NativeView.md`](NativeView.md) | [JSON](NativeView.agent.json) |\n| [`docs/NativeWidgets.md`](NativeWidgets.md) | [JSON](NativeWidgets.agent.json) |\n| [`docs/ObjectInputs.md`](ObjectInputs.md) | [JSON](ObjectInputs.agent.json) |\n| [`docs/Popovers.md`](Popovers.md) | [JSON](Popovers.agent.json) |\n| [`docs/PopupContent.md`](PopupContent.md) | [JSON](PopupContent.agent.json) |\n| [`docs/PopupMotionChannels.md`](PopupMotionChannels.md) | [JSON](PopupMotionChannels.agent.json) |\n| [`docs/Presentation.md`](Presentation.md) | [JSON](Presentation.agent.json) |\n| [`docs/QtGuiComparison.md`](QtGuiComparison.md) | [JSON](QtGuiComparison.agent.json) |\n| [`docs/Renderers.md`](Renderers.md) | [JSON](Renderers.agent.json) |\n| [`docs/RetainedPopupEffects.md`](RetainedPopupEffects.md) | [JSON](RetainedPopupEffects.agent.json) |\n| [`docs/Retirement.md`](Retirement.md) | [JSON](Retirement.agent.json) |\n| [`docs/RevealLocalRect.md`](RevealLocalRect.md) | [JSON](RevealLocalRect.agent.json) |\n| [`docs/ScrollViews.md`](ScrollViews.md) | [JSON](ScrollViews.agent.json) |\n| [`docs/SelfRenderedWidgets.md`](SelfRenderedWidgets.md) | [JSON](SelfRenderedWidgets.agent.json) |\n| [`docs/Shadows.md`](Shadows.md) | [JSON](Shadows.agent.json) |\n| [`docs/SourceLayout.md`](SourceLayout.md) | [JSON](SourceLayout.agent.json) |\n| [`docs/StackLayout.md`](StackLayout.md) | [JSON](StackLayout.agent.json) |\n| [`docs/SubtreeScenes.md`](SubtreeScenes.md) | [JSON](SubtreeScenes.agent.json) |\n| [`docs/TextBoundary.md`](TextBoundary.md) | [JSON](TextBoundary.agent.json) |\n| [`docs/TextInputProvider.md`](TextInputProvider.md) | [JSON](TextInputProvider.agent.json) |\n| [`docs/TextLine.md`](TextLine.md) | [JSON](TextLine.agent.json) |\n| [`docs/TextRasterCache.md`](TextRasterCache.md) | [JSON](TextRasterCache.agent.json) |\n| [`docs/TextWrapFallback.md`](TextWrapFallback.md) | [JSON](TextWrapFallback.agent.json) |\n| [`docs/Usage.md`](Usage.md) | [JSON](Usage.agent.json) |\n| [`docs/Verification.md`](Verification.md) | [JSON](Verification.agent.json) |\n| [`docs/VirtualViewports.md`](VirtualViewports.md) | [JSON](VirtualViewports.agent.json) |\n| [`docs/WidgetInteraction.md`](WidgetInteraction.md) | [JSON](WidgetInteraction.agent.json) |\n| [`docs/WidgetOpacity.md`](WidgetOpacity.md) | [JSON](WidgetOpacity.agent.json) |\n| [`docs/WindowProperties.md`](WindowProperties.md) | [JSON](WindowProperties.agent.json) |\n| [`docs/WindowsBuildAndRun.md`](WindowsBuildAndRun.md) | [JSON](WindowsBuildAndRun.agent.json) |\n| [`docs/WindowsRegression.md`](WindowsRegression.md) | [JSON](WindowsRegression.agent.json) |\n| [`docs/desktop.md`](desktop.md) | [JSON](desktop.agent.json) |\n| [`docs/documentation-structure.md`](documentation-structure.md) | [JSON](documentation-structure.agent.json) |\n| [`docs/editor-input.md`](editor-input.md) | [JSON](editor-input.agent.json) |\n| [`docs/gpu-materials.md`](gpu-materials.md) | [JSON](gpu-materials.agent.json) |\n| [`docs/native-platforms.md`](native-platforms.md) | [JSON](native-platforms.agent.json) |\n| [`docs/secure-input.md`](secure-input.md) | [JSON](secure-input.agent.json) |\n| [`docs/text-raster.md`](text-raster.md) | [JSON](text-raster.agent.json) |\n| [`example/README.md`](../example/README.md) | [JSON](mirrors/example/README.agent.json) |\n| [`examples/HelloAndroid/README.md`](../examples/HelloAndroid/README.md) | [JSON](mirrors/examples/HelloAndroid/README.agent.json) |\n| [`examples/HelloHosts/README.md`](../examples/HelloHosts/README.md) | [JSON](mirrors/examples/HelloHosts/README.agent.json) |\n",
+      "end_line": 100,
+      "raw": "| Document | Agent JSON |\n| --- | --- |\n| [`AGENT.md`](../AGENT.md) | [JSON](entrypoints/AGENT.agent.json) |\n| [`README.md`](../README.md) | [JSON](entrypoints/README.agent.json) |\n| [`docs/AOTDesktop.md`](AOTDesktop.md) | [JSON](AOTDesktop.agent.json) |\n| [`docs/AccessibilitySemantics.md`](AccessibilitySemantics.md) | [JSON](AccessibilitySemantics.agent.json) |\n| [`docs/ActionSurfaces.md`](ActionSurfaces.md) | [JSON](ActionSurfaces.agent.json) |\n| [`docs/AndroidHello.md`](AndroidHello.md) | [JSON](AndroidHello.agent.json) |\n| [`docs/AndroidIME.md`](AndroidIME.md) | [JSON](AndroidIME.agent.json) |\n| [`docs/AndroidKeyboard.md`](AndroidKeyboard.md) | [JSON](AndroidKeyboard.agent.json) |\n| [`docs/Architecture.md`](Architecture.md) | [JSON](Architecture.agent.json) |\n| [`docs/BackdropMaterials.md`](BackdropMaterials.md) | [JSON](BackdropMaterials.agent.json) |\n| [`docs/Bindings.md`](Bindings.md) | [JSON](Bindings.agent.json) |\n| [`docs/BuildLayout.md`](BuildLayout.md) | [JSON](BuildLayout.agent.json) |\n| [`docs/CallableFields.md`](CallableFields.md) | [JSON](CallableFields.agent.json) |\n| [`docs/CellEditors.md`](CellEditors.md) | [JSON](CellEditors.agent.json) |\n| [`docs/ClipboardCapacity.md`](ClipboardCapacity.md) | [JSON](ClipboardCapacity.agent.json) |\n| [`docs/Colors.md`](Colors.md) | [JSON](Colors.agent.json) |\n| [`docs/Composition.md`](Composition.md) | [JSON](Composition.agent.json) |\n| [`docs/ContainerLayout.md`](ContainerLayout.md) | [JSON](ContainerLayout.agent.json) |\n| [`docs/ContentHosts.md`](ContentHosts.md) | [JSON](ContentHosts.agent.json) |\n| [`docs/CoreApplication.md`](CoreApplication.md) | [JSON](CoreApplication.agent.json) |\n| [`docs/CustomWindowChrome.md`](CustomWindowChrome.md) | [JSON](CustomWindowChrome.agent.json) |\n| [`docs/DialogLayout.md`](DialogLayout.md) | [JSON](DialogLayout.agent.json) |\n| [`docs/DisplayFrames.md`](DisplayFrames.md) | [JSON](DisplayFrames.agent.json) |\n| [`docs/DynamicLinking.md`](DynamicLinking.md) | [JSON](DynamicLinking.agent.json) |\n| [`docs/EditorColorSwatch.md`](EditorColorSwatch.md) | [JSON](EditorColorSwatch.agent.json) |\n| [`docs/EditorViewports.md`](EditorViewports.md) | [JSON](EditorViewports.agent.json) |\n| [`docs/ExternalPainter.md`](ExternalPainter.md) | [JSON](ExternalPainter.agent.json) |\n| [`docs/FactoryCaptures.md`](FactoryCaptures.md) | [JSON](FactoryCaptures.agent.json) |\n| [`docs/Fonts.md`](Fonts.md) | [JSON](Fonts.agent.json) |\n| [`docs/FrameworkBoundary.md`](FrameworkBoundary.md) | [JSON](FrameworkBoundary.agent.json) |\n| [`docs/GpuSceneComposition.md`](GpuSceneComposition.md) | [JSON](GpuSceneComposition.agent.json) |\n| [`docs/Graphics.md`](Graphics.md) | [JSON](Graphics.agent.json) |\n| [`docs/HostPlatforms.md`](HostPlatforms.md) | [JSON](HostPlatforms.agent.json) |\n| [`docs/IPADOS.md`](IPADOS.md) | [JSON](IPADOS.agent.json) |\n| [`docs/ImageBudgets.md`](ImageBudgets.md) | [JSON](ImageBudgets.agent.json) |\n| [`docs/ImageComposition.md`](ImageComposition.md) | [JSON](ImageComposition.agent.json) |\n| [`docs/Images.md`](Images.md) | [JSON](Images.agent.json) |\n| [`docs/IncrementalWidgetUpdates.md`](IncrementalWidgetUpdates.md) | [JSON](IncrementalWidgetUpdates.agent.json) |\n| [`docs/InferredValues.md`](InferredValues.md) | [JSON](InferredValues.agent.json) |\n| [`docs/KeyedContent.md`](KeyedContent.md) | [JSON](KeyedContent.agent.json) |\n| [`docs/LVUI.md`](LVUI.md) | [JSON](LVUI.agent.json) |\n| [`docs/MaterialInputs.md`](MaterialInputs.md) | [JSON](MaterialInputs.agent.json) |\n| [`docs/Menus.md`](Menus.md) | [JSON](Menus.agent.json) |\n| [`docs/MethodQueries.md`](MethodQueries.md) | [JSON](MethodQueries.agent.json) |\n| [`docs/NativeMotion.md`](NativeMotion.md) | [JSON](NativeMotion.agent.json) |\n| [`docs/NativeView.md`](NativeView.md) | [JSON](NativeView.agent.json) |\n| [`docs/NativeWidgets.md`](NativeWidgets.md) | [JSON](NativeWidgets.agent.json) |\n| [`docs/ObjectInputs.md`](ObjectInputs.md) | [JSON](ObjectInputs.agent.json) |\n| [`docs/Popovers.md`](Popovers.md) | [JSON](Popovers.agent.json) |\n| [`docs/PopupContent.md`](PopupContent.md) | [JSON](PopupContent.agent.json) |\n| [`docs/PopupMotionChannels.md`](PopupMotionChannels.md) | [JSON](PopupMotionChannels.agent.json) |\n| [`docs/Presentation.md`](Presentation.md) | [JSON](Presentation.agent.json) |\n| [`docs/QtGuiComparison.md`](QtGuiComparison.md) | [JSON](QtGuiComparison.agent.json) |\n| [`docs/Renderers.md`](Renderers.md) | [JSON](Renderers.agent.json) |\n| [`docs/RetainedPopupEffects.md`](RetainedPopupEffects.md) | [JSON](RetainedPopupEffects.agent.json) |\n| [`docs/Retirement.md`](Retirement.md) | [JSON](Retirement.agent.json) |\n| [`docs/RevealLocalRect.md`](RevealLocalRect.md) | [JSON](RevealLocalRect.agent.json) |\n| [`docs/ScrollViews.md`](ScrollViews.md) | [JSON](ScrollViews.agent.json) |\n| [`docs/SelfRenderedWidgets.md`](SelfRenderedWidgets.md) | [JSON](SelfRenderedWidgets.agent.json) |\n| [`docs/Shadows.md`](Shadows.md) | [JSON](Shadows.agent.json) |\n| [`docs/SourceLayout.md`](SourceLayout.md) | [JSON](SourceLayout.agent.json) |\n| [`docs/StackLayout.md`](StackLayout.md) | [JSON](StackLayout.agent.json) |\n| [`docs/SubtreeScenes.md`](SubtreeScenes.md) | [JSON](SubtreeScenes.agent.json) |\n| [`docs/TextBoundary.md`](TextBoundary.md) | [JSON](TextBoundary.agent.json) |\n| [`docs/TextInputProvider.md`](TextInputProvider.md) | [JSON](TextInputProvider.agent.json) |\n| [`docs/TextLine.md`](TextLine.md) | [JSON](TextLine.agent.json) |\n| [`docs/TextRasterCache.md`](TextRasterCache.md) | [JSON](TextRasterCache.agent.json) |\n| [`docs/TextWrapFallback.md`](TextWrapFallback.md) | [JSON](TextWrapFallback.agent.json) |\n| [`docs/Usage.md`](Usage.md) | [JSON](Usage.agent.json) |\n| [`docs/Verification.md`](Verification.md) | [JSON](Verification.agent.json) |\n| [`docs/VirtualViewports.md`](VirtualViewports.md) | [JSON](VirtualViewports.agent.json) |\n| [`docs/WidgetInteraction.md`](WidgetInteraction.md) | [JSON](WidgetInteraction.agent.json) |\n| [`docs/WidgetOpacity.md`](WidgetOpacity.md) | [JSON](WidgetOpacity.agent.json) |\n| [`docs/WindowProperties.md`](WindowProperties.md) | [JSON](WindowProperties.agent.json) |\n| [`docs/WindowsBuildAndRun.md`](WindowsBuildAndRun.md) | [JSON](WindowsBuildAndRun.agent.json) |\n| [`docs/WindowsRegression.md`](WindowsRegression.md) | [JSON](WindowsRegression.agent.json) |\n| [`docs/desktop.md`](desktop.md) | [JSON](desktop.agent.json) |\n| [`docs/documentation-structure.md`](documentation-structure.md) | [JSON](documentation-structure.agent.json) |\n| [`docs/editor-input.md`](editor-input.md) | [JSON](editor-input.agent.json) |\n| [`docs/gpu-materials.md`](gpu-materials.md) | [JSON](gpu-materials.agent.json) |\n| [`docs/native-platforms.md`](native-platforms.md) | [JSON](native-platforms.agent.json) |\n| [`docs/secure-input.md`](secure-input.md) | [JSON](secure-input.agent.json) |\n| [`docs/text-raster.md`](text-raster.md) | [JSON](text-raster.agent.json) |\n| [`example/README.md`](../example/README.md) | [JSON](mirrors/example/README.agent.json) |\n",
       "columns": [
         "Document",
         "Agent JSON"
@@ -467,22 +467,14 @@
         [
           "[`example/README.md`](../example/README.md)",
           "[JSON](mirrors/example/README.agent.json)"
-        ],
-        [
-          "[`examples/HelloAndroid/README.md`](../examples/HelloAndroid/README.md)",
-          "[JSON](mirrors/examples/HelloAndroid/README.agent.json)"
-        ],
-        [
-          "[`examples/HelloHosts/README.md`](../examples/HelloHosts/README.md)",
-          "[JSON](mirrors/examples/HelloHosts/README.agent.json)"
         ]
       ]
     },
     {
       "id": "b000011",
       "kind": "html",
-      "start_line": 103,
-      "end_line": 103,
+      "start_line": 101,
+      "end_line": 101,
       "raw": "<!-- workspace-docs:document-map:end -->\n"
     }
   ],
@@ -1725,34 +1717,6 @@
         "target": "mirrors/example/README.agent.json",
         "kind": "relative",
         "line": 100
-      },
-      {
-        "block_id": "b000010",
-        "label": "`examples/HelloAndroid/README.md`",
-        "target": "../examples/HelloAndroid/README.md",
-        "kind": "relative",
-        "line": 101
-      },
-      {
-        "block_id": "b000010",
-        "label": "JSON",
-        "target": "mirrors/examples/HelloAndroid/README.agent.json",
-        "kind": "relative",
-        "line": 101
-      },
-      {
-        "block_id": "b000010",
-        "label": "`examples/HelloHosts/README.md`",
-        "target": "../examples/HelloHosts/README.md",
-        "kind": "relative",
-        "line": 102
-      },
-      {
-        "block_id": "b000010",
-        "label": "JSON",
-        "target": "mirrors/examples/HelloHosts/README.agent.json",
-        "kind": "relative",
-        "line": 102
       }
     ],
     "tables": [
@@ -2098,14 +2062,6 @@
           [
             "[`example/README.md`](../example/README.md)",
             "[JSON](mirrors/example/README.agent.json)"
-          ],
-          [
-            "[`examples/HelloAndroid/README.md`](../examples/HelloAndroid/README.md)",
-            "[JSON](mirrors/examples/HelloAndroid/README.agent.json)"
-          ],
-          [
-            "[`examples/HelloHosts/README.md`](../examples/HelloHosts/README.md)",
-            "[JSON](mirrors/examples/HelloHosts/README.agent.json)"
           ]
         ]
       }

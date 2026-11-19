@@ -98,6 +98,4 @@ Markdown is the maintained human source. Agent JSON is a structured, source-trac
 | [`docs/secure-input.md`](secure-input.md) | [JSON](secure-input.agent.json) |
 | [`docs/text-raster.md`](text-raster.md) | [JSON](text-raster.agent.json) |
 | [`example/README.md`](../example/README.md) | [JSON](mirrors/example/README.agent.json) |
-| [`examples/HelloAndroid/README.md`](../examples/HelloAndroid/README.md) | [JSON](mirrors/examples/HelloAndroid/README.agent.json) |
-| [`examples/HelloHosts/README.md`](../examples/HelloHosts/README.md) | [JSON](mirrors/examples/HelloHosts/README.agent.json) |
 <!-- workspace-docs:document-map:end -->

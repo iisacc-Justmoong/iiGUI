@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/CoreApplication.md",
-    "sha256": "1cc7eee6628d8377688515d59571ad8a667a422841ed27024c7e576e8e380e5b",
-    "bytes": 3837,
-    "line_count": 66,
+    "sha256": "8ec996e57ed6da5ec4d7eceb8d5878736ca3136aa75d2140eff493f4ee0ffb7c",
+    "bytes": 3777,
+    "line_count": 65,
     "encoding": "utf-8",
     "language": "en"
   },
@@ -158,38 +158,38 @@
       "id": "b000019",
       "kind": "paragraph",
       "start_line": 49,
-      "end_line": 52,
-      "raw": "First build/install the updated Core and LVUI into their `build/install` prefixes,\nthen configure iiGUI using those package directories and the existing Vulkan kit.\nBuild and run CTest in `iiGUI/build`. The standalone example and installed copy\nboth use the Core entrypoint.\n"
+      "end_line": 51,
+      "raw": "Build and install Core and iiGUI, then configure the host examples in LVUI.\nBuild and run the example tests from `LVUI/build`. The source and installed\nexamples both use the Core entrypoint.\n"
     },
     {
       "id": "b000020",
       "kind": "blank",
-      "start_line": 53,
-      "end_line": 53,
+      "start_line": 52,
+      "end_line": 52,
       "raw": "\n"
     },
     {
       "id": "b000021",
       "kind": "fenced_code",
-      "start_line": 54,
-      "end_line": 59,
-      "raw": "```sh\ncmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n```\n",
+      "start_line": 53,
+      "end_line": 58,
+      "raw": "```sh\ncmake -DSOURCE=\"$PWD/../LVUI\" -DBUILD_ROOT=\"$PWD/../LVUI/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P ../LVUI/tests/aot_package.cmake\n```\n",
       "language": "sh",
-      "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n",
+      "code": "cmake -DSOURCE=\"$PWD/../LVUI\" -DBUILD_ROOT=\"$PWD/../LVUI/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P ../LVUI/tests/aot_package.cmake\n",
       "closed": true
     },
     {
       "id": "b000022",
       "kind": "blank",
-      "start_line": 60,
-      "end_line": 60,
+      "start_line": 59,
+      "end_line": 59,
       "raw": "\n"
     },
     {
       "id": "b000023",
       "kind": "paragraph",
-      "start_line": 61,
-      "end_line": 66,
+      "start_line": 60,
+      "end_line": 65,
       "raw": "The verifier requires a fresh destination. It relocates installed packages,\ncompiles the installed Core entry source into the consumer executable, checks\nbundled font hashes and Qt/DSL-parser absence, then runs with the consumer source\nand lvui-compile unavailable. Core Runtime and the existing Vulkan kit remain\nnative deployment dependencies; this verification does not implement distribution\nsigning, notarization or a fully self-contained bundle.\n"
     }
   ],
@@ -233,7 +233,7 @@
       {
         "block_id": "b000021",
         "language": "sh",
-        "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n"
+        "code": "cmake -DSOURCE=\"$PWD/../LVUI\" -DBUILD_ROOT=\"$PWD/../LVUI/build/core-widget-consumer\" \\\n  -DCORE_PREFIX=/path/to/iiSDKCore/build/install \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P ../LVUI/tests/aot_package.cmake\n"
       }
     ],
     "links": [

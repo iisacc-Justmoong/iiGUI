@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/TextInputProvider.md",
-    "sha256": "b3d0923383f811141513c2365b38d97350d3f7add909fb854cc187c8fc2afe53",
-    "bytes": 4308,
-    "line_count": 31,
+    "sha256": "3381b9af2eeebd3cda0da4c159a95efcd012617f26b97485ce3d06fc0abe0074",
+    "bytes": 5105,
+    "line_count": 42,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -165,10 +165,40 @@
       "raw": "\n"
     },
     {
+      "kind": "heading",
+      "level": 2,
+      "title": "하드웨어 키의 반복과 숫자패드 정보",
       "id": "b000021",
-      "kind": "paragraph",
       "start_line": 31,
       "end_line": 31,
+      "raw": "## 하드웨어 키의 반복과 숫자패드 정보\n"
+    },
+    {
+      "kind": "blank",
+      "id": "b000022",
+      "start_line": 32,
+      "end_line": 32,
+      "raw": "\n"
+    },
+    {
+      "kind": "paragraph",
+      "id": "b000023",
+      "start_line": 33,
+      "end_line": 40,
+      "raw": "`WidgetInput::key_repeat`는 눌린 상태가 이어져 발생한 `key_down`을 표시한다.\n`numeric_keypad`는 호스트가 식별한 숫자패드 키를 표시한다. 두 필드는\n`WidgetInput::key`와 `text`에 별도로 전달되며 앱은 단축키에서 사용할 수 있다.\nCocoa·Win32·Wayland·웹은 호스트가 제공한 반복·키 위치 정보를 사용한다.\nUIKit은 HID 사용 코드별로 현재 눌린 키를 기록하고, 해제·취소·포커스 상실 시\n해당 기록을 지운다. `iiGUI.mobile_input`은 유지·해제·취소의 구분을 검사한다.\nWin32는 상단 숫자열의 논리적 숫자를 키 이벤트에 포함하며, 텍스트는 기존\n문자 입력 이벤트로 편집기에 들어간다.\n"
+    },
+    {
+      "kind": "blank",
+      "id": "b000024",
+      "start_line": 41,
+      "end_line": 41,
+      "raw": "\n"
+    },
+    {
+      "id": "b000025",
+      "kind": "paragraph",
+      "start_line": 42,
+      "end_line": 42,
       "raw": "웹 호스트의 편집·조합 입력과 제한은 [웹 텍스트 입력과 조합](WebTextInput.md)을 따른다.\n"
     }
   ],
@@ -180,6 +210,14 @@
       "title": "자체 텍스트 위젯과 OS 입력기",
       "anchor": "자체-텍스트-위젯과-os-입력기",
       "start_line": 1
+    },
+    {
+      "block_id": "b000021",
+      "parent_id": "b000001",
+      "level": 2,
+      "title": "하드웨어 키의 반복과 숫자패드 정보",
+      "anchor": "하드웨어-키의-반복과-숫자패드-정보",
+      "start_line": 31
     }
   ],
   "indexes": {
@@ -216,11 +254,11 @@
     "commands": [],
     "links": [
       {
-        "block_id": "b000021",
+        "block_id": "b000025",
         "label": "웹 텍스트 입력과 조합",
         "target": "WebTextInput.md",
         "kind": "relative",
-        "line": 31
+        "line": 42
       }
     ],
     "tables": []

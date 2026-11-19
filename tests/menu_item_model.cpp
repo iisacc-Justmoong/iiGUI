@@ -9,7 +9,12 @@ int main(){
     require(rect&&rect->icon.width==16&&rect->chevron.width==16&&rect->label.width==40&&rect->shortcut.width==18,"Item layout changed");
     require(item.visual({.hovered=true,.pressed=true}).background==value.palette.pressed,"Pressed state lost precedence");
     value.compact=true;value.state=ii::gui::MenuItemState::selected;value.expanded=true;
-    require(item.set_configuration(value)&&item.width()==141&&item.height()==18&&item.direction()==ii::gui::MenuDirection::down&&item.visual({}).background==value.palette.selected,"Selection or direction changed");
+    require(item.set_configuration(value)&&item.width()==141&&item.height()==18&&item.direction()==ii::gui::MenuDirection::down,"Selection or direction changed");
+    for(auto interaction : {ii::gui::MenuItemInteraction{}, ii::gui::MenuItemInteraction{.hovered=true},
+                            ii::gui::MenuItemInteraction{.hovered=true,.pressed=true},
+                            ii::gui::MenuItemInteraction{.focused=true}})
+        require(item.visual(interaction).background.alpha==0 && !item.visual(interaction).focused,
+                "Context item displayed a background or focus frame");
     value.state=ii::gui::MenuItemState::inactive;require(item.set_configuration(value)&&!item.visual({.focused=true}).enabled&&!item.visual({.focused=true}).focused,"Inactive item remained interactive");
     value.key_visible=false;require(item.set_configuration(value)&&item.shortcut().empty(),"Hidden shortcut remained visible");
     value.key_visible=true;value.shortcut.clear();value.key_placeholder="Key";require(item.set_configuration(value)&&item.shortcut()=="Key","Shortcut fallback changed");

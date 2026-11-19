@@ -53,23 +53,23 @@ and renderers are not replaced by an unverified native widget implementation.
 
 ## Build the actual LVUI Hello World
 
-Build/install the updated LVUI package into `LVUI/build/install` first, then:
+Install iiGUI 0.6.0 or later and build the sample from the LVUI checkout:
 
 ```sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+cmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \
-  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \
+  -DLVUI_BUILD_HOST_EXAMPLES=ON -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \
   -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \
   -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \
   -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
-cmake --build build --parallel 4
-ctest --test-dir build --output-on-failure
-open build/examples/HelloWorld/HelloWorld.app
+cmake --build ../LVUI/build --target HelloWorld --parallel 4
+ctest --test-dir ../LVUI/build -R '^HelloWorld\.' --output-on-failure
+open ../LVUI/build/example/HelloWorld/HelloWorld.app
 ```
 
 The HelloWorld configuration explicitly requests one Core worker before the
 native host starts, so its background result does not depend on an implicit
-worker pool. `examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`
+worker pool. `../LVUI/example/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`
 at build time into `HelloWorld.generated.h`. C++23 then compiles the generated
 native construction calls and scoped backend callbacks. The app binary does
 not call or contain the LVUI parser/compiler, and needs neither the source file
@@ -77,16 +77,16 @@ nor the build tool to run. The `.app` is also runnable directly with `--self-tes
 Its timer, background result 42, resize, two native button actions and normal
 close are verified, including one backend construction/destruction per mount.
 
-The legacy `examples/HelloLVUI` remains an explicitly separate runtime-parsed
-GPU canvas demonstration. Embedding that earlier markup is not the AOT route.
+The source of the earlier runtime-parsed GPU canvas demonstration is archived
+under `../LVUI/example/HelloLVUI`. HelloWorld is the buildable AOT sample.
 
 ## Installed-only consumer
 
 ```sh
-cmake -DSOURCE="$PWD" -DBUILD_ROOT="$PWD/build/aot-consumer" \
+cmake -DSOURCE="$PWD/../LVUI" -DBUILD_ROOT="$PWD/../LVUI/build/aot-consumer" \
   -DCORE_PREFIX=/path/to/installed/iiSDKCore \
   -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD="$PWD/build" \
-  -P tests/aot_package.cmake
+  -P ../LVUI/tests/aot_package.cmake
 ```
 
 Use a fresh destination under `build/`. This stages the installed Core plus

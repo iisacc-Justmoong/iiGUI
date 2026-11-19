@@ -24,7 +24,7 @@ class SourceBoundaryTests(unittest.TestCase):
                 self.assertFalse(forbidden_component_rendering(source))
 
     def test_source_rejects_lvui_lvrs_and_framework_dependencies(self):
-        for source in ('#include <LVUI/Button.h>', '#include "LVRS/Widgets.h"',
+        for source in ('#include <LVUI/Button.h>', '#include <LVUI>', '#include "LVRS/Widgets.h"',
                        '#include <lvrs/Widgets.h>', 'lvui::Button b;', 'LVRS::Button b;',
                        'namespace lvrs { class Button; }', 'namespace LVRS { class Button; }',
                        '#include <QtCore/QObject>', '#include <QQuickItem>', '#include <qml/Component.h>',
@@ -45,6 +45,10 @@ class SourceBoundaryTests(unittest.TestCase):
                        'find_package(iiNetwork CONFIG REQUIRED)',
                        'find_dependency(iiFileProviderNative CONFIG)',
                        'target_link_libraries(iiGUI PRIVATE iiColorManager::iiColorManager)',
+                       'target_link_libraries(Demo PRIVATE LVUI::Native)',
+                       'set(IIGUI_LVUI_COMPILER /sdk/bin/lvui-compile)',
+                       'lvui_generate(NAME Example SOURCE View.lvui)',
+                       'include("${CMAKE_CURRENT_LIST_DIR}/iiGUILvui.cmake")',
                        'target_link_libraries(iiGUI PRIVATE nested(test) LVRS::Native)'):
             with self.subTest(source=source):
                 self.assertTrue(forbidden_cmake_dependencies(source))
@@ -69,6 +73,7 @@ class SourceBoundaryTests(unittest.TestCase):
         self.assertFalse(forbidden_source_dependencies('// LVRS migration history\n#include <iiGUI/Host.h>\n'))
         self.assertFalse(forbidden_source_dependencies('#include <iiSDKCore/Runtime/Runtime.h>\n'))
         self.assertFalse(forbidden_cmake_dependencies('find_dependency(iiSDKCore CONFIG)\n'
+                                                      'find_dependency(iiGUIPainter CONFIG)\n'
                                                       'target_link_libraries(iiGUI PUBLIC iiSDKCore::Runtime)\n'))
 
 

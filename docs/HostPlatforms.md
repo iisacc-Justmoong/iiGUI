@@ -354,6 +354,25 @@ Win32 창의 고정 주기 프레임 구동은 명시적인 앱 프레임 루프
 해당 호스트와 공통 프레임 수요 검사 소스는 Windows 10 이상 대상의 x86-64와
 ARM64 객체로 교차 컴파일했다. Windows 라이브러리 링크나 실제 창 실행은 별도이다.
 
+## macOS 마우스 버튼 상태
+
+macOS 입력 어댑터는 AppKit의 전역 버튼 상태를 시작값으로 읽고, 현재 `NSEvent`의
+유형과 버튼 번호로 `WidgetInput.buttons`를 보정한다. 누름과 드래그는 해당 비트를
+설정하고, 뗌은 해당 비트를 해제한다. 다른 버튼의 상태와 보조 키 플래그도 전달한다.
+이에 따라 전역 버튼 상태가 이미 달라진 이벤트도 왼쪽과 오른쪽 입력을 구분할 수 있다.
+
+`iiGUI.host_embedded_mac` 검사는 전역 버튼 상태에 의존하지 않는 AppKit 이벤트를
+표면에 전달하고, 왼쪽 버튼의 누름·드래그·뗌과 오른쪽 버튼의 누름·뗌에서 버튼 값과
+Command·Option 플래그를 확인한다.
+
+사용자 정의 포인터를 그리는 위젯은 소유 UI 스레드에서
+`Widget::set_native_pointer_hidden`으로 포함된 데스크톱 표면의 시스템 포인터를
+숨기거나 복원한다. 포인터 이탈이나 입력 취소, 위젯 해제 시 복원한다.
+macOS는 뷰의 커서 사각형, Windows는 클라이언트 영역의 커서 메시지,
+Linux는 Wayland seat 또는 X11 창의 커서를 사용한다. 창 없는 위젯 트리에서는
+네이티브 자원 없이 성공한다. `iiGUI.ancestor_input.native_pointer`는 중첩 위젯의
+요청이 소유 표면에 도달하는지와 해제된 핸들이 거부되는지를 확인한다.
+
 ## 디스플레이 배율과 HiDPI
 
 호스트는 창의 논리 크기와 현재 화면의 배율을 분리한다. `WindowSnapshot`의
@@ -636,7 +655,7 @@ Android 일반 `TextRun`은 선택한 글꼴과 시스템 대체 글꼴을 사�
 [Android 키보드 계약](AndroidKeyboard.md)에 따라 위젯으로 전달한다. IME, 문서 선택,
 접근성, 보조 창은 아직 별도 구현이 필요하며 `text_input` 완전 지원으로 광고하지 않는다.
 호스트 모형과 NDK 링크는 실제 Android 문자 표시나 기기 실행의 증거가 아니다. 재현 도구는
-tools/android_hello.py이다.
+../LVUI/tools/android_hello.py이다.
 
 ### Android 포인터 입력 계약
 
@@ -666,7 +685,7 @@ API bridge는 존재한다. LVUI 소스 해석, Qt/QML, 공통 바이트코드 V
 Web 결과를 OS 머신 코드 바이너리라고 부르지 않는다.
 
 ```sh
-iisdk-builder build --manifest examples/HelloHosts/iiSDKBuilder.json
+iisdk-builder build --manifest ../LVUI/example/HelloHosts/iiSDKBuilder.json
 python3 -B tools/serve_web.py build/hosts/kits/web/Release/app/build
 # http://127.0.0.1:8765/HelloHosts.html
 # 자동 종료 검증: HelloHosts.html?self-test

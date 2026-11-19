@@ -4,7 +4,7 @@
 [HostPlatforms.md](HostPlatforms.md)를 따른다. 아래의 이전 장치 실행 기록과 새
 텍스트 경로의 검증 기록은 구분한다.
 
-`examples/HelloAndroid`는 Android 10/API 29 이상에서 실행하는 최소 Hello World이다.
+`../LVUI/example/HelloAndroid`는 Android 10/API 29 이상에서 실행하는 최소 Hello World이다.
 LVUI의 `ApplicationWindow`, `VStack`, `Label`을 빌드 호스트의 `lvui-compile`로
 C++23 코드에 변환하고 Android NDK로 컴파일한다. 앱 런타임은 iiSDKCore의
 `Application`·이벤트 루프·타이머이며, iiGUI의 C++ 위젯을 Vulkan으로 표시한다.
@@ -80,7 +80,7 @@ Android SDK의 API 35/build-tools/platform-tools, JDK가 필요하다. 모든 �
 서명 키는 iiGUI의 `build/` 안에 둔다. 다른 앱·사용자 데이터는 변경하지 않는다.
 
 ```sh
-python3 tools/android_hello.py \
+python3 ../LVUI/tools/android_hello.py \
   --sdk /absolute/path/to/android-sdk \
   --ndk /absolute/path/to/android-ndk \
   --jdk /absolute/path/to/jdk \
@@ -101,7 +101,7 @@ python3 tools/android_hello.py \
 Qt·인터프리터·LVUI 파서의 부재를 검사하고 폰트와 라이선스를 패키징한다. 개발용 키로
 서명한 `iiSDK-LVUI-HelloWorld.apk`는 배포용 릴리스 서명을 대신하지 않는다.
 
-설치된 `examples/HelloAndroid`는 선택적 OS·렌더 검사에 필요한 소스를 함께 제공한다.
+설치된 `../LVUI/example/HelloAndroid`는 선택적 OS·렌더 검사에 필요한 소스를 함께 제공한다.
 OS 검사는 Activity를 직접 빌려 공개 SDK만 사용하며 원래 클립보드를 복원한다.
 API 24–27에서 원래 클립이 없으면 빈 상태를 복원할 공개 API가 없으므로,
 클립보드를 변경하기 전에 검사를 중단한다. 2026-11-05 정적·공유 iiGUI 설치본의
@@ -130,7 +130,7 @@ SDK 이미지·AVD·사용자 설정·서명 키·실행 증거는 `build/` 아�
 명시한 serial에만 수행한다. 실기기를 연결한 상태에서도 선택을 바꾸지 않는다.
 
 ```sh
-python3 tools/android_hello.py \
+python3 ../LVUI/tools/android_hello.py \
   --sdk "$PWD/build/android-emulator-20261027/sdk" \
   --ndk /absolute/path/to/android-ndk \
   --jdk /absolute/path/to/jdk \

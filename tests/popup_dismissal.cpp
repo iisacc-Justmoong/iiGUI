@@ -79,6 +79,17 @@ int main(){
     good(tree->input({.kind=gui::WidgetInputKind::context_request,.x=bounds.x+bounds.width/2,.y=bounds.y+bounds.height/2}));
     require(take(popup.snapshot()).opened&&take(nested.snapshot()).opened,"Context request inside a descendant dismissed its parent popup");
     context();require(!take(popup.snapshot()).opened&&!take(nested.snapshot()).opened,"Outside context request did not close nested popups");
+    // Host accessibility cancellation follows the same policy as the Escape key.
+    const auto accessible_cancel=[&]{
+        good(tree->input({.kind=gui::WidgetInputKind::close_popup,.target=take(popup.snapshot()).id}));
+    };
+    options.modal=true;options.dismiss_on_escape=false;good(popup.set_popover_options(options));
+    good(popup.open_at(20,20));accessible_cancel();
+    require(take(popup.snapshot()).opened,"Accessibility cancellation closed a mandatory modal");
+    options.dismiss_on_escape=true;good(popup.set_popover_options(options));
+    accessible_cancel();
+    require(!take(popup.snapshot()).opened,"Accessibility cancellation did not close a dismissible modal");
+    options.modal=false;
     int closed=0,canceled=0;bool reopen_then_close=false;
     good(host.set_content([&](gui::WidgetBuilder& builder)->ii::core::Result<void>{
         auto root=builder.vstack({},"root");if(!root)return std::unexpected(root.error());

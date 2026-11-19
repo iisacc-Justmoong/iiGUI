@@ -45,7 +45,84 @@ void edge_scroll(){
     retire_on_viewport=true;good(tree->input({.kind=WidgetInputKind::scroll,.x=250,.y=30,.scroll_x=10}));
     check(!timeline->options(),"viewport callback did not safely retire the timeline");tree->close();
 }
+// The ruler must paint boundaries independently of the spacing between labels.
+void per_frame_ruler() {
+    using namespace ii::gui;
+    auto tree=std::make_shared<detail::WidgetState>([](ii::runtime::Task task){task();});
+    const auto host=take(tree->content_host({},"host",{400,160}));
+    std::optional<NativeEditorTimeline> timeline;
+    EditorTimelineOptions options{.width=400,.height=160,.frame_count=48,.pixels_per_frame=4};
+    options.palette.text={1,1,1,1};
+    options.frame_rate={24,1};
+    int queries=0;
+    NativeEditorTimelineCallbacks callbacks;
+    callbacks.query=[&](const EditorTimelineQuery&)->ii::core::Result<EditorTimelineProjection>{
+        ++queries;return EditorTimelineProjection{};
+    };
+    good(host.set_content([&](WidgetBuilder& builder)->ii::core::Result<void>{
+        timeline=take(NativeEditorTimeline::create(builder,{},"timeline",options,callbacks));
+        return {};
+    }));
+    const auto tick_bounds=[&] {
+        const auto drawing=take(tree->drawing_snapshot({400,160}));
+        std::vector<Rect> result;
+        const auto collect=[&](const auto& panels){for(const auto& panel:panels){
+            const auto& r=panel.bounds;
+            if(panel.top.red==1&&panel.top.green==1&&panel.top.blue==1&&r.y+r.height==44&&r.height>0)
+                result.push_back(r);
+        }};
+        collect(drawing.panels);
+        for(const auto& overlay:drawing.overlays)collect(overlay.panels);
+        std::ranges::sort(result,{},&Rect::x);
+        return result;
+    };
+    const auto marks=tick_bounds();
+    check(marks.size()==49,"The ruling omitted visible frame boundaries");
+    for(std::size_t frame=0;frame<marks.size();++frame)
+        check(marks[frame].x==192+4*frame,"A ruler tick drifted from its frame boundary");
+    check(marks[1].height==4&&marks[6].height==7&&marks[24].height==10,
+          "The ruler did not distinguish frames, quarter seconds and seconds");
+
+    options.frame_rate={30,1};
+    good(timeline->set_options(options));
+    const auto thirty=tick_bounds();
+    check(thirty.size()==49&&thirty[7].height==4&&thirty[8].height==7&&thirty[24].height==4&&
+          thirty[30].height==10&&queries==1,"Changing frame rate did not redraw the ruler independently");
+
+    options.frame_count=52;
+    good(timeline->set_options(options));
+    const auto fitted=tick_bounds();
+    check(fitted.size()==53&&fitted.back().x==399&&fitted.back().width==1,
+          "The terminal boundary at the right edge was clipped entirely");
+
+    options.frame_count=2000;
+    options.frame_rate={30000,1001};
+    options.scroll_x=2017.5;
+    good(timeline->set_options(options));
+    const auto fraction=tick_bounds();
+    check(fraction.size()==52&&fraction.front().x==194.5f&&fraction.back().x==398.5f,
+          "Fractional panning clipped or misaligned visible boundaries");
+    check(fraction[509-505].height==10&&fraction[510-505].height==4,
+          "The fractional rate accumulated drift by rounding FPS before snapping");
+
+    auto invalid=options;
+    invalid.frame_rate.denominator=0;
+    check(!timeline->set_options(invalid)&&take(timeline->options())==options,
+          "An invalid frame rate replaced the timeline configuration");
+
+    options.frame_count=100'000'000;
+    options.pixels_per_frame=.0001;
+    options.scroll_x=2500;
+    good(timeline->set_options(options));
+    const auto compressed=tick_bounds();
+    check(compressed.size()==208&&compressed.front().x==192&&compressed.back().x==399&&
+          std::ranges::all_of(compressed,[](const auto& r){return r.height==10;}),
+          "The zoomed-out ruler lost frames or second markers instead of coalescing them");
+    tree->close();
+}
+
 int main(){
+    per_frame_ruler();
     using namespace ii::gui;
     auto tree=std::make_shared<detail::WidgetState>([](ii::runtime::Task task){task();});
     auto host=take(tree->content_host({},"host",{400,160}));std::optional<NativeEditorTimeline> timeline;

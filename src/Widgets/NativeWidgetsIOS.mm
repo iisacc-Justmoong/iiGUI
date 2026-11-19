@@ -124,8 +124,48 @@ WidgetKey key(UIKeyboardHIDUsage code){switch(code){case UIKeyboardHIDUsageKeybo
     for(UITouch* touch in touches)[self emitTouchBatch:touchRouter.cancel(std::uint64_t((__bridge void*)touch))];
     }catch(...){if(callbacks.failure)callbacks.failure(std::current_exception());}}
 - (void)hover:(UIHoverGestureRecognizer*)g {auto p=[g locationInView:self];[self deliver:WidgetInput{.kind=g.state==UIGestureRecognizerStateEnded?WidgetInputKind::pointer_leave:WidgetInputKind::pointer_move,.x=p.x,.y=p.y,.device=PointerDevice::mouse,.pressure=0}];}
-- (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {bool handled=false;for(UIPress* press in presses){auto k=press.key;if(!k)continue;auto modifiers=k.modifierFlags;WidgetInput e{.kind=WidgetInputKind::key_down,.key=key(k.keyCode),.shift=bool(modifiers&UIKeyModifierShift),.text=k.charactersIgnoringModifiers.UTF8String?:"",.control=bool(modifiers&UIKeyModifierControl),.alt=bool(modifiers&UIKeyModifierAlternate),.meta=bool(modifiers&UIKeyModifierCommand)};const bool has_editor=bool([self editor]);if((e.meta||e.control)&&e.text=="a"&&has_editor)e.key=WidgetKey::select_all;if(ii::gui::detail::mobile_text_service_key(e,has_editor))continue;if(ii::gui::detail::mobile_widget_key(e,has_editor)){[self deliver:std::move(e)];handled=true;}}if(!handled)[super pressesBegan:presses withEvent:event];}
-- (void)resignForBackground:(NSNotification*)notification {(void)notification;(void)touchRouter.cancel();try{if(callbacks.input)callbacks.input({.kind=WidgetInputKind::focus_lost});}catch(...){if(callbacks.failure)callbacks.failure(std::current_exception());}pointer=nil;}
+// Physical key qualifiers follow the responder's press lifetime. UIKit
+// retains its normal text input path while an editor owns character input.
+- (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    bool handled=false;
+    for(UIPress* press in presses){
+        auto k=press.key;
+        if(!k)continue;
+        const auto modifiers=k.modifierFlags;
+        const auto usage=k.keyCode;
+        WidgetInput e{.kind=WidgetInputKind::key_down,.key=key(usage),.shift=bool(modifiers&UIKeyModifierShift),
+            .text=k.charactersIgnoringModifiers.UTF8String?:"",.control=bool(modifiers&UIKeyModifierControl),
+            .alt=bool(modifiers&UIKeyModifierAlternate),.meta=bool(modifiers&UIKeyModifierCommand),.timestamp=press.timestamp};
+        e.key_repeat=hardwareKeys.press(unsigned(usage));
+        e.numeric_keypad=bool(modifiers&UIKeyModifierNumericPad) ||
+            (usage>=UIKeyboardHIDUsageKeypad1 && usage<=UIKeyboardHIDUsageKeypad0);
+        const bool has_editor=bool([self editor]);
+        if((e.meta||e.control)&&e.text=="a"&&has_editor)e.key=WidgetKey::select_all;
+        if(ii::gui::detail::mobile_text_service_key(e,has_editor))continue;
+        if(ii::gui::detail::mobile_widget_key(e,has_editor)){
+            [self deliver:std::move(e)];
+            handled=true;
+        }
+    }
+    if(!handled)[super pressesBegan:presses withEvent:event];
+}
+// Both release and cancellation allow the same hardware key to start a new press.
+- (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    for(UIPress* press in presses) if(auto k=press.key) hardwareKeys.release(unsigned(k.keyCode));
+    [super pressesEnded:presses withEvent:event];
+}
+// Cancel only the keys in this event so other held keys keep their repeat state.
+- (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    for(UIPress* press in presses) if(auto k=press.key) hardwareKeys.release(unsigned(k.keyCode));
+    [super pressesCancelled:presses withEvent:event];
+}
+// Releases may reach another responder after focus transfers.
+- (BOOL)resignFirstResponder {
+    const BOOL resigned=[super resignFirstResponder];
+    if(resigned)hardwareKeys.clear();
+    return resigned;
+}
+- (void)resignForBackground:(NSNotification*)notification {(void)notification;hardwareKeys.clear();(void)touchRouter.cancel();try{if(callbacks.input)callbacks.input({.kind=WidgetInputKind::focus_lost});}catch(...){if(callbacks.failure)callbacks.failure(std::current_exception());}pointer=nil;}
 - (NSArray*)accessibilityElements {if(!callbacks.accessibility)return @[];NSMutableArray* result=[NSMutableArray new];auto snapshot=callbacks.accessibility();
     auto live=[NSMutableSet new];for(const auto& n:snapshot)[live addObject:native(n.id)];
     for(NSString* key in peers.allKeys)if(![live containsObject:key]){auto item=peers[key];item->read={};item->send={};[peers removeObjectForKey:key];}

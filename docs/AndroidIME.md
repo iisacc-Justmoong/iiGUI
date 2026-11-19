@@ -12,7 +12,7 @@ Android용 iiGUI 설치본은 `share/iiGUI/android/AndroidImeBridge.java`와
 `AndroidImeBridge.pro`를 제공한다. 앱은 Java 파일을 Android API 24 이상 대상으로
 컴파일해 DEX에 포함하고 매니페스트의 `android:hasCode`를 `true`로 설정한다.
 R8 등으로 앱을 축소하면 함께 제공된 규칙을 적용해 JNI에서 찾는 클래스와 메서드
-이름을 보존한다. `tools/android_hello.py`는 축소 없이 이를 패키징하는 예제이다.
+이름을 보존한다. `../LVUI/tools/android_hello.py`는 축소 없이 이를 패키징하는 예제이다.
 
 입력기와 네이티브 앱의 스레드·수명이 다르므로, 요청은 편집기를 소유한 스레드에
 전달하고 포커스 세대가 바뀌거나 위젯이 퇴역한 뒤에는 적용하지 않는다. 읽기는

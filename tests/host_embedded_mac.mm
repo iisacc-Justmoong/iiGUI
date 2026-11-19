@@ -1,9 +1,11 @@
 #import <AppKit/AppKit.h>
 #include <iiGUI/Host.h>
 #include <iiGUI/NativeWidgets.h>
+#include <iiGUI/WidgetSurfaceNative.h>
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <vector>
 
 @interface IIGUITestParentView : NSView
 @end
@@ -28,6 +30,39 @@ struct State final {
     __strong id<NSWindowDelegate> windowDelegate=nil;
     __strong id<NSApplicationDelegate> appDelegate=nil;
 };
+
+// Deliver AppKit mouse events without depending on the global mouse state.
+// In particular, these events do not update NSEvent.pressedMouseButtons.
+void check_pointer_buttons(State& state) {
+    using Kind = ii::gui::WidgetInputKind;
+    std::vector<ii::gui::WidgetInput> inputs;
+    ii::gui::detail::NativeWidgetSurface native_surface((__bridge void*)state.parent,
+        {.input = [&](ii::gui::WidgetInput input) { inputs.push_back(std::move(input)); }});
+    NSView* surface = state.parent.subviews.lastObject;
+    const auto modifiers = NSEventModifierFlagCommand | NSEventModifierFlagOption;
+    const auto event = [&](NSEventType type, NSPoint location) {
+        return [NSEvent mouseEventWithType:type location:location modifierFlags:modifiers
+            timestamp:NSProcessInfo.processInfo.systemUptime windowNumber:state.window.windowNumber
+            context:nil eventNumber:0 clickCount:1 pressure:1];
+    };
+    [surface mouseDown:event(NSEventTypeLeftMouseDown, NSMakePoint(24, 32))];
+    [surface mouseDragged:event(NSEventTypeLeftMouseDragged, NSMakePoint(40, 32))];
+    [surface mouseUp:event(NSEventTypeLeftMouseUp, NSMakePoint(40, 32))];
+    [surface rightMouseDown:event(NSEventTypeRightMouseDown, NSMakePoint(24, 32))];
+    [surface rightMouseUp:event(NSEventTypeRightMouseUp, NSMakePoint(24, 32))];
+    const auto check = [&](std::size_t index, Kind kind, std::uint32_t buttons) {
+        const auto& input = inputs[index];
+        return input.kind == kind && input.buttons == buttons && input.alt && input.meta;
+    };
+    if (inputs.size() != 5 || !check(0, Kind::pointer_down, 1) ||
+        !check(1, Kind::pointer_move, 1) || !check(2, Kind::pointer_up, 0) ||
+        !check(3, Kind::context_request, 2) || !check(4, Kind::pointer_up, 0)) {
+        state.error = "AppKit events lost their changed button or modifier flags";
+        for (const auto& input : inputs)
+            std::fprintf(stderr, "kind=%d buttons=%u option=%d command=%d\n",
+                static_cast<int>(input.kind), input.buttons, input.alt, input.meta);
+    }
+}
 }
 
 int main(int argc, char**) {
@@ -46,6 +81,7 @@ int main(int argc, char**) {
         if(![state->window makeFirstResponder:state->parent])return 1;
         state->host=std::make_unique<ii::gui::Host>();
         dispatch_async(dispatch_get_main_queue(), ^{
+            check_pointer_buttons(*state);
             auto opened=[state] {
                 state->opened=true;
                 auto mounted=state->host->mount_widgets([](ii::gui::WidgetBuilder& builder)->ii::core::Result<void>{

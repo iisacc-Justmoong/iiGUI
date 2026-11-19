@@ -31,6 +31,11 @@ shortcuts. The five bundled font faces and both OFL notices are attached through
 Core application resources. LVRS factories hydrate original SVG icons and arrows.
 Standalone menu items/dividers are also supported for component catalogs.
 
+`MenuStyle::context`는 하위 뷰와 중첩 팝업에 일시적 상태 차단을 상속한다.
+`Widget::suppress_popup_transient_feedback()`는 일반 팝업을 조합한 문맥 메뉴에도
+같은 정책을 적용한다. 중첩 콘텐츠 호스트와 교체된 뷰까지 호버·누름·포커스 강조와
+누름·뗌·취소 단계의 콜백이 차단된다. 클릭, 키보드 포커스와 실행, 명시적 선택은 유지한다.
+
 The popup captures input. Up/Down, Home/End and Tab navigate eligible items;
 inactive/disabled items and dividers are skipped. Navigation reveals offscreen
 rows. Pointer wheels scroll logical pixels. The popup is clipped to the viewport,
@@ -71,3 +76,7 @@ context requests, descendant close and scope retirement, regular/context paints,
 and a 150-entry scrolling menu. `tests/images.cpp` checks actual Metal/Vulkan
 clip pixels and foreground-cache reuse. D3D11 was updated in source; macOS tests
 do not establish Windows runtime validation.
+
+## 컨텍스트 메뉴 호버
+
+컨텍스트 메뉴 항목은 선택, 누름, 포커스를 포함한 모든 상태에서 배경과 테두리를 그리지 않는다. 활성 항목을 호버하면 아이콘과 레이블이 1.1배로 확대되고 레이블이 위로 1픽셀 이동한다. 단축키와 화살표는 크기를 유지한다.

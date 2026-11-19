@@ -48,8 +48,9 @@ struct NativeWidgetSurface::Impl final {
     }
 };
 NativeWidgetSurface::NativeWidgetSurface(void* parent,WidgetSurfaceCallbacks value):impl_(std::make_unique<Impl>(*static_cast<WaylandConnection*>(parent),std::move(value))){}
-NativeWidgetSurface::~NativeWidgetSurface(){impl_->shutdown();}
+NativeWidgetSurface::~NativeWidgetSurface(){impl_->parent.set_native_pointer_hidden(false);impl_->shutdown();}
 void NativeWidgetSurface::invalidate(){impl_->dirty=true;impl_->ime_dirty=true;}
+void NativeWidgetSurface::set_native_pointer_hidden(bool hidden){impl_->parent.set_native_pointer_hidden(hidden);}
 void NativeWidgetSurface::accessibility_changed(){impl_->ime_dirty=true;}
 void NativeWidgetSurface::accessibility_value_changed(std::string_view){impl_->ime_dirty=true;}
 void NativeWidgetSurface::set_frame_paced(bool){}

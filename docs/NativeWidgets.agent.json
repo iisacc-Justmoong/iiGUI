@@ -10,8 +10,8 @@
   },
   "source": {
     "path": "docs/NativeWidgets.md",
-    "sha256": "840d53640b8ba30e35eb7903247bba0c4b5a298414aa4e15e729c853acdd8bd0",
-    "bytes": 6342,
+    "sha256": "c985cd46adb1ddb1e37bb1389edaf3df5d936d7a8dd96d1d67358f85ac59830e",
+    "bytes": 6461,
     "line_count": 109,
     "encoding": "utf-8",
     "language": "en"
@@ -185,7 +185,7 @@
       "kind": "paragraph",
       "start_line": 56,
       "end_line": 56,
-      "raw": "Build/install the updated LVUI package into `LVUI/build/install` first, then:\n"
+      "raw": "Install iiGUI 0.6.0 or later and build the sample from the LVUI checkout:\n"
     },
     {
       "id": "b000024",
@@ -199,9 +199,9 @@
       "kind": "fenced_code",
       "start_line": 58,
       "end_line": 68,
-      "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\nopen build/examples/HelloWorld/HelloWorld.app\n```\n",
+      "raw": "```sh\ncmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_BUILD_HOST_EXAMPLES=ON -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build ../LVUI/build --target HelloWorld --parallel 4\nctest --test-dir ../LVUI/build -R '^HelloWorld\\.' --output-on-failure\nopen ../LVUI/build/example/HelloWorld/HelloWorld.app\n```\n",
       "language": "sh",
-      "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\nopen build/examples/HelloWorld/HelloWorld.app\n",
+      "code": "cmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_BUILD_HOST_EXAMPLES=ON -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build ../LVUI/build --target HelloWorld --parallel 4\nctest --test-dir ../LVUI/build -R '^HelloWorld\\.' --output-on-failure\nopen ../LVUI/build/example/HelloWorld/HelloWorld.app\n",
       "closed": true
     },
     {
@@ -216,7 +216,7 @@
       "kind": "paragraph",
       "start_line": 70,
       "end_line": 78,
-      "raw": "The HelloWorld configuration explicitly requests one Core worker before the\nnative host starts, so its background result does not depend on an implicit\nworker pool. `examples/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`\nat build time into `HelloWorld.generated.h`. C++23 then compiles the generated\nnative construction calls and scoped backend callbacks. The app binary does\nnot call or contain the LVUI parser/compiler, and needs neither the source file\nnor the build tool to run. The `.app` is also runnable directly with `--self-test`.\nIts timer, background result 42, resize, two native button actions and normal\nclose are verified, including one backend construction/destruction per mount.\n"
+      "raw": "The HelloWorld configuration explicitly requests one Core worker before the\nnative host starts, so its background result does not depend on an implicit\nworker pool. `../LVUI/example/HelloWorld/HelloWorld.lvui` is compiled by installed `lvui-compile`\nat build time into `HelloWorld.generated.h`. C++23 then compiles the generated\nnative construction calls and scoped backend callbacks. The app binary does\nnot call or contain the LVUI parser/compiler, and needs neither the source file\nnor the build tool to run. The `.app` is also runnable directly with `--self-test`.\nIts timer, background result 42, resize, two native button actions and normal\nclose are verified, including one backend construction/destruction per mount.\n"
     },
     {
       "id": "b000028",
@@ -230,7 +230,7 @@
       "kind": "paragraph",
       "start_line": 80,
       "end_line": 81,
-      "raw": "The legacy `examples/HelloLVUI` remains an explicitly separate runtime-parsed\nGPU canvas demonstration. Embedding that earlier markup is not the AOT route.\n"
+      "raw": "The source of the earlier runtime-parsed GPU canvas demonstration is archived\nunder `../LVUI/example/HelloLVUI`. HelloWorld is the buildable AOT sample.\n"
     },
     {
       "id": "b000030",
@@ -260,9 +260,9 @@
       "kind": "fenced_code",
       "start_line": 85,
       "end_line": 90,
-      "raw": "```sh\ncmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n```\n",
+      "raw": "```sh\ncmake -DSOURCE=\"$PWD/../LVUI\" -DBUILD_ROOT=\"$PWD/../LVUI/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P ../LVUI/tests/aot_package.cmake\n```\n",
       "language": "sh",
-      "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n",
+      "code": "cmake -DSOURCE=\"$PWD/../LVUI\" -DBUILD_ROOT=\"$PWD/../LVUI/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P ../LVUI/tests/aot_package.cmake\n",
       "closed": true
     },
     {
@@ -362,12 +362,12 @@
       {
         "block_id": "b000025",
         "language": "sh",
-        "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\nopen build/examples/HelloWorld/HelloWorld.app\n"
+        "code": "cmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_BUILD_HOST_EXAMPLES=ON -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/libMoltenVK.dylib \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build ../LVUI/build --target HelloWorld --parallel 4\nctest --test-dir ../LVUI/build -R '^HelloWorld\\.' --output-on-failure\nopen ../LVUI/build/example/HelloWorld/HelloWorld.app\n"
       },
       {
         "block_id": "b000033",
         "language": "sh",
-        "code": "cmake -DSOURCE=\"$PWD\" -DBUILD_ROOT=\"$PWD/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P tests/aot_package.cmake\n"
+        "code": "cmake -DSOURCE=\"$PWD/../LVUI\" -DBUILD_ROOT=\"$PWD/../LVUI/build/aot-consumer\" \\\n  -DCORE_PREFIX=/path/to/installed/iiSDKCore \\\n  -DLVUI_BUILD=/path/to/LVUI/build -DGUI_BUILD=\"$PWD/build\" \\\n  -P ../LVUI/tests/aot_package.cmake\n"
       }
     ],
     "links": [

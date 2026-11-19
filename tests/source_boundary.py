@@ -26,7 +26,7 @@ def forbidden_component_rendering(source):
 
 def forbidden_source_dependencies(source):
     errors = []
-    if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:LVUI|LVRS)/|'
+    if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:LVUI|LVRS)(?:[/>"]|\.h[>"])|'
                  r'\b(?:lvui|lvrs)::|namespace\s+(?:lvui|lvrs)\b', source, re.M | re.I):
         errors.append("lower-level host depends on LVUI or LVRS")
     if re.search(r'^\s*#\s*(?:include|import)\s*[<"](?:Qt|Q[A-Z]|SDL|WebKit|WebView|webkit|cef_|(?i:qml))',
@@ -40,13 +40,17 @@ def forbidden_source_dependencies(source):
 
 def forbidden_cmake_dependencies(source):
     errors = []
+    source = re.sub(r'(?m)^\s*#[^\n]*', '', source)
     if re.search(r'\b(?:find_package|find_dependency)\s*\(\s*"?'
                  r'(?:Qt\w*|QML|LVUI|LVRS|SDL\w*|WebKit|WebView|CEF)\b', source, re.I):
         errors.append("framework or higher-level SDK package dependency")
     for match in re.finditer(r'\b(?:find_package|find_dependency)\s*\(\s*"?(ii[A-Z][A-Za-z0-9_]*)',
                              source, re.I):
-        if match.group(1).casefold() not in {"iigui", "iisdkcore"}:
+        if match.group(1).casefold() not in {"iigui", "iiguipainter", "iisdkcore"}:
             errors.append("package depends on another iiSDK module: " + match.group(1))
+    if re.search(r'\bLVUI::\w+|\biiGUI(?:Run)?Lvui\.cmake\b|\b(?:iigui_compile_lvui|lvui_generate)\s*\(|'
+                 r'\b(?:IIGUI_(?:BUILD_)?LVUI|LVUI_BUILD)\w*\b', source, re.I):
+        errors.append("iiGUI build, example or test uses LVUI")
     for match in re.finditer(r'\btarget_link_libraries\s*\(\s*iiGUI\b', source):
         depth = 1
         end = match.end()

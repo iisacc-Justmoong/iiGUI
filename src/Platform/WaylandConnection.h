@@ -34,6 +34,8 @@ public:
     void resize(Size);
     void action(WindowAction);
     void begin_move(std::uint32_t serial);
+    // Change the current seat pointer only while it belongs to this surface.
+    void set_native_pointer_hidden(bool);
     void request_frame();
     void cancel_frame();
     wl_display* display()const;

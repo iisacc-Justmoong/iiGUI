@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/FrameworkBoundary.md",
-    "sha256": "2b01c878bf6e15470108469230da174b1450e1b557cc817426ec71066980db44",
-    "bytes": 51363,
-    "line_count": 513,
+    "sha256": "4f664f60d1fee98b50cbc98494dca0fade0e707660cea92f467f74aab467e0f2",
+    "bytes": 51816,
+    "line_count": 516,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -986,651 +986,651 @@
       "id": "b000137",
       "kind": "paragraph",
       "start_line": 414,
-      "end_line": 414,
-      "raw": "`iiGUI/NativeEditorTimelineView.h`는 가시 구간 질의, 장면·재생선 갱신, 입력과 드래그 중에만 필요한 프레임을 관리한다. 팔레트는 주입되며 색상만 바뀔 때 데이터를 재질의하지 않는다. macOS arm64에서 LVUI 토큰과 NativeView 연결, 독립 소비자를 창 없이 검사했다.\n"
+      "end_line": 417,
+      "raw": "`iiGUI/NativeEditorTimelineView.h`는 가시 구간 질의, 장면·재생선 갱신, 입력과 드래그 중에만 필요한 프레임을 관리한다. 팔레트는 주입되며 색상만 바뀔 때 데이터를 재질의하지 않는다. macOS arm64에서 LVUI 토큰과 NativeView 연결, 독립 소비자를 창 없이 검사했다.\n가시 구간의 시작부터 끝까지 모든 프레임 경계를 클립과 재생선과 같은 좌표로 그린다.\n프로젝트의 정확한 유리수 프레임 레이트로 ¼초와 1초 눈금을 가장 가까운 프레임에 맞추고, 정확히 중간이면 뒤쪽 프레임에 배치한다.\n한 논리 픽셀에 여러 경계가 들어오면 그 열의 가장 긴 눈금을 사용한다. 레이트만 변경되면 눈금자를 다시 그린다.\n"
     },
     {
       "id": "b000138",
       "kind": "blank",
-      "start_line": 415,
-      "end_line": 415,
+      "start_line": 418,
+      "end_line": 418,
       "raw": "\n"
     },
     {
       "id": "b000139",
       "kind": "paragraph",
-      "start_line": 416,
-      "end_line": 416,
+      "start_line": 419,
+      "end_line": 419,
       "raw": "`iiGUI/DocumentLayout.h`는 앱이 주입한 문서 구조로 배치, 텍스트 측정과 그리기 프레임을 생성한다. 문서와 레이아웃 정책은 iiGUI가 소유하지 않으며 임시 문서에 대한 비소유 뷰 생성을 금지한다. macOS arm64 독립 소비자와 LVUI 문서 배치·오류 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000140",
       "kind": "blank",
-      "start_line": 417,
-      "end_line": 417,
+      "start_line": 420,
+      "end_line": 420,
       "raw": "\n"
     },
     {
       "id": "b000141",
       "kind": "paragraph",
-      "start_line": 418,
-      "end_line": 418,
+      "start_line": 421,
+      "end_line": 421,
       "raw": "`iiGUI/CollectionWidgetNavigation.h`는 앱이 주입한 목록·탐색 상태를 포인터와 키보드에 연결한다. 재진입으로 폐기되면 구독과 콜백을 해제하고 남은 입력을 중단한다. 자신의 입력 핸들러를 자식 컨트롤로 오인하지 않으며 자식 컨트롤 우선순위는 유지한다. macOS arm64에서 생성된 목록의 선택·측정·포커스·수명과 독립 소비자를 창 없이 검사했다. 선택적 LVUI 통합 검사는 LVUI가 생성한 아이콘 헤더 경로를 사용한다.\n"
     },
     {
       "id": "b000142",
       "kind": "blank",
-      "start_line": 419,
-      "end_line": 419,
+      "start_line": 422,
+      "end_line": 422,
       "raw": "\n"
     },
     {
       "id": "b000143",
       "kind": "paragraph",
-      "start_line": 420,
-      "end_line": 420,
+      "start_line": 423,
+      "end_line": 423,
       "raw": "`iiGUI/ColorSurfaceModel.h`와 `NativeColorSurfaceView.h`는 색상 표면의 검증·좌표·입력·그리기와 수명을 담당한다. 앱의 원천 리비전이 그대로면 래스터를 재요청하지 않고 폐기 중 조회는 게시하지 않는다. macOS arm64에서 LVUI 색상 세션과 생성 코드, 독립 설치 소비자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000144",
       "kind": "blank",
-      "start_line": 421,
-      "end_line": 421,
+      "start_line": 424,
+      "end_line": 424,
       "raw": "\n"
     },
     {
       "id": "b000145",
       "kind": "paragraph",
-      "start_line": 422,
-      "end_line": 422,
+      "start_line": 425,
+      "end_line": 425,
       "raw": "`iiGUI/TabModel.h`와 `NativeTabView.h`는 탭의 상태·배치·그리기·입력과 수명 및 탭 막대 선택 모델을 담당한다. 아이콘 원천은 주입되고 같은 리비전은 재조회하지 않으며, 재진입한 최신 요청이 이전 후보보다 우선한다. macOS arm64에서 LVUI 탭·동적 섹션과 독립 소비자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000146",
       "kind": "blank",
-      "start_line": 423,
-      "end_line": 423,
+      "start_line": 426,
+      "end_line": 426,
       "raw": "\n"
     },
     {
       "id": "b000147",
       "kind": "paragraph",
-      "start_line": 424,
-      "end_line": 424,
+      "start_line": 427,
+      "end_line": 427,
       "raw": "`iiGUI/NativeTabBarView.h`는 주입된 탭 포트의 등록·선택·키보드 탐색·동적 섹션 및 수명을 소유한다. 선택 중 폐기되면 호출 종료 후 자식 포트와 콜백을 해제한다. macOS arm64에서 LVUI 생성·동적 슬롯과 독립 소비자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000148",
       "kind": "blank",
-      "start_line": 425,
-      "end_line": 425,
+      "start_line": 428,
+      "end_line": 428,
       "raw": "\n"
     },
     {
       "id": "b000149",
       "kind": "paragraph",
-      "start_line": 426,
-      "end_line": 426,
+      "start_line": 429,
+      "end_line": 429,
       "raw": "`iiGUI/CardModel.h`와 `NativeCardView.h`는 카드 상태·배치·선택·입력·그리기와 슬롯 수명을 소유한다. 앱은 디자인 값과 기본 라벨·아이콘 원천을 주입한다. 같은 입력은 재처리하지 않으며 조회 중 새 요청이나 퇴역이 발생하면 오래된 결과를 게시하지 않는다. macOS arm64의 독립 설치 소비자와 LVUI 카드·슬롯 경로를 창 없이 검사했다. 실제 운영체제 표시와 GPU는 검사하지 않았다.\n"
     },
     {
       "id": "b000150",
       "kind": "blank",
-      "start_line": 427,
-      "end_line": 427,
+      "start_line": 430,
+      "end_line": 430,
       "raw": "\n"
     },
     {
       "id": "b000151",
       "kind": "paragraph",
-      "start_line": 428,
-      "end_line": 428,
+      "start_line": 431,
+      "end_line": 431,
       "raw": "`iiGUI/ListItemSegmentsModel.h`와 `NativeListItemSegmentsView.h`는 목록 세그먼트의 선택·기하·키보드 입력과 버튼 조합을 소유한다. 입력을 게시 전에 준비할 수 있으며 퇴역 시 콜백·명령과 자식 연결을 해제한다. macOS arm64에서 독립 설치 소비자와 LVUI 복합 목록 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000152",
       "kind": "blank",
-      "start_line": 429,
-      "end_line": 429,
+      "start_line": 432,
+      "end_line": 432,
       "raw": "\n"
     },
     {
       "id": "b000153",
       "kind": "paragraph",
-      "start_line": 430,
-      "end_line": 430,
+      "start_line": 433,
+      "end_line": 433,
       "raw": "`iiGUI/ListItemSelectorModel.h`와 `NativeListItemSelectorView.h`는 선택·유효성·메뉴·키보드 및 자식 위젯 수명을 소유한다. 앱은 디자인 값과 메뉴·콤보 상자 계약을 주입한다. 퇴역 후 콜백의 예외를 보관하지 않아 캡처된 자원이 해제된다. 목록 세그먼트도 같은 예외 수명 규칙을 따른다. macOS arm64에서 독립 설치 소비자와 LVUI 생성·복합 목록 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000154",
       "kind": "blank",
-      "start_line": 431,
-      "end_line": 431,
+      "start_line": 434,
+      "end_line": 434,
       "raw": "\n"
     },
     {
       "id": "b000155",
       "kind": "paragraph",
-      "start_line": 432,
-      "end_line": 432,
+      "start_line": 435,
+      "end_line": 435,
       "raw": "`iiGUI/ColorChannelSurface.h`는 채널 공급자의 일곱 색상 정점을 보간해 표면 래스터를 생성하고 리비전이 바뀐 결과와 오래된 입력을 거절한다. 원천·색상 계약은 앱이 정책으로 주입한다. macOS arm64의 독립 설치 소비자와 LVUI 채널 통합을 창 없이 검사했다.\n"
     },
     {
       "id": "b000156",
       "kind": "blank",
-      "start_line": 433,
-      "end_line": 433,
+      "start_line": 436,
+      "end_line": 436,
       "raw": "\n"
     },
     {
       "id": "b000157",
       "kind": "paragraph",
-      "start_line": 434,
-      "end_line": 434,
+      "start_line": 437,
+      "end_line": 437,
       "raw": "`iiGUI/TextInputModel.h`의 `BasicTextInput`은 주입된 Unicode 경계로 텍스트 선택, IME 조합, 주변 삭제와 제한된 실행 취소 이력을 소유한다. 독립 소비자는 `TextInputModel`과 `make_text_input_boundary`를 사용할 수 있다. macOS arm64에서 독립 설치 소비자와 LVUI 조합·이력 행렬 및 입력 필드를 창 없이 검사했다.\n"
     },
     {
       "id": "b000158",
       "kind": "blank",
-      "start_line": 435,
-      "end_line": 435,
+      "start_line": 438,
+      "end_line": 438,
       "raw": "\n"
     },
     {
       "id": "b000159",
       "kind": "paragraph",
-      "start_line": 436,
-      "end_line": 436,
+      "start_line": 439,
+      "end_line": 439,
       "raw": "`iiGUI/NativeInputFieldView.h`의 `BasicNativeInputField`는 주입된 텍스트 모델과 디자인 정책을 사용해 필드의 입력·글자 배치·선택·그리기와 위젯 수명을 관리한다. 퇴역은 콜백과 클립보드 연결을 끊고 활성 호출이 끝나면 텍스트 모델·배치·재질 캐시를 해제한다. macOS arm64의 독립 설치 소비자와 LVUI 입력기·생성·목록·표·색상 피커를 창 없이 검사했다. 실제 창·GPU와 다른 운영체제는 검사하지 않았다.\n"
     },
     {
       "id": "b000160",
       "kind": "blank",
-      "start_line": 437,
-      "end_line": 437,
+      "start_line": 440,
+      "end_line": 440,
       "raw": "\n"
     },
     {
       "id": "b000161",
       "kind": "paragraph",
-      "start_line": 438,
-      "end_line": 438,
+      "start_line": 441,
+      "end_line": 441,
       "raw": "`iiGUI/NativeTextEditorView.h`는 주입된 입력 필드를 조합하고 최소 높이를 적용한다. 필드의 텍스트·입력·퇴역을 재사용하며 iiGUI는 LVUI에 의존하지 않는다. macOS arm64 독립 설치 소비자와 LVUI 생성·스크롤 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000162",
       "kind": "blank",
-      "start_line": 439,
-      "end_line": 439,
+      "start_line": 442,
+      "end_line": 442,
       "raw": "\n"
     },
     {
       "id": "b000163",
       "kind": "paragraph",
-      "start_line": 440,
-      "end_line": 440,
+      "start_line": 443,
+      "end_line": 443,
       "raw": "`iiGUI/SliderModel.h`와 `iiGUI/NativeSliderView.h`는 슬라이더의 범위·스냅·배치·입력·접근성·그리기·모션 및 퇴역을 제공한다. 디자인 값과 아이콘 공급은 정책으로 주입하며 iiGUI는 LVUI에 의존하지 않는다. 프레임은 진행 중인 모션에만 요청한다.\n"
     },
     {
       "id": "b000164",
       "kind": "blank",
-      "start_line": 441,
-      "end_line": 441,
+      "start_line": 444,
+      "end_line": 444,
       "raw": "\n"
     },
     {
       "id": "b000165",
       "kind": "paragraph",
-      "start_line": 442,
-      "end_line": 442,
+      "start_line": 445,
+      "end_line": 445,
       "raw": "`iiGUI/NativeSearchFieldView.h`는 입력 필드·아이콘·재질을 조합하고 배치·입력·그리기·수명을 관리한다. 정책과 실제 필드 구현은 앱이 주입하며 iiGUI는 LVUI를 참조하지 않는다. 퇴역 시 편집 콜백과 재질 래스터 자원을 해제한다.\n"
     },
     {
       "id": "b000166",
       "kind": "blank",
-      "start_line": 443,
-      "end_line": 443,
+      "start_line": 446,
+      "end_line": 446,
       "raw": "\n"
     },
     {
       "id": "b000167",
       "kind": "paragraph",
-      "start_line": 444,
-      "end_line": 444,
+      "start_line": 447,
+      "end_line": 447,
       "raw": "`iiGUI/NativeTableCellItemView.h`는 주입된 셀 모델·편집 필드를 조합하여 입력·그리기·검증 호출·퇴역을 관리한다. 퇴역 중 다시 진입한 갱신은 이전 상태를 게시하지 않고 콜백·초안·검증기를 반환한다.\n"
     },
     {
       "id": "b000168",
       "kind": "blank",
-      "start_line": 445,
-      "end_line": 445,
+      "start_line": 448,
+      "end_line": 448,
       "raw": "\n"
     },
     {
       "id": "b000169",
       "kind": "paragraph",
-      "start_line": 446,
-      "end_line": 446,
+      "start_line": 449,
+      "end_line": 449,
       "raw": "`iiGUI/TableCellItemModel.h`는 셀 상태·기하와 형식 검증을, `iiGUI/TableRowViewModel.h`는 키 검증과 가시 셀 배치를 소유한다. 텍스트 검증 및 사용자 검증기 계약은 앱 정책으로 주입한다.\n"
     },
     {
       "id": "b000170",
       "kind": "blank",
-      "start_line": 447,
-      "end_line": 447,
+      "start_line": 450,
+      "end_line": 450,
       "raw": "\n"
     },
     {
       "id": "b000171",
       "kind": "paragraph",
-      "start_line": 448,
-      "end_line": 448,
+      "start_line": 451,
+      "end_line": 451,
       "raw": "`iiGUI/NativeTableRowView.h`는 가시 셀만 키 기준으로 유지하고 입력과 위젯 수명을 관리한다. 게시된 키 인덱스를 재사용하며 행이 퇴역하면 콜백과 셀 상태를 해제한다.\n"
     },
     {
       "id": "b000172",
       "kind": "blank",
-      "start_line": 449,
-      "end_line": 449,
+      "start_line": 452,
+      "end_line": 452,
       "raw": "\n"
     },
     {
       "id": "b000173",
       "kind": "paragraph",
-      "start_line": 450,
-      "end_line": 450,
+      "start_line": 453,
+      "end_line": 453,
       "raw": "`iiGUI/NativeColorPickerValuesView.h`는 비교 견본과 HEX·알파 입력 행의 배치·그리기·입력·수명을 소유한다. 앱이 세션과 입력 필드 정책을 주입하며 퇴역 시 세션과 콜백을 해제한다.\n"
     },
     {
       "id": "b000174",
       "kind": "blank",
-      "start_line": 451,
-      "end_line": 451,
+      "start_line": 454,
+      "end_line": 454,
       "raw": "\n"
     },
     {
       "id": "b000175",
       "kind": "paragraph",
-      "start_line": 452,
-      "end_line": 452,
+      "start_line": 455,
+      "end_line": 455,
       "raw": "`iiGUI/NativeColorChannelView.h`는 채널 표면과 숫자 입력을 조합하며 리비전 검증·배치·편집·퇴역을 관리한다. 앱은 교체 가능한 색상 원천과 입력 필드를 공급한다.\n"
     },
     {
       "id": "b000176",
       "kind": "blank",
-      "start_line": 453,
-      "end_line": 453,
+      "start_line": 456,
+      "end_line": 456,
       "raw": "\n"
     },
     {
       "id": "b000177",
       "kind": "paragraph",
-      "start_line": 454,
-      "end_line": 454,
+      "start_line": 457,
+      "end_line": 457,
       "raw": "`iiGUI/ColorPickerLayout.h`는 앱이 주입한 디자인 치수를 사용해 선택기 배치를 계산한다. `iiGUI/NativeColorPickerView.h`는 표면·채널·값·버튼을 조합하고 세션·콜백·취소 수명을 관리한다. iiGUI는 LVUI나 색상 SDK에 의존하지 않는다.\n"
     },
     {
       "id": "b000178",
       "kind": "blank",
-      "start_line": 455,
-      "end_line": 455,
+      "start_line": 458,
+      "end_line": 458,
       "raw": "\n"
     },
     {
       "id": "b000179",
       "kind": "paragraph",
-      "start_line": 456,
-      "end_line": 456,
+      "start_line": 459,
+      "end_line": 459,
       "raw": "`iiGUI/MobileNavigationModel.h`, `iiGUI/MobileNavigationMotion.h`, `iiGUI/NativeMobileNavigationView.h`는 모바일 탐색의 상태·배치·배지·프레임 모션과 위젯 수명을 소유한다. 디자인 값과 아이콘 공급은 정책으로 주입하며 퇴역 시 캐시와 콜백을 반환한다.\n"
     },
     {
       "id": "b000180",
       "kind": "blank",
-      "start_line": 457,
-      "end_line": 457,
+      "start_line": 460,
+      "end_line": 460,
       "raw": "\n"
     },
     {
       "id": "b000181",
       "kind": "paragraph",
-      "start_line": 458,
-      "end_line": 458,
+      "start_line": 461,
+      "end_line": 461,
       "raw": "`iiGUI/HierarchyItemModel.h`는 계층 행의 상태·기하와 원천 행 투영을, `iiGUI/NativeHierarchyItemView.h`는 입력·그리기·자식 View·수명을 소유한다. 디자인과 아이콘은 앱 정책으로 주입하며 퇴역 시 캐시와 콜백을 해제한다.\n"
     },
     {
       "id": "b000182",
       "kind": "blank",
-      "start_line": 459,
-      "end_line": 459,
+      "start_line": 462,
+      "end_line": 462,
       "raw": "\n"
     },
     {
       "id": "b000183",
       "kind": "paragraph",
-      "start_line": 460,
-      "end_line": 460,
+      "start_line": 463,
+      "end_line": 463,
       "raw": "`iiGUI/HierarchyToolbarModel.h`와 `NativeHierarchyToolbarView.h`는 ID 인덱스·선택·탐색·배치·입력과 위젯 수명을 소유한다. 앱이 디자인 값과 아이콘 공급을 주입하며 퇴역 시 버튼·캐시·콜백을 해제한다. macOS arm64 독립 설치 소비자와 LVUI 생성·계층 패널 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000184",
       "kind": "blank",
-      "start_line": 461,
-      "end_line": 461,
+      "start_line": 464,
+      "end_line": 464,
       "raw": "\n"
     },
     {
       "id": "b000185",
       "kind": "paragraph",
-      "start_line": 462,
-      "end_line": 462,
+      "start_line": 465,
+      "end_line": 465,
       "raw": "`iiGUI/TableHeaderModel.h`와 `NativeTableHeaderView.h`는 주입된 표 데이터와 표시 범위로 열 검증·적중·입력·접근성·그리기 및 위젯 수명을 관리한다. 퇴역 중 실행이 끝난 뒤 프레젠테이션·자식 View·콜백을 해제한다. macOS arm64 독립 설치 소비자와 LVUI 생성·사용자 열·접근성 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000186",
       "kind": "blank",
-      "start_line": 463,
-      "end_line": 463,
+      "start_line": 466,
+      "end_line": 466,
       "raw": "\n"
     },
     {
       "id": "b000187",
       "kind": "paragraph",
-      "start_line": 464,
-      "end_line": 464,
+      "start_line": 467,
+      "end_line": 467,
       "raw": "`iiGUI/NativeHierarchyListView.h`는 주입된 계층 원천과 항목을 키별 가상 행으로 조합하고 입력·스크롤·드래그·수명을 관리한다. 퇴역 시 실행 중인 게시와 콜백이 끝난 뒤 원천·아이콘 캐시와 팩터리를 해제한다. 재진입한 최신 원천은 마운트된 키를 유지하며 다음 게시로 반영한다. macOS arm64 독립 설치 소비자와 LVUI 가상화·접근·생성 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000188",
       "kind": "blank",
-      "start_line": 465,
-      "end_line": 465,
+      "start_line": 468,
+      "end_line": 468,
       "raw": "\n"
     },
     {
       "id": "b000189",
       "kind": "paragraph",
-      "start_line": 466,
-      "end_line": 466,
+      "start_line": 469,
+      "end_line": 469,
       "raw": "`iiGUI/PanelLayout.h`는 주입된 패널 디자인 값으로 도구 모음·목록·푸터의 표시 영역을 검증하고 겹치지 않게 계산한다. macOS arm64 독립 설치 소비자와 LVUI 두 패널의 배치·생성 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000190",
       "kind": "blank",
-      "start_line": 467,
-      "end_line": 467,
+      "start_line": 470,
+      "end_line": 470,
       "raw": "\n"
     },
     {
       "id": "b000191",
       "kind": "paragraph",
-      "start_line": 468,
-      "end_line": 468,
+      "start_line": 471,
+      "end_line": 471,
       "raw": "`iiGUI/NativeHierarchyPanelView.h`는 주입된 계층 목록·도구 모음·푸터의 배치와 수명을 관리한다. 갱신 중 퇴역해도 진행 중인 호출이 끝난 뒤 자식과 컨트롤러를 해제한다. macOS arm64 독립 설치 소비자와 LVUI 계층 패널 생성·행 대리자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000192",
       "kind": "blank",
-      "start_line": 469,
-      "end_line": 469,
+      "start_line": 472,
+      "end_line": 472,
       "raw": "\n"
     },
     {
       "id": "b000193",
       "kind": "paragraph",
-      "start_line": 470,
-      "end_line": 470,
+      "start_line": 473,
+      "end_line": 473,
       "raw": "`iiGUI/NativeListPanelView.h`는 주입된 목록·도구 모음·푸터의 영역과 위젯 수명을 조합한다. 퇴역 시 진행 중인 갱신이 끝난 뒤 자식과 컨트롤러를 반환한다. macOS arm64의 독립 설치 소비자와 LVUI 생성·헤드리스 경로를 검사했다.\n"
     },
     {
       "id": "b000194",
       "kind": "blank",
-      "start_line": 471,
-      "end_line": 471,
+      "start_line": 474,
+      "end_line": 474,
       "raw": "\n"
     },
     {
       "kind": "paragraph",
       "id": "b000195",
-      "start_line": 472,
-      "end_line": 475,
+      "start_line": 475,
+      "end_line": 478,
       "raw": "`iiGUI/NativeListView.h`는 주입된 키 색인·행 그리기·편집 필드로 가상 행, 입력,\n편집, 드래그와 수명을 관리한다. 리비전 갱신은 표시 구간의 행을 키로 유지하고\n시각 입력이나 행 문맥이 달라진 경우에만 그 위젯을 갱신한다. 퇴역하면 실행 중인\n콜백이 끝난 뒤 원천·행·편집 세션을 반환한다.\n"
     },
     {
       "id": "b000196",
       "kind": "blank",
-      "start_line": 476,
-      "end_line": 476,
+      "start_line": 479,
+      "end_line": 479,
       "raw": "\n"
     },
     {
       "id": "b000197",
       "kind": "paragraph",
-      "start_line": 477,
-      "end_line": 477,
+      "start_line": 480,
+      "end_line": 480,
       "raw": "`iiGUI/NativeCodeEditorView.h`는 주입된 코드 문서·편집 세션으로 가시 줄 셰이핑·선택·텍스트 입력·그리기와 수명을 관리한다. 퇴역 중인 입력이 끝나면 조합을 취소하고 문서와 콜백을 반환한다. macOS arm64 독립 설치 소비자와 LVUI 문서·생성·헤드리스 입력 경로를 검사했다.\n"
     },
     {
       "id": "b000198",
       "kind": "blank",
-      "start_line": 478,
-      "end_line": 478,
+      "start_line": 481,
+      "end_line": 481,
       "raw": "\n"
     },
     {
       "id": "b000199",
       "kind": "paragraph",
-      "start_line": 479,
-      "end_line": 479,
+      "start_line": 482,
+      "end_line": 482,
       "raw": "`iiGUI/TooltipModel.h`, `TooltipController.h`, `TooltipOutline.h`는 주입된 값으로 툴팁의 기하·시간 상태와 표시 포트 조정·윤곽을 관리한다. 제어기를 명시적으로 퇴역시키면 포트와 콜백을 해제한다. macOS arm64 독립 설치 소비자와 LVUI 툴팁 모델·윤곽·생성 경로를 창 없이 검사했다.\n"
     },
     {
       "id": "b000200",
       "kind": "blank",
-      "start_line": 480,
-      "end_line": 480,
+      "start_line": 483,
+      "end_line": 483,
       "raw": "\n"
     },
     {
       "id": "b000201",
       "kind": "paragraph",
-      "start_line": 481,
-      "end_line": 481,
+      "start_line": 484,
+      "end_line": 484,
       "raw": "`iiGUI/NativeTooltipPresentationView.h`의 표시 호스트는 주입된 재질·윤곽과 예약 포트를 조합한다. 퇴역 시 예약을 취소하고 재질과 예약 함수 캡처를 해제하며, 갱신 중 퇴역하면 해당 갱신이 끝난 뒤 해제한다. macOS arm64에서 창 없이 기존 표시·생성 검사와 독립 설치 소비자를 통과했다.\n"
     },
     {
       "id": "b000202",
       "kind": "blank",
-      "start_line": 482,
-      "end_line": 482,
+      "start_line": 485,
+      "end_line": 485,
       "raw": "\n"
     },
     {
       "id": "b000203",
       "kind": "paragraph",
-      "start_line": 483,
-      "end_line": 483,
+      "start_line": 486,
+      "end_line": 486,
       "raw": "`iiGUI/TooltipScheduler.h`, `NativeTooltipTargetView.h`, `NativeTooltipView.h`는 Core 이벤트 루프 기한 예약, 대상 위젯 관찰, 툴팁 조립을 담당한다. 앱이 모델과 표시 정책을 주입하며 대상 변경·재진입·취소와 오래된 알림 차단을 유지한다. macOS arm64에서 창 없이 기존 툴팁 통합 검사와 독립 설치 소비자를 통과했다.\n"
     },
     {
       "id": "b000204",
       "kind": "blank",
-      "start_line": 484,
-      "end_line": 484,
+      "start_line": 487,
+      "end_line": 487,
       "raw": "\n"
     },
     {
       "id": "b000205",
       "kind": "paragraph",
-      "start_line": 485,
-      "end_line": 485,
+      "start_line": 488,
+      "end_line": 488,
       "raw": "`iiGUI/NativeTableView.h`의 `BasicNativeTable`은 데이터 계약을 주입받아 표시 영역의 표 그리기, 입력, 선택, 편집, 클립보드, 접근성 및 사용자 정의 셀을 처리한다. macOS arm64에서 LVUI 표 통합 검사와 독립 설치 소비자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000206",
       "kind": "blank",
-      "start_line": 486,
-      "end_line": 486,
+      "start_line": 489,
+      "end_line": 489,
       "raw": "\n"
     },
     {
       "id": "b000207",
       "kind": "paragraph",
-      "start_line": 487,
-      "end_line": 487,
+      "start_line": 490,
+      "end_line": 490,
       "raw": "`iiGUI/NativeListItemCompositeView.h`는 주입된 컨트롤을 조합해 복합 목록의 입력·그리기와 사용자 정의 뷰 문맥을 처리한다. `ListItemDetailActionsLayout.h`, `ListItemDetailControlsLayout.h`, `ListItemTaskLayout.h`, `ListItemPreviewRowLayout.h`, `ListItemFormLayout.h`, `ListItemQuantityLayout.h`는 각각 배치와 수량 상태를 제공한다. 두 생성 화면을 한 번에 포함하는 컴파일 검사도 제공한다.\n"
     },
     {
       "id": "b000208",
       "kind": "blank",
-      "start_line": 488,
-      "end_line": 488,
+      "start_line": 491,
+      "end_line": 491,
       "raw": "\n"
     },
     {
       "kind": "paragraph",
       "id": "b000209",
-      "start_line": 489,
-      "end_line": 492,
+      "start_line": 492,
+      "end_line": 495,
       "raw": "`iiGUI/ListViewport.h`와 `iiGUI/ListDrag.h`는 주입된 불변 행과 키 색인을 공유해\n가시 범위와 드래그 후보를 계산한다. 높이가 일정한 목록은 위치를 산술로 계산한다.\n가변 높이는 측정된 행의 누적 높이와 이진 탐색을 사용한다. 스크롤·선택·편집·드래그가\n전체 행 벡터를 다시 생성할 필요가 없다.\n"
     },
     {
       "id": "b000210",
       "kind": "blank",
-      "start_line": 493,
-      "end_line": 493,
+      "start_line": 496,
+      "end_line": 496,
       "raw": "\n"
     },
     {
       "id": "b000211",
       "kind": "paragraph",
-      "start_line": 494,
-      "end_line": 494,
+      "start_line": 497,
+      "end_line": 497,
       "raw": "`iiGUI/HierarchyViewport.h`와 `iiGUI/HierarchyDrag.h`는 주입된 불변 계층 투영을 가상화하고 리비전을 검사하는 드래그 후보를 계산한다. macOS arm64에서 계층 모델·호스트·생성 경로와 독립 설치 소비자를 창 없이 검사했다.\n"
     },
     {
       "id": "b000212",
       "kind": "blank",
-      "start_line": 495,
-      "end_line": 495,
+      "start_line": 498,
+      "end_line": 498,
       "raw": "\n"
     },
     {
       "id": "b000213",
       "kind": "paragraph",
-      "start_line": 496,
-      "end_line": 496,
+      "start_line": 499,
+      "end_line": 499,
       "raw": "`iiGUI/TableViewport.h`는 불변 표 스냅샷에서 행·열 누적 위치와 병합 셀의 보이는 범위를 계산한다. 표 헤더와 본문은 같은 교체 가능한 뷰포트 구현을 사용한다.\n"
     },
     {
       "id": "b000214",
       "kind": "blank",
-      "start_line": 497,
-      "end_line": 497,
+      "start_line": 500,
+      "end_line": 500,
       "raw": "\n"
     },
     {
       "id": "b000215",
       "kind": "paragraph",
-      "start_line": 498,
-      "end_line": 498,
+      "start_line": 501,
+      "end_line": 501,
       "raw": "`iiGUI/ListItemMenuModel.h`는 주입된 메뉴 항목의 중첩·텍스트·아이콘 한도를 검증한다.\n"
     },
     {
       "id": "b000216",
       "kind": "blank",
-      "start_line": 499,
-      "end_line": 499,
+      "start_line": 502,
+      "end_line": 502,
       "raw": "\n"
     },
     {
       "id": "b000217",
       "kind": "paragraph",
-      "start_line": 500,
-      "end_line": 500,
+      "start_line": 503,
+      "end_line": 503,
       "raw": "`iiGUI/CollectionNavigation.h`와 `iiGUI/VirtualViewport.h`는 주입된 키·상태 계약으로 컬렉션 선택과 포커스 및 가상 뷰포트의 이벤트 기반 상태를 관리한다. 화면 밖 선택 보존과 위젯 퇴역 시 수명 경계를 유지한다.\n"
     },
     {
       "id": "b000218",
       "kind": "blank",
-      "start_line": 501,
-      "end_line": 501,
+      "start_line": 504,
+      "end_line": 504,
       "raw": "\n"
     },
     {
       "id": "b000219",
       "kind": "paragraph",
-      "start_line": 502,
-      "end_line": 502,
+      "start_line": 505,
+      "end_line": 505,
       "raw": "`iiGUI/VirtualCollectionPlanner.h`, `iiGUI/VirtualMeasurements.h`, `iiGUI/VirtualLineIndex.h`는 주입된 컬렉션의 표시 셀 배치와 가변 행 높이·누적 위치를 계산한다. 키별 원천과 값 형식은 앱이 제공한다. 동일한 측정치는 다시 알리지 않으며 낡은 세대와 퇴역 후 결과를 무시한다.\n"
     },
     {
       "id": "b000220",
       "kind": "blank",
-      "start_line": 503,
-      "end_line": 503,
+      "start_line": 506,
+      "end_line": 506,
       "raw": "\n"
     },
     {
       "id": "b000221",
       "kind": "paragraph",
-      "start_line": 504,
-      "end_line": 504,
+      "start_line": 507,
+      "end_line": 507,
       "raw": "`iiGUI/CodeViewport.h`는 주입된 불변 문서에서 실제 보이는 줄과 열만 읽는다. 읽기 범위와 바이트 예산을 제한하고 유니코드 스칼라 경계를 보존하며 코드 편집기 호스트가 이 계산을 직접 사용한다.\n"
     },
     {
       "id": "b000222",
       "kind": "blank",
-      "start_line": 505,
-      "end_line": 505,
+      "start_line": 508,
+      "end_line": 508,
       "raw": "\n"
     },
     {
       "id": "b000223",
       "kind": "paragraph",
-      "start_line": 506,
-      "end_line": 506,
+      "start_line": 509,
+      "end_line": 509,
       "raw": "`iiGUI/FocusRing.h`와 `iiGUI/NativeFocusRingView.h`는 포커스 윤곽의 유효성, 기하, 선형 색 변환, 상태 전환과 위젯 수명을 소유한다. 앱이 색과 모션을 주입하며 전환 중에만 프레임을 요청한다. 잘못된 입력은 기존 상태를 보존한다.\n"
     },
     {
       "id": "b000224",
-      "kind": "blank",
-      "start_line": 507,
-      "end_line": 507,
-      "raw": "\n"
-    },
-    {
-      "id": "b000225",
-      "kind": "paragraph",
-      "start_line": 508,
-      "end_line": 509,
-      "raw": "`iiGUI/MobileTabPainter.h`와 `iiGUI/NativeMobileTabView.h`는 독립 모바일 탭의 그리기·입력·배지·선택 모션을 소유하며 기존 모바일 탐색 막대와 그리기 계산을 공유한다. 입력 검증 실패는 기존 상태를 보존하고, 시스템 모션 설정과 위젯 퇴역을 반영해 불필요한 프레임과 참조를 해제한다.\n아이콘 조회 중 발생한 재진입과 퇴역은 리비전과 수명 확인으로 처리하므로 오래된 결과가 최신 입력을 덮어쓰지 않는다.\n"
-    },
-    {
-      "id": "b000226",
       "kind": "blank",
       "start_line": 510,
       "end_line": 510,
       "raw": "\n"
     },
     {
-      "id": "b000227",
+      "id": "b000225",
       "kind": "paragraph",
       "start_line": 511,
-      "end_line": 511,
+      "end_line": 512,
+      "raw": "`iiGUI/MobileTabPainter.h`와 `iiGUI/NativeMobileTabView.h`는 독립 모바일 탭의 그리기·입력·배지·선택 모션을 소유하며 기존 모바일 탐색 막대와 그리기 계산을 공유한다. 입력 검증 실패는 기존 상태를 보존하고, 시스템 모션 설정과 위젯 퇴역을 반영해 불필요한 프레임과 참조를 해제한다.\n아이콘 조회 중 발생한 재진입과 퇴역은 리비전과 수명 확인으로 처리하므로 오래된 결과가 최신 입력을 덮어쓰지 않는다.\n"
+    },
+    {
+      "id": "b000226",
+      "kind": "blank",
+      "start_line": 513,
+      "end_line": 513,
+      "raw": "\n"
+    },
+    {
+      "id": "b000227",
+      "kind": "paragraph",
+      "start_line": 514,
+      "end_line": 514,
       "raw": "`iiGUI/WindowNoiseTexture.h`와 `iiGUI/NativeWindowNoiseTextureView.h`는 256×256의 결정적 노이즈 텍스처와 보관형 이미지 타일을 제공한다. 색·노이즈·블러·그레인이 바뀔 때만 CPU에서 타일을 다시 만들고 크기만 바뀌면 재사용한다. 블러는 반복 경계가 있는 세 차례의 선형 시간 상자 필터로 근사한다. 통상적인 화면에서는 그레인을 장치 픽셀에 맞추고 매우 큰 뷰포트에서는 그리기 명령 수를 제한한다. 실제 화면의 GPU 합성은 호스트 렌더러에 달려 있으며 실기기 실행으로 확인하지 않았다.\n"
     },
     {
       "id": "b000228",
       "kind": "blank",
-      "start_line": 512,
-      "end_line": 512,
+      "start_line": 515,
+      "end_line": 515,
       "raw": "\n"
     },
     {
       "id": "b000229",
       "kind": "paragraph",
-      "start_line": 513,
-      "end_line": 513,
+      "start_line": 516,
+      "end_line": 516,
       "raw": "`iiGUI/NativeWheelScrollGuard.h`는 자신 안의 스크롤 뷰에 정규화된 휠을 전달한다. 경계에서 이벤트를 소비할지 상위 스크롤로 넘길지를 설정할 수 있으며 비활성화 시 기본 스크롤 경로를 유지한다. 대상을 바꾸거나 퇴역한 뒤 오래된 관찰 결과는 보내지 않는다.\n"
     }
   ],
@@ -1854,49 +1854,49 @@
       },
       {
         "block_id": "b000139",
-        "line": 416,
+        "line": 419,
         "text": "`iiGUI/DocumentLayout.h`는 앱이 주입한 문서 구조로 배치, 텍스트 측정과 그리기 프레임을 생성한다. 문서와 레이아웃 정책은 iiGUI가 소유하지 않으며 임시 문서에 대한 비소유 뷰 생성을 금지한다. macOS arm64 독립 소비자와 LVUI 문서 배치·오류 경로를 창 없이 검사했다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000143",
-        "line": 420,
+        "line": 423,
         "text": "`iiGUI/ColorSurfaceModel.h`와 `NativeColorSurfaceView.h`는 색상 표면의 검증·좌표·입력·그리기와 수명을 담당한다. 앱의 원천 리비전이 그대로면 래스터를 재요청하지 않고 폐기 중 조회는 게시하지 않는다. macOS arm64에서 LVUI 색상 세션과 생성 코드, 독립 설치 소비자를 창 없이 검사했다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000149",
-        "line": 426,
+        "line": 429,
         "text": "`iiGUI/CardModel.h`와 `NativeCardView.h`는 카드 상태·배치·선택·입력·그리기와 슬롯 수명을 소유한다. 앱은 디자인 값과 기본 라벨·아이콘 원천을 주입한다. 같은 입력은 재처리하지 않으며 조회 중 새 요청이나 퇴역이 발생하면 오래된 결과를 게시하지 않는다. macOS arm64의 독립 설치 소비자와 LVUI 카드·슬롯 경로를 창 없이 검사했다. 실제 운영체제 표시와 GPU는 검사하지 않았다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000161",
-        "line": 438,
+        "line": 441,
         "text": "`iiGUI/NativeTextEditorView.h`는 주입된 입력 필드를 조합하고 최소 높이를 적용한다. 필드의 텍스트·입력·퇴역을 재사용하며 iiGUI는 LVUI에 의존하지 않는다. macOS arm64 독립 설치 소비자와 LVUI 생성·스크롤 경로를 창 없이 검사했다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000163",
-        "line": 440,
+        "line": 443,
         "text": "`iiGUI/SliderModel.h`와 `iiGUI/NativeSliderView.h`는 슬라이더의 범위·스냅·배치·입력·접근성·그리기·모션 및 퇴역을 제공한다. 디자인 값과 아이콘 공급은 정책으로 주입하며 iiGUI는 LVUI에 의존하지 않는다. 프레임은 진행 중인 모션에만 요청한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000165",
-        "line": 442,
+        "line": 445,
         "text": "`iiGUI/NativeSearchFieldView.h`는 입력 필드·아이콘·재질을 조합하고 배치·입력·그리기·수명을 관리한다. 정책과 실제 필드 구현은 앱이 주입하며 iiGUI는 LVUI를 참조하지 않는다. 퇴역 시 편집 콜백과 재질 래스터 자원을 해제한다.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000177",
-        "line": 454,
+        "line": 457,
         "text": "`iiGUI/ColorPickerLayout.h`는 앱이 주입한 디자인 치수를 사용해 선택기 배치를 계산한다. `iiGUI/NativeColorPickerView.h`는 표면·채널·값·버튼을 조합하고 세션·콜백·취소 수명을 관리한다. iiGUI는 LVUI나 색상 SDK에 의존하지 않는다.",
         "basis": "lexical_match",
         "context": "paragraph"

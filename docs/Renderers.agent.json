@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/Renderers.md",
-    "sha256": "d950f5bead6dfedba217a9ae66bc14751d74d2ca833581ed8519262a5a581c6c",
-    "bytes": 7644,
-    "line_count": 137,
+    "sha256": "7665d88d1f6a42abf6e84edad3719d981b249d77ed0e7e22a4f67a9515d69e59",
+    "bytes": 7563,
+    "line_count": 135,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -342,52 +342,52 @@
       "id": "b000039",
       "kind": "fenced_code",
       "start_line": 104,
-      "end_line": 114,
-      "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan\n```\n",
+      "end_line": 112,
+      "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build -R '^iiGUI\\.vulkan_' --output-on-failure\n```\n",
       "language": "sh",
-      "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan\n",
+      "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build -R '^iiGUI\\.vulkan_' --output-on-failure\n",
       "closed": true
     },
     {
       "id": "b000040",
       "kind": "blank",
-      "start_line": 115,
-      "end_line": 115,
+      "start_line": 113,
+      "end_line": 113,
       "raw": "\n"
     },
     {
       "id": "b000041",
       "kind": "paragraph",
-      "start_line": 116,
-      "end_line": 122,
+      "start_line": 114,
+      "end_line": 120,
       "raw": "Use the target's Vulkan loader on Windows/Linux and MoltenVK on macOS; the\nexample library path above is illustrative, not a macOS path. Installed static\nconsumers receive `Vulkan::Vulkan` through CMake dependency discovery. If the\nVulkan SDK is outside normal search paths, provide the same two cache variables\nto the consumer. Runtime loader paths remain a deployment responsibility;\nverification removes inherited DYLD overrides and checks a relocated consumer.\nNo Vulkan dependency is added to LVUI or iiSDKCore.\n"
     },
     {
       "id": "b000042",
       "kind": "blank",
-      "start_line": 123,
-      "end_line": 123,
+      "start_line": 121,
+      "end_line": 121,
       "raw": "\n"
     },
     {
       "id": "b000043",
       "kind": "paragraph",
-      "start_line": 124,
-      "end_line": 126,
+      "start_line": 122,
+      "end_line": 124,
       "raw": "GLSL sources are in `src/shaders`. Checked-in `VulkanShaders.h` contains their\nSPIR-V, so consumers do not need a runtime or build-time shader compiler.\nAfter editing GLSL, regenerate using the official Khronos tool:\n"
     },
     {
       "id": "b000044",
       "kind": "blank",
-      "start_line": 127,
-      "end_line": 127,
+      "start_line": 125,
+      "end_line": 125,
       "raw": "\n"
     },
     {
       "id": "b000045",
       "kind": "fenced_code",
-      "start_line": 128,
-      "end_line": 130,
+      "start_line": 126,
+      "end_line": 128,
       "raw": "```sh\npython3 -B tools/compile_vulkan_shaders.py /path/to/glslang\n```\n",
       "language": "sh",
       "code": "python3 -B tools/compile_vulkan_shaders.py /path/to/glslang\n",
@@ -396,15 +396,15 @@
     {
       "id": "b000046",
       "kind": "blank",
-      "start_line": 131,
-      "end_line": 131,
+      "start_line": 129,
+      "end_line": 129,
       "raw": "\n"
     },
     {
       "id": "b000047",
       "kind": "paragraph",
-      "start_line": 132,
-      "end_line": 137,
+      "start_line": 130,
+      "end_line": 135,
       "raw": "The shader guard checks source hashes and SPIR-V magic. Renderer policy tests\ninject deterministic private backend failures; real forced-Vulkan tests verify\npanel colors/alpha/antialiasing, native glyph pixels/clipping, swapchain\npresentation, resize, equal-scene reuse and the installed consumer. A policy\ntest is not evidence that a physical Metal/DirectX device was made unavailable.\nRuntime evidence must name its actual platform/device and API.\n"
     }
   ],
@@ -453,14 +453,14 @@
       },
       {
         "block_id": "b000043",
-        "line": 125,
+        "line": 123,
         "text": "SPIR-V, so consumers do not need a runtime or build-time shader compiler.",
         "basis": "lexical_match",
         "context": "paragraph"
       },
       {
         "block_id": "b000047",
-        "line": 137,
+        "line": 135,
         "text": "Runtime evidence must name its actual platform/device and API.",
         "basis": "lexical_match",
         "context": "paragraph"
@@ -470,7 +470,7 @@
       {
         "block_id": "b000039",
         "language": "sh",
-        "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DLVUI_DIR=/path/to/LVUI/lib/cmake/LVUI \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test --vulkan\n"
+        "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/Core/lib/cmake/iiSDKCore \\\n  -DVulkan_INCLUDE_DIR=/path/to/Vulkan/include \\\n  -DVulkan_LIBRARY=/path/to/Vulkan/lib/libvulkan.so \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build -R '^iiGUI\\.vulkan_' --output-on-failure\n"
       },
       {
         "block_id": "b000045",

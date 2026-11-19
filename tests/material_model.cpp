@@ -23,7 +23,8 @@ int main(){
     const auto dense=ii::gui::MaterialModel::resolve(window);
     require(dense.density==ii::gui::MaterialDensity::dense75&&dense.tint.alpha==.75&&dense.blur_radius==64,
             "Dense window material must use its density opacity and blur");
-    window.density=ii::gui::MaterialDensity::glass25;
+    window.density=ii::gui::MaterialDensity::glass85;
     const auto glass=ii::gui::MaterialModel::resolve(window);
-    require(glass.tint.alpha==.25&&glass.blur_radius==16,"Glass window material must retain its density opacity and blur");
+    require(glass.tint.alpha==.85&&glass.tint.red==0&&glass.tint.green==0&&glass.tint.blue==0&&glass.blur_radius==16,
+            "Glass window material must use an 85 percent black tint");
 }

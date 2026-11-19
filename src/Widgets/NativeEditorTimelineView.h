@@ -27,6 +27,7 @@ struct EditorTimelineOptions final {
     std::uint64_t revision=0;
     bool enabled=true;
     EditorTimelinePalette palette;
+    EditorTimelineFrameRate frame_rate;
     friend bool operator==(const EditorTimelineOptions&,const EditorTimelineOptions&)=default;
 };
 struct EditorTimelineQuery final {
@@ -121,6 +122,7 @@ class NativeEditorTimeline final {
            !color_valid(o.palette.clip)||!color_valid(o.palette.selected)||!color_valid(o.palette.accent))return false;
         return std::isfinite(o.width)&&std::isfinite(o.height)&&o.width>=0&&o.height>=0&&o.width<=8192&&o.height<=8192&&
             std::isfinite(o.scroll_y)&&o.scroll_y>=0&&o.scroll_y<=1e12&&o.playhead>=0&&
+            o.frame_rate.denominator!=0&&
             (o.frame_count==0?o.playhead==0:o.playhead<o.frame_count)&&
             v.configure({.frame_count=o.frame_count,.pixels_per_frame=o.pixels_per_frame,.scroll=o.scroll_x,.width=(std::max)(0.,o.width-header)});
     }
@@ -148,7 +150,7 @@ class NativeEditorTimeline final {
             const auto label_y=(std::max)(ruler,y);const auto label_bottom=(std::min)(o.height,y+t.height);
             if(header>0&&label_bottom>label_y)foreground->texts.push_back({.bounds={8,float(label_y),float((std::min)(header-16,o.width)),float(label_bottom-label_y)},
                 .text=t.label,.color=ink,.font_size=11,.alignment=ii::gui::TextAlignment::left,.line_height=11,.elide_right=true});}
-        const auto px=[&](std::int64_t frame){return header+double(frame)*o.pixels_per_frame-viewport.configuration().scroll;};
+        const auto px=[&](std::int64_t frame){return header+viewport.boundary_x(frame);};
         for(const auto& c:data.clips){const auto* t=tracks.at(c.track_id);const auto y=ruler+t->top-o.scroll_y;
             const auto left=(std::max)(header,px(c.first)),right=(std::min)(o.width,px(c.end));
             const auto top=(std::max)(ruler,y+4),bottom=(std::min)(o.height,y+t->height-4);
@@ -163,11 +165,41 @@ class NativeEditorTimeline final {
                 .source={float((x0-left)/(right-left)),float((y0-top)/(bottom-top)),float((x1-x0)/(right-left)),float((y1-y0)/(bottom-top))}});}
         for(const auto& k:data.keys){const auto* t=tracks.at(k.track_id);const auto x=px(k.frame),y=ruler+t->top-o.scroll_y+t->height/2;
             if(x>=header&&x<o.width&&y>=ruler&&y<o.height)front_rect(x-3,y-3,6,6,accent,1);}
-        const auto range=viewport.visible_frames();std::int64_t step=1;
-        while(double(step)*o.pixels_per_frame<50&&step<100'000'000'000LL)step*=10;
-        if(range.end>range.first){auto tick=((range.first+step-1)/step)*step;
-            for(;tick<range.end&&tick>=0;tick+=step){const auto x=px(tick);front_rect(x,ruler-8,1,8,ink);
-                if(x+30<=o.width)foreground->texts.push_back({.bounds={float(x+3),4,48,16},.text=std::to_string(tick),.color=ink,.font_size=11,.line_height=11});}}
+        const auto boundaries=viewport.visible_boundaries();
+        const auto width=viewport.configuration().width;
+        // The Figma ruler distinguishes one frame, a quarter second and one
+        // second by length. Label collisions affect only the text.
+        constexpr double frame_tick=4,quarter_tick=7,second_tick=10,tick_width=1;
+        constexpr double label_width=48,label_spacing=50,label_offset=3;
+        double next_label=0;
+        const auto paint_tick=[&](EditorFrameRange frames,double x){
+            auto second=o.frame_rate.first_time_boundary(frames,1);
+            if(!o.frame_rate.numerator&&frames.first==0)second=0;
+            const auto length=second?second_tick:o.frame_rate.first_time_boundary(frames,4)?quarter_tick:frame_tick;
+            const auto start=x>=width?(std::max)(0.,width-tick_width):(std::max)(0.,x);
+            front_rect(header+start,ruler-length,(std::min)(tick_width,width-start),length,ink);
+            if(!second||width<label_width)return;
+            const auto number_x=viewport.boundary_x(*second)+label_offset;
+            const auto label_x=std::clamp(number_x,0.,width-label_width);
+            if(label_x<next_label)return;
+            foreground->texts.push_back({.bounds={float(header+label_x),4,float(label_width),16},
+                .text=std::to_string(*second),.color=ink,.font_size=11,
+                .alignment=number_x>label_x?TextAlignment::right:TextAlignment::left,.line_height=11});
+            next_label=label_x+label_spacing;
+        };
+        if(o.pixels_per_frame>=tick_width){
+            for(auto frame=boundaries.first;frame<boundaries.end;++frame)
+                paint_tick({frame,frame+1},viewport.boundary_x(frame));
+        }else{
+            // Subpixel ticks occupy the same screen column. Give each column
+            // its tallest tick using the complete interval of frame boundaries.
+            auto first=boundaries.first;
+            for(double x=0;x<width&&first<boundaries.end;x+=tick_width){
+                const auto end=x+tick_width<width?(std::min)(boundaries.end,viewport.boundary_at_or_after(x+tick_width)):boundaries.end;
+                if(end>first)paint_tick({first,end},x);
+                first=end;
+            }
+        }
         return {std::move(d),std::move(foreground)};
     }
     [[nodiscard]] static ii::core::Result<void> cancel(const std::shared_ptr<State>& s){
@@ -213,7 +245,7 @@ class NativeEditorTimeline final {
             EditorTimelineEvent next{.phase=EditorTimelinePhase::begin,.kind=EditorTimelineGesture::scrub,.frame=*frame,.initial_frame=*frame};
             if(point.y>=ruler){bool hit=false;
                 for(const auto& t:s->projection->tracks){const auto y=ruler+t.top-s->options.scroll_y;if(point.y<y||point.y>=y+t.height)continue;
-                    const auto px=[&](std::int64_t f){return header+double(f)*s->options.pixels_per_frame-s->viewport.configuration().scroll;};
+                    const auto px=[&](std::int64_t f){return header+s->viewport.boundary_x(f);};
                     for(const auto& key:s->projection->keys)if(key.track_id==t.id&&std::abs(point.x-px(key.frame))<=6&&std::abs(point.y-(y+t.height/2))<=8){
                         next.kind=EditorTimelineGesture::move_key;next.id=key.id;hit=true;break;}
                     if(!hit)for(const auto& clip:s->projection->clips)if(clip.track_id==t.id&&!clip.locked&&point.x>=px(clip.first)&&point.x<px(clip.end)){
@@ -244,7 +276,8 @@ class NativeEditorTimeline final {
             projection=std::make_shared<const EditorTimelineProjection>(std::move(*result));
             if(!s->live)return ii::core::fail(ii::core::ErrorCode::closed,"Editor timeline retired during query");}
         const bool redraw=queried||value.width!=s->options.width||value.height!=s->options.height||
-            value.scroll_x!=s->options.scroll_x||value.scroll_y!=s->options.scroll_y||value.pixels_per_frame!=s->options.pixels_per_frame||value.palette!=s->options.palette;
+            value.scroll_x!=s->options.scroll_x||value.scroll_y!=s->options.scroll_y||value.pixels_per_frame!=s->options.pixels_per_frame||
+            value.palette!=s->options.palette||value.frame_rate!=s->options.frame_rate;
         auto drawing=redraw?draw(value,v,*projection):s->drawing;
         if(!value.enabled&&s->options.enabled)if(auto r=cancel(s);!r)return r;
         if(!s->live)return ii::core::fail(ii::core::ErrorCode::closed,"Editor timeline retired during cancellation");
@@ -254,7 +287,7 @@ class NativeEditorTimeline final {
         if(initial||value.enabled!=s->options.enabled)if(auto r=s->root.set_enabled(value.enabled);!r)return r;
         if(initial||value.height!=s->options.height||value.palette.accent!=s->options.palette.accent){ii::gui::WidgetDrawing line;auto ink=color(value.palette.accent);
             line.panels.push_back({{0,0,1,float(value.height)},ink,ink,0});if(auto r=s->playhead.set_drawing(std::move(line));!r)return r;}
-        const auto x=header+double(value.playhead)*value.pixels_per_frame-v.configuration().scroll;
+        const auto x=header+v.boundary_x(value.playhead);
         if(auto r=s->playhead.set_visible(value.frame_count>0&&x>=header&&x<value.width);!r)return r;
         if(auto r=s->playhead.set_frame({float(std::clamp(x,0.,value.width)),0,1,float(value.height)});!r)return r;
         s->options=value;s->viewport=v;s->query=request;s->projection=std::move(projection);s->drawing=std::move(drawing);

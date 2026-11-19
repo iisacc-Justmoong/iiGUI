@@ -23,8 +23,8 @@
 드래그·보조키·취소를 창 없이 검사한다. 선택적
 `iiGUI.native_double_click_generated`는 LVUI에서 생성한 실제 위젯과 반응형
 활성화 설정을 연결해 검사한다. 이 검사는 실제 OS 포인터 입력이나 제품 실행을
-의미하지 않는다. 현재 macOS 검사 타깃은 LVUI 컴파일러와 네이티브 공유 라이브러리가
-빌드된 상태에서 `IIGUI_BUILD_LVUI_INTEGRATION_TESTS=ON`으로 활성화한다.
+의미하지 않는다. macOS 검사 타깃은 iiGUI 설치본을 선택한 LVUI 프로젝트에서
+`LVUI_BUILD_IIGUI_INTEGRATION_TESTS=ON`으로 활성화한다.
 
 `Widget::set_keyed_content(items, options)`는 콘텐츠 호스트 안에 독립적인 키별 행 세대를
 마운트한다. 같은 키의 팩토리는 다시 호출하지 않으며, 행의 위젯·소유 객체·구독·편집 상태·

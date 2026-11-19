@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/LVUI.md",
-    "sha256": "0bbd7fa992529acc7c3cfbe621eebff13ae06c7b4aeb26b367ebfe6a6673839b",
-    "bytes": 6566,
-    "line_count": 123,
+    "sha256": "325c3df18f6a2960a706fd12392b77929f5fed8472ac9f6b62133cf1f02645aa",
+    "bytes": 5814,
+    "line_count": 112,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -43,7 +43,7 @@
       "kind": "paragraph",
       "start_line": 3,
       "end_line": 6,
-      "raw": "The compiled component-language route is documented separately in\n[NativeWidgets.md](NativeWidgets.md). `examples/HelloWorld` AOT-compiles `.lvui`\ninto native C++23 and mounts iiGUI's own C++ widgets on a Cocoa surface. The document below describes\nthe earlier HTML-shaped runtime-parsed GPU canvas API, which remains available.\n"
+      "raw": "The compiled component-language route is documented separately in\n[NativeWidgets.md](NativeWidgets.md). `../LVUI/example/HelloWorld` AOT-compiles `.lvui`\ninto native C++23 and mounts iiGUI's widgets on a native surface. The earlier\nHTML-shaped runtime-parsed canvas example is retained as API history.\n"
     },
     {
       "id": "b000004",
@@ -99,9 +99,9 @@
       "kind": "heading",
       "start_line": 24,
       "end_line": 24,
-      "raw": "## Application usage\n",
+      "raw": "## Prior document API example\n",
       "level": 2,
-      "title": "Application usage"
+      "title": "Prior document API example"
     },
     {
       "id": "b000012",
@@ -234,7 +234,7 @@
       "kind": "paragraph",
       "start_line": 91,
       "end_line": 94,
-      "raw": "기본 iiGUI 빌드에는 LVUI가 필요하지 않다. 별도 HelloLVUI 앱까지 빌드하려면\n앱이 사용할 LVUI 패키지를 준비하고 선택적 예제를 활성화한다. LVUI 생성 위젯의\n기존 통합 검사를 iiGUI 빌드에 추가하려면 `IIGUI_BUILD_LVUI_INTEGRATION_TESTS=ON`을\n명시하고 LVUI의 빌드된 컴파일러와 런타임을 제공한다.\n"
+      "raw": "iiGUI의 라이브러리, 패키지, 네이티브 예제와 테스트는 독립적으로 구성한다.\nHelloWorld와 생성 뷰 검사는 iiGUI 0.6.0 이상을 설치한 뒤 LVUI 저장소에서 구성한다.\nLVUI 0.1.1은 생성 코드에서 사용하는 최소 호스트 API를\nLVUI_IIGUI_MIN_VERSION으로 공개한다.\n"
     },
     {
       "id": "b000030",
@@ -247,67 +247,53 @@
       "id": "b000031",
       "kind": "fenced_code",
       "start_line": 96,
-      "end_line": 105,
-      "raw": "```sh\ncmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DIIGUI_BUILD_LVUI_EXAMPLES=ON \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test\n```\n",
+      "end_line": 102,
+      "raw": "```sh\ncmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_BUILD_HOST_EXAMPLES=ON -DLVUI_BUILD_IIGUI_INTEGRATION_TESTS=ON\ncmake --build ../LVUI/build --target HelloWorld --parallel 4\n```\n",
       "language": "sh",
-      "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DIIGUI_BUILD_LVUI_EXAMPLES=ON \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test\n",
+      "code": "cmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_BUILD_HOST_EXAMPLES=ON -DLVUI_BUILD_IIGUI_INTEGRATION_TESTS=ON\ncmake --build ../LVUI/build --target HelloWorld --parallel 4\n",
       "closed": true
     },
     {
       "id": "b000032",
       "kind": "blank",
-      "start_line": 106,
-      "end_line": 106,
+      "start_line": 103,
+      "end_line": 103,
       "raw": "\n"
     },
     {
       "id": "b000033",
       "kind": "paragraph",
-      "start_line": 107,
-      "end_line": 112,
-      "raw": "HelloLVUI's `main.lvui` is embedded by CMake, so changing it triggers regeneration\nand rebuilding. The executable uses no runtime file I/O or source-tree lookup.\nRun without flags for an ordinary resizable window. `--capture` emits one ASCII PPM\nGPU capture to stdout and closes; redirection/export belongs to the caller.\nThe application source has no platform conditionals. It can also be built\nstandalone with installed Core/LVUI/iiGUI packages.\n"
+      "start_line": 104,
+      "end_line": 106,
+      "raw": "현재 데스크톱 예제는 CMake에서 `HelloWorld.lvui`를 C++로 생성한다.\n창 없는 조합 검사는 생성된 팩토리와 iiGUI 네이티브 위젯을 연결해\n레이아웃·입력·콜백·수명을 확인한다.\n"
     },
     {
       "id": "b000034",
       "kind": "blank",
-      "start_line": 113,
-      "end_line": 113,
+      "start_line": 107,
+      "end_line": 107,
       "raw": "\n"
     },
     {
       "id": "b000035",
       "kind": "paragraph",
-      "start_line": 114,
-      "end_line": 115,
-      "raw": "LVUI의 창 없는 조합 검사는 박스·백분율·패딩·글꼴·줄바꿈과 잘못된 입력을\n확인한다. 플랫폼 GPU·창·스크린 리더 실행은 이 검사와 별도로 보고한다.\n"
+      "start_line": 108,
+      "end_line": 109,
+      "raw": "Native API references: [AppKit attributed text drawing](https://developer.apple.com/documentation/foundation/nsattributedstring/draw%28in%3A%29)\nand [Direct2D rendering into a WIC bitmap](https://learn.microsoft.com/en-us/windows/win32/direct2d/server-side-rendering-overview).\n"
     },
     {
       "id": "b000036",
       "kind": "blank",
-      "start_line": 116,
-      "end_line": 116,
+      "start_line": 110,
+      "end_line": 110,
       "raw": "\n"
     },
     {
       "id": "b000037",
       "kind": "paragraph",
-      "start_line": 117,
-      "end_line": 118,
-      "raw": "Native API references: [AppKit attributed text drawing](https://developer.apple.com/documentation/foundation/nsattributedstring/draw%28in%3A%29)\nand [Direct2D rendering into a WIC bitmap](https://learn.microsoft.com/en-us/windows/win32/direct2d/server-side-rendering-overview).\n"
-    },
-    {
-      "id": "b000038",
-      "kind": "blank",
-      "start_line": 119,
-      "end_line": 119,
-      "raw": "\n"
-    },
-    {
-      "id": "b000039",
-      "kind": "paragraph",
-      "start_line": 120,
-      "end_line": 123,
-      "raw": "Renderer selection defaults to the platform accelerator with Vulkan fallback.\nUse `host.set_view(document, ii::gui::Renderer::vulkan)` to force Vulkan.\nHelloLVUI accepts `--vulkan` or `--native`; `--capture --vulkan` captures the\nsame view through Vulkan. See [renderer contracts](Renderers.md).\n"
+      "start_line": 111,
+      "end_line": 112,
+      "raw": "Renderer selection defaults to the platform accelerator with Vulkan fallback.\nSee [renderer contracts](Renderers.md) for Vulkan selection.\n"
     }
   ],
   "outline": [
@@ -323,8 +309,8 @@
       "block_id": "b000011",
       "parent_id": "b000001",
       "level": 2,
-      "title": "Application usage",
-      "anchor": "application-usage",
+      "title": "Prior document API example",
+      "anchor": "prior-document-api-example",
       "start_line": 24
     },
     {
@@ -358,7 +344,7 @@
       {
         "block_id": "b000031",
         "language": "sh",
-        "code": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DIIGUI_BUILD_LVUI_EXAMPLES=ON \\\n  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \\\n  -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON\ncmake --build build --parallel 4\nctest --test-dir build --output-on-failure\n./build/examples/HelloLVUI/HelloLVUI --self-test\n"
+        "code": "cmake -S ../LVUI -B ../LVUI/build -G Ninja -DCMAKE_BUILD_TYPE=Release \\\n  -DiiGUI_DIR=/path/to/iiGUI/lib/cmake/iiGUI \\\n  -DiiSDKCore_DIR=/path/to/iiSDKCore/lib/cmake/iiSDKCore \\\n  -DLVUI_BUILD_HOST_EXAMPLES=ON -DLVUI_BUILD_IIGUI_INTEGRATION_TESTS=ON\ncmake --build ../LVUI/build --target HelloWorld --parallel 4\n"
       }
     ],
     "links": [
@@ -377,25 +363,25 @@
         "line": 15
       },
       {
-        "block_id": "b000037",
+        "block_id": "b000035",
         "label": "AppKit attributed text drawing",
         "target": "https://developer.apple.com/documentation/foundation/nsattributedstring/draw%28in%3A%29",
         "kind": "external",
-        "line": 117
+        "line": 108
       },
       {
-        "block_id": "b000037",
+        "block_id": "b000035",
         "label": "Direct2D rendering into a WIC bitmap",
         "target": "https://learn.microsoft.com/en-us/windows/win32/direct2d/server-side-rendering-overview",
         "kind": "external",
-        "line": 118
+        "line": 109
       },
       {
-        "block_id": "b000039",
+        "block_id": "b000037",
         "label": "renderer contracts",
         "target": "Renderers.md",
         "kind": "relative",
-        "line": 123
+        "line": 112
       }
     ],
     "tables": []

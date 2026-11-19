@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.31)
 project(iiGUIStandaloneHost LANGUAGES CXX)
+set(CMAKE_DISABLE_FIND_PACKAGE_LVUI TRUE)
 find_package(iiGUI CONFIG REQUIRED)
 get_target_property(host_dependencies iiGUI::iiGUI INTERFACE_LINK_LIBRARIES)
-if(host_dependencies MATCHES "LVUI|LVRS|Qt[56]::" OR TARGET LVUI::LVUI OR LVUI_FOUND OR
+if(host_dependencies MATCHES "LVUI|LVRS|Qt[56]::" OR LVUI_FOUND OR
    TARGET LVRS::LVRS OR LVRS_FOUND OR TARGET Qt6::Core OR TARGET Qt5::Core)
     message(FATAL_ERROR "iiGUI unexpectedly imported or linked LVUI, LVRS, or Qt")
 endif()

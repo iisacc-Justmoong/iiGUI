@@ -127,6 +127,14 @@ class BasicNativeMenuItem final {
             if(!value->model.shortcut().empty()){auto m=measure(value->model.shortcut());if(!m)return std::unexpected(m.error());sw=(std::min)(32767.,m->width);sh=(std::min)(32767.,m->height);}
             auto layout=value->model.geometry(state.size.width,state.size.height,lw,lh,sw,sh);
             if(!layout)return ii::core::fail(ii::core::ErrorCode::invalid_argument,"Invalid Menu item paint extent");
+            // Lift only the icon and label while the pointer hovers over an enabled context item.
+            const double scale = c.compact && visual.enabled && state.hovered ? 1.1 : 1.0;
+            if(scale>1.0){
+                auto& icon=layout->icon;const auto w=icon.width*scale,h=icon.height*scale;
+                icon.x-=(w-icon.width)/2;icon.y-=(h-icon.height)/2;icon.width=w;icon.height=h;
+                auto& label=layout->label;label.y-=1;label.width=(std::min)(label.width*scale,state.size.width-label.x);
+                label.height=(std::min)(label.height*scale,state.size.height-label.y);
+            }
             const auto rect=[](MenuRect r){return ii::gui::Rect{float(r.x),float(r.y),float(r.width),float(r.height)};};
             auto result=std::make_shared<ii::gui::WidgetDrawing>();
             if(visual.background.alpha>0&&layout->surface.width>0&&layout->surface.height>0){const auto ink=linear(visual.background);result->panels.push_back({rect(layout->surface),ink,ink,float(layout->radius)});}
@@ -140,8 +148,8 @@ class BasicNativeMenuItem final {
                 result->images.push_back({.bounds=rect(layout->chevron),.image=value->chevron,.opacity=visual.enabled?1.f:.3f});
             const ii::gui::Rect clip{0,0,float(state.size.width),float(state.size.height)};
             if(layout->label.width>0&&layout->label.height>0)result->texts.push_back({.bounds=rect(layout->label),.text=c.label,.color=linear(visual.text),
-                .font_size=float(c.font_size),.font_weight=c.font_weight,.alignment=ii::gui::TextAlignment::left,.font_family=state.font_family,
-                .line_height=float(c.line_height),.elide_right=true,.clip=clip});
+                .font_size=float(c.font_size*scale),.font_weight=c.font_weight,.alignment=ii::gui::TextAlignment::left,.font_family=state.font_family,
+                .line_height=float(c.line_height*scale),.elide_right=true,.clip=clip});
             if(layout->shortcut.width>0&&layout->shortcut.height>0)result->texts.push_back({.bounds=rect(layout->shortcut),.text=std::string(value->model.shortcut()),
                 .color=linear(visual.detail),.font_size=float(c.font_size),.font_weight=c.font_weight,.alignment=ii::gui::TextAlignment::right,
                 .font_family=state.font_family,.line_height=float(c.line_height),.elide_right=true,.clip=clip});

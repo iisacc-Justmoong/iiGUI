@@ -7,9 +7,9 @@ same native surface as ordinary C++ widgets and creates no OS popup or control.
 
 기본 위젯 호스트의 창 바탕은 악센트와 독립적인 중립색이다. LVUI 애플리케이션은
 실제 `Panel/window` 토큰을 창 appearance와 창 재질 정책에 전달한다. 창 재질의
-Dense 75와 Glass 25는 각각 75%·25% 채색과 64·16 논리 px 블러를 유지한다.
-LVUI 창 재질 정책은 악센트 방사형을 사용하지 않는다. 방사형이 없는 재질은
-빈 밑그림 이미지를 생성하지 않으며 패널 재질의 악센트 동작은 유지한다.
+Dense 75와 Glass 85는 각각 75%·85% 틴트와 64·16 논리 px 블러를 사용한다.
+Glass 85는 검정 틴트 아래에 강조색 밑그림을 합성해 그 기여를 최대 15%로 제한한다.
+Dense 75 창은 중립색을 유지한다. `glass25`는 기존 소스 호환 별칭이다.
 
 `BackdropSource::content` captures the base canvas before any overlay. This lets
 a dialog blur application content without feeding its own dim layer, text or

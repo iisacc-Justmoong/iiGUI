@@ -13,7 +13,9 @@
 파서나 컴파일러를 링크하지 않는다.
 
 ```cmake
-find_package(iiGUI CONFIG REQUIRED)
+find_package(LVUI 0.1.1 CONFIG REQUIRED COMPONENTS Compiler)
+find_package(iiGUI ${LVUI_IIGUI_MIN_VERSION} CONFIG REQUIRED)
+include("${LVUI_DIR}/iiGUILvui.cmake")
 iigui_compile_lvui(NAME Example SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/Example.lvui"
     COMPILER "${LVUI_HOST_COMPILER}" OUTPUT_VARIABLE generated_view)
 add_executable(example main.cpp "${generated_view}")

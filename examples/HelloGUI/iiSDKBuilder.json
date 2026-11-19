@@ -3,7 +3,7 @@
   "app": {
     "name": "HelloGUI",
     "source": ".",
-    "depends": ["iiGUI", "LVUI"],
+    "depends": ["iiGUI"],
     "cache": {"BUILD_TESTING": "ON"},
     "targets": ["HelloGUI"]
   },
@@ -13,11 +13,6 @@
       "name": "iiSDKCore",
       "source": "../../../iiSDKCore",
       "cache": {"BUILD_SHARED_LIBS": "OFF"}
-    },
-    {
-      "name": "LVUI",
-      "source": "../../../LVUI",
-      "cache": {"BUILD_TESTING": "OFF", "BUILD_SHARED_LIBS": "OFF"}
     },
     {
       "name": "iiGUI",

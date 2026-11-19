@@ -1,6 +1,7 @@
 #pragma once
 #include <iiGUI/NativeWidgets.h>
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 #include <numbers>
 namespace ii::gui::detail {
@@ -18,6 +19,26 @@ inline bool mobile_widget_key(const WidgetInput& input,bool editing)noexcept{
     return input.kind==WidgetInputKind::key_down&&
         (!editing||input.key!=WidgetKey::character||input.control||input.meta);
 }
+// UIKit identifies a hardware press by its HID usage, without a repeat flag.
+// Keep the active ordinary keyboard usages until the responder releases them.
+class MobileHeldKeys final {
+public:
+    // True only when this usage was already pressed and has not ended.
+    [[nodiscard]] bool press(unsigned usage) noexcept {
+        if (usage >= active_.size()) return false;
+        const bool repeated = active_[usage];
+        active_[usage] = true;
+        return repeated;
+    }
+    // Release a single physical key without disturbing other held keys.
+    void release(unsigned usage) noexcept {
+        if (usage < active_.size()) active_[usage] = false;
+    }
+    // Losing the responder discards presses whose releases may go elsewhere.
+    void clear() noexcept { active_.reset(); }
+private:
+    std::bitset<256> active_;
+};
 inline WidgetInput touch_input(WidgetInputKind kind,MobileTouch touch){
     WidgetInput input;input.kind=kind;input.device=touch.pencil?PointerDevice::pen:PointerDevice::touch;
     input.x=std::isfinite(touch.x)?touch.x:0;input.y=std::isfinite(touch.y)?touch.y:0;

@@ -39,6 +39,7 @@ struct NativeWidgetSurface::Impl final {
     Win32ImeProtocol ime;Win32Utf16Input text_input;WindowsAccessibility accessibility;
     SurfaceInvalidation dirty;
     bool frame_paced=false,releasing_capture=false,owned_drop_registration=false,owned_capture=false;
+    bool native_pointer_hidden=false,tracking_mouse=false;
     Impl(HWND window,WidgetSurfaceCallbacks value,std::shared_ptr<NativeCanvas> bound={},std::function<void()> external={})
         :parent(window),callbacks(std::move(value)),wake(std::move(external)),
          canvas(bound?std::move(bound):std::make_shared<NativeCanvas>(window,nullptr,Acceleration::prefer_hardware,callbacks.renderer,callbacks.presentations)),
@@ -48,8 +49,20 @@ struct NativeWidgetSurface::Impl final {
         }
     }
     ~Impl(){
+        set_pointer_hidden(false);
         if(owned_capture && GetCapture()==parent)ReleaseCapture();
         if(owned_drop_registration && IsWindow(parent))DragAcceptFiles(parent,FALSE);
+    }
+    // Update the current client cursor and remember the override for the next
+    // WM_SETCURSOR. The window's nonclient and other windows keep OS cursors.
+    void set_pointer_hidden(bool hidden){
+        if(native_pointer_hidden==hidden)return;
+        native_pointer_hidden=hidden;
+        POINT point{};
+        if(!GetCursorPos(&point)||WindowFromPoint(point)!=parent)return;
+        RECT bounds{};
+        if(ScreenToClient(parent,&point)&&GetClientRect(parent,&bounds)&&PtInRect(&bounds,point))
+            SetCursor(hidden?nullptr:LoadCursorW(nullptr,IDC_ARROW));
     }
     double scale()const{const auto dpi=GetDpiForWindow(parent);return dpi?dpi/96.:1;}
     Size size()const{RECT r{};GetClientRect(parent,&r);return {(r.right-r.left)/scale(),(r.bottom-r.top)/scale()};}
@@ -73,9 +86,19 @@ struct NativeWidgetSurface::Impl final {
         if(code==WM_DPICHANGED){dirty.invalidate();return false;}
         if(code==WM_CAPTURECHANGED){owned_capture=false;if(releasing_capture)return false;}
         if(code==WM_KILLFOCUS||code==WM_CAPTURECHANGED||code==WM_CANCELMODE){ime.abandon();text_input.clear();send(event(WidgetInputKind::focus_lost));return false;}
+        if(code==WM_MOUSELEAVE){
+            tracking_mouse=false;
+            set_pointer_hidden(false);
+            send(event(WidgetInputKind::pointer_leave));
+            return false;
+        }
         if(code==WM_MOUSEMOVE||code==WM_LBUTTONDOWN||code==WM_RBUTTONDOWN||code==WM_MBUTTONDOWN||code==WM_XBUTTONDOWN||code==WM_LBUTTONDBLCLK||code==WM_RBUTTONDBLCLK||code==WM_MBUTTONDBLCLK||code==WM_XBUTTONDBLCLK||code==WM_LBUTTONUP||code==WM_RBUTTONUP||code==WM_MBUTTONUP||code==WM_XBUTTONUP){
             // Promoted pen messages are already delivered with pressure below.
             if((GetMessageExtraInfo()&0xffffff00)==0xff515700)return true;
+            if(!tracking_mouse){
+                TRACKMOUSEEVENT tracking{sizeof(TRACKMOUSEEVENT),TME_LEAVE,parent,0};
+                tracking_mouse=TrackMouseEvent(&tracking)!=FALSE;
+            }
             const bool doubled=code==WM_LBUTTONDBLCLK||code==WM_RBUTTONDBLCLK||code==WM_MBUTTONDBLCLK||code==WM_XBUTTONDBLCLK;
             const bool down=doubled||code==WM_LBUTTONDOWN||code==WM_RBUTTONDOWN||code==WM_MBUTTONDOWN||code==WM_XBUTTONDOWN;
             const bool up=code==WM_LBUTTONUP||code==WM_RBUTTONUP||code==WM_MBUTTONUP||code==WM_XBUTTONUP;
@@ -87,7 +110,17 @@ struct NativeWidgetSurface::Impl final {
         }
         if(code==WM_POINTERDOWN||code==WM_POINTERUPDATE||code==WM_POINTERUP){POINTER_PEN_INFO pen{};const auto id=GET_POINTERID_WPARAM(w);if(!GetPointerPenInfo(id,&pen))return false;POINT point=pen.pointerInfo.ptPixelLocation;ScreenToClient(parent,&point);auto input=event(code==WM_POINTERDOWN?WidgetInputKind::pointer_down:code==WM_POINTERUP?WidgetInputKind::pointer_up:WidgetInputKind::pointer_move);input.x=point.x/dpi;input.y=point.y/dpi;input.device=(pen.penFlags&PEN_FLAG_ERASER)?PointerDevice::eraser:PointerDevice::pen;input.device_id=id;input.pressure=(pen.penMask&PEN_MASK_PRESSURE)?std::clamp(pen.pressure/1024.,0.,1.):1;input.tilt_x=pen.tiltX;input.tilt_y=pen.tiltY;input.rotation=pen.rotation;input.buttons=(pen.pointerInfo.pointerFlags&POINTER_FLAG_FIRSTBUTTON)?1:0;send(std::move(input));return true;}
         if(code==WM_MOUSEWHEEL||code==WM_MOUSEHWHEEL){POINT p{GET_X_LPARAM(l),GET_Y_LPARAM(l)};ScreenToClient(parent,&p);auto input=event(WidgetInputKind::scroll);input.x=p.x/dpi;input.y=p.y/dpi;if(code==WM_MOUSEWHEEL)input.scroll_y=GET_WHEEL_DELTA_WPARAM(w)*48./WHEEL_DELTA;else input.scroll_x=GET_WHEEL_DELTA_WPARAM(w)*48./WHEEL_DELTA;send(std::move(input));return true;}
-        if(code==WM_KEYDOWN||code==WM_SYSKEYDOWN||code==WM_KEYUP||code==WM_SYSKEYUP){auto input=event((code==WM_KEYUP||code==WM_SYSKEYUP)?WidgetInputKind::key_up:WidgetInputKind::key_down);input.key=key(w);if(w>='A'&&w<='Z')input.text=std::string(1,char('a'+w-'A'));if(w==VK_OEM_PLUS)input.text="+";if(w==VK_OEM_MINUS)input.text="-";
+        if(code==WM_KEYDOWN||code==WM_SYSKEYDOWN||code==WM_KEYUP||code==WM_SYSKEYUP){
+            auto input=event((code==WM_KEYUP||code==WM_SYSKEYUP)?WidgetInputKind::key_up:WidgetInputKind::key_down);
+            input.key=key(w);
+            // The previous-key-state bit identifies auto-repeat. WM_CHAR
+            // remains responsible for entering characters into an editor.
+            input.key_repeat=input.kind==WidgetInputKind::key_down && (l & (LPARAM{1} << 30)) != 0;
+            input.numeric_keypad=(w>=VK_NUMPAD0&&w<=VK_DIVIDE)||w==VK_SEPARATOR;
+            if(w>='0'&&w<='9')input.text=std::string(1,char(w));
+            if(w>='A'&&w<='Z')input.text=std::string(1,char('a'+w-'A'));
+            if(w==VK_OEM_PLUS)input.text="+";
+            if(w==VK_OEM_MINUS)input.text="-";
             if(input.control&&input.kind==WidgetInputKind::key_down&&editor()){
                 if(w=='A')input.key=WidgetKey::select_all;
                 else if(w=='V'){auto content=read_clipboard();if(content){if(editor()->kind==WidgetKind::input_field)send({.kind=WidgetInputKind::text,.text=content->text});else send({.kind=WidgetInputKind::text,.content=std::make_shared<const ClipboardContent>(std::move(*content))});}return true;}
@@ -132,5 +165,13 @@ std::string NativeWidgetSurface::resolve_font_family(std::string_view value)cons
 GraphicsInfo NativeWidgetSurface::info(){return impl_->canvas->info();}
 PixelBuffer NativeWidgetSurface::capture(){impl_->flush();return impl_->canvas->capture();}
 bool NativeWidgetSurface::native_event(const void* value){auto held=impl_;try{return held->process(*static_cast<const MSG*>(value));}catch(...){if(held->callbacks.failure)held->callbacks.failure(std::current_exception());return true;}}
-std::optional<std::intptr_t> NativeWidgetSurface::native_result(const void* value){auto held=impl_;return held->accessibility.result(value);}
+void NativeWidgetSurface::set_native_pointer_hidden(bool hidden){impl_->set_pointer_hidden(hidden);}
+std::optional<std::intptr_t> NativeWidgetSurface::native_result(const void* value){
+    auto held=impl_;const auto& message=*static_cast<const MSG*>(value);
+    if(message.message==WM_SETCURSOR&&LOWORD(message.lParam)==HTCLIENT&&held->native_pointer_hidden){
+        SetCursor(nullptr);
+        return TRUE;
+    }
+    return held->accessibility.result(value);
+}
 }

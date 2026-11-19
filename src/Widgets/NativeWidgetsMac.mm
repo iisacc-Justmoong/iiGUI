@@ -28,13 +28,38 @@ WidgetKey key(unsigned short code) {
         default:return WidgetKey::none;
     }
 }
+// Copy the native key qualifiers separately from the translated character so
+// shortcuts can distinguish held keys and the keypad without changing text.
 WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     WidgetInput value;value.kind=kind;value.shift=(event.modifierFlags&NSEventModifierFlagShift)!=0;
     value.control=(event.modifierFlags&NSEventModifierFlagControl)!=0;value.alt=(event.modifierFlags&NSEventModifierFlagOption)!=0;
     value.meta=(event.modifierFlags&NSEventModifierFlagCommand)!=0;value.timestamp=event.timestamp;value.buttons=std::uint32_t(NSEvent.pressedMouseButtons);
     const auto type=event.type;
-    const bool mouse=type==NSEventTypeLeftMouseDown||type==NSEventTypeLeftMouseUp||type==NSEventTypeLeftMouseDragged||type==NSEventTypeRightMouseDown||type==NSEventTypeRightMouseUp||type==NSEventTypeRightMouseDragged||type==NSEventTypeOtherMouseDown||type==NSEventTypeOtherMouseUp||type==NSEventTypeOtherMouseDragged||type==NSEventTypeMouseMoved;
-    if(kind==WidgetInputKind::pointer_down && (type==NSEventTypeLeftMouseDown||type==NSEventTypeRightMouseDown||type==NSEventTypeOtherMouseDown)){
+    if (type == NSEventTypeKeyDown || type == NSEventTypeKeyUp) {
+        value.key_repeat = type == NSEventTypeKeyDown && [event isARepeat];
+        value.numeric_keypad = (event.modifierFlags & NSEventModifierFlagNumericPad) != 0;
+    }
+    const bool mouse_down = type == NSEventTypeLeftMouseDown ||
+                            type == NSEventTypeRightMouseDown || type == NSEventTypeOtherMouseDown;
+    const bool mouse_up = type == NSEventTypeLeftMouseUp ||
+                          type == NSEventTypeRightMouseUp || type == NSEventTypeOtherMouseUp;
+    const bool mouse_drag = type == NSEventTypeLeftMouseDragged ||
+                            type == NSEventTypeRightMouseDragged || type == NSEventTypeOtherMouseDragged;
+    const bool mouse = mouse_down || mouse_up || mouse_drag || type == NSEventTypeMouseMoved;
+    if (mouse_down || mouse_up || mouse_drag) {
+        // AppKit's global sample is taken at dispatch time. The event itself
+        // identifies the changed button for queued and synthesized events.
+        const bool secondary = type == NSEventTypeRightMouseDown ||
+                               type == NSEventTypeRightMouseUp || type == NSEventTypeRightMouseDragged;
+        const bool other = type == NSEventTypeOtherMouseDown ||
+                           type == NSEventTypeOtherMouseUp || type == NSEventTypeOtherMouseDragged;
+        const auto button = other ? event.buttonNumber : secondary ? 1 : 0;
+        if (button >= 0 && button < std::numeric_limits<std::uint32_t>::digits) {
+            const auto bit = std::uint32_t{1} << button;
+            value.buttons = mouse_up ? value.buttons & ~bit : value.buttons | bit;
+        }
+    }
+    if(kind==WidgetInputKind::pointer_down && mouse_down){
         const auto count=event.clickCount;
         if(count>0)value.native_click_count=static_cast<std::uint32_t>(std::min<NSInteger>(count,std::numeric_limits<std::uint32_t>::max()));
     }
@@ -239,13 +264,32 @@ WidgetInput native_input(NSEvent* event,WidgetInputKind kind){
     NSRange selection;
     NSTrackingArea* tracking;
     NSTextInputContext* textContext;
+    NSCursor* transparentPointer;
+    bool nativePointerHidden;
 }
+- (void)setNativePointerHidden:(bool)hidden;
 @end
 @implementation IIGUIWidgetSurface
 - (BOOL)isFlipped { return YES; }
 - (BOOL)acceptsFirstResponder { return YES; }
 - (BOOL)acceptsFirstMouse:(NSEvent*)event { (void)event; return YES; }
 - (NSView*)hitTest:(NSPoint)point { return NSPointInRect(point,self.frame)?self:nil; }
+- (void)resetCursorRects {
+    [super resetCursorRects];
+    if(nativePointerHidden) [self addCursorRect:self.visibleRect cursor:transparentPointer];
+}
+- (void)setNativePointerHidden:(bool)hidden {
+    if(nativePointerHidden==hidden) return;
+    if(hidden && !transparentPointer) {
+        auto image=[NSImage imageWithSize:NSMakeSize(1,1) flipped:NO drawingHandler:^BOOL(NSRect){ return YES; }];
+        transparentPointer=[[NSCursor alloc] initWithImage:image hotSpot:NSZeroPoint];
+    }
+    nativePointerHidden=hidden;
+    [self.window invalidateCursorRectsForView:self];
+    const auto point=[self convertPoint:self.window.mouseLocationOutsideOfEventStream fromView:nil];
+    if(NSApp.isActive && self.window.isKeyWindow && NSPointInRect(point,self.visibleRect))
+        [(hidden ? transparentPointer : NSCursor.arrowCursor) set];
+}
 - (NSTextInputContext*)inputContext {
     if(!textContext) textContext=[[NSTextInputContext alloc] initWithClient:self];
     return textContext;
@@ -435,6 +479,7 @@ struct NativeWidgetSurface::Impl final {
     }
     ~Impl() {
         if(view) {
+            [view setNativePointerHidden:false];
             view->paint={}; view->send={}; view->snapshots={}; view->lookup={}; view->failure={};view->text_content={};view->text_position={};
             for(IIGUIWidgetElement* peer in view->peers.allValues) { peer->read={}; peer->send={};[peer->entries removeAllObjects]; peer.accessibilityParent=nil; }
             [view->peers removeAllObjects]; view->textContext=nil;
@@ -473,6 +518,7 @@ void NativeWidgetSurface::accessibility_value_changed(std::string_view id) {
     auto peer=impl_->view->peers[native(id)];if(peer)NSAccessibilityPostNotification(peer,NSAccessibilityValueChangedNotification);
 }
 void NativeWidgetSurface::set_frame_paced(bool value) { impl_->paced=value;if(value) impl_->view.needsDisplay=NO;else invalidate(); }
+void NativeWidgetSurface::set_native_pointer_hidden(bool hidden) { [impl_->view setNativePointerHidden:hidden]; }
 void NativeWidgetSurface::flush() { if(!impl_->paced || impl_->dirty || size()!=impl_->rendered_size || impl_->rendered_scale!=impl_->view.window.backingScaleFactor) impl_->draw(); }
 Size NativeWidgetSurface::size() const { auto s=impl_->view.bounds.size; return {s.width,s.height}; }
 double NativeWidgetSurface::backing_scale() const {return impl_->view.window.backingScaleFactor;}

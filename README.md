@@ -26,10 +26,10 @@ Wayland/xdg-shell/Vulkan host, Android OS clipboard/URL services and Choreograph
 frames, and an AOT WebAssembly pthread host with self-rendered WebGL2 widgets.
 `host_capabilities()` exposes the implemented host contract. Core build targets
 and GUI host availability are distinct; embedded support does not imply a window
-system. [HelloHosts](examples/HelloHosts) exercises the common C++23/LVUI path.
+system. [HelloHosts](../LVUI/example/HelloHosts) exercises the common C++23/LVUI path.
 Native builds and browser/device execution have separate verification evidence.
 
-The minimal [Android LVUI Hello World](examples/HelloAndroid) uses NDK
+The minimal [Android LVUI Hello World](../LVUI/example/HelloAndroid) uses NDK
 NativeActivity, iiSDKCore and self-rendered Vulkan labels. The
 [Android guide](docs/AndroidHello.md) states its supported label subset and the
 separate build, installation, physical-device and emulator evidence. Emulator
@@ -42,7 +42,7 @@ NativeActivity to an application-supplied iiSDKCore configuration. LVUI's
 application helper uses this target for its Android shared library; manifest,
 APK packaging and signing remain with the application.
 
-The AOT [Hello World](examples/HelloWorld) uses one LVUI source and one C++23
+The AOT [Hello World](../LVUI/example/HelloWorld) uses one LVUI source and one C++23
 application on macOS, Windows and Linux. Its [desktop verification guide](docs/AOTDesktop.md)
 covers native cross compilation, binary audits and relocated installed consumers
 without launching a GUI or implying device runtime validation.
@@ -142,7 +142,7 @@ errors. See [host file requests](docs/HostPlatforms.md#cocoa-파일-열기-요�
 and [iPadOS hosting](docs/IPADOS.md).
 
 The working tree now also implements [compiled self-rendered widgets and LVUI AOT](docs/SelfRenderedWidgets.md):
-`examples/HelloWorld/HelloWorld.lvui` generates C++23 during the build and mounts
+`../LVUI/example/HelloWorld/HelloWorld.lvui` generates C++23 during the build and mounts
 iiGUI C++ stacks, labels and buttons on the native desktop GPU surface. Hello World
 uses Core timers/workers, follows resize and closes normally. This AOT route does
 not embed or parse LVUI source at runtime. The shared desktop sample targets
@@ -155,7 +155,7 @@ Package release: **0.4.1** (2026-10-19). This patch packages the current
 source snapshot; build, test and installation evidence is recorded in the SDK
 patch-release report. Earlier versioned feature notes remain historical.
 
-Applications can additionally compose [LVUI 0.1](docs/LVUI.md) with iiGUI.
+Applications can additionally compose [LVUI 0.1.1](docs/LVUI.md) with iiGUI.
 LVUI owns parsing and document layout; iiGUI provides text measurement and a GPU canvas.
 The iiGUI package does not require `LVUI::LVUI`; OS hosts use Vulkan 1.1+ where selected and
 the Web target uses WebGL2 without a Vulkan SDK. [Native rendering](docs/Renderers.md)
@@ -220,10 +220,8 @@ points. A cross build or binary inspection does not prove desktop execution.
   widget input path. A small Android Java bridge connects basic text-service
   selection and composition to native editors; unsupported operations and the
   absence of device validation are detailed in [AndroidIME.md](docs/AndroidIME.md).
-- An optional application-side LVUI adapter owns document parsing and bounded
-  row/column layout. `Host::set_view` accepts an app-supplied view extension;
-  `lvui::native::layout_document` exposes logical ID bounds. HelloLVUI embeds
-  a real `.lvui` source at build time.
+- Applications can mount LVUI-generated C++ widget factories through the iiGUI
+  host API. The LVUI HelloWorld sample exercises that composition.
 
 The 0.5.0 release baseline excluded mobile/web hosts, direct Wayland, editable
 text/IME, general input, a widget framework, custom-control accessibility,
@@ -245,7 +243,6 @@ separately if the distribution ships an older version.
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_PREFIX_PATH=/path/to/iiSDKCore \
-  -DLVUI_DIR=/path/to/LVUI/build/install/lib/cmake/LVUI \
   -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
 cmake --build build --parallel 4
 ctest --test-dir build --output-on-failure
@@ -260,7 +257,7 @@ not replace global SDK packages.
 ## Build layout
 
 The default build produces the iiGUI module and enabled tests in `build/`. Native
-examples are opt-in with `-DIIGUI_BUILD_EXAMPLES=ON`. LunaSVG source is stored
+HelloGUI is opt-in with `-DIIGUI_BUILD_EXAMPLES=ON`. LVUI-based examples and generated-view tests live in the LVUI repository. LunaSVG source is stored
 in `resources/dependencies/lunasvg`; a new download uses a pinned revision. An
 existing source tree is reused without replacement or automatic revision checks;
 an incomplete tree fails configuration. Build
@@ -340,8 +337,8 @@ For a separate package check:
 
 ```sh
 cmake -DSOURCE=/path/to/iiGUI -DBUILD=/path/to/iiGUI/build/package-check \
+  -DRESOURCE_ROOT=/path/to/iiGUI/resources/.state/verification/package-check \
   -DCORE_BUILD=/path/to/Core/build -DGUI_BUILD=/path/to/iiGUI/build \
-  -DLVUI_BUILD=/path/to/LVUI/build \
   -P tests/package.cmake
 ```
 

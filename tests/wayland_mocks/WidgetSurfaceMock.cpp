@@ -19,6 +19,7 @@ NativeWidgetSurface::NativeWidgetSurface(void* parent,WidgetSurfaceCallbacks cal
     :impl_(std::make_shared<Impl>(static_cast<WaylandConnection*>(parent),std::move(callbacks))){}
 NativeWidgetSurface::~NativeWidgetSurface()=default;
 void NativeWidgetSurface::invalidate(){}
+void NativeWidgetSurface::set_native_pointer_hidden(bool){}
 void NativeWidgetSurface::accessibility_changed(){}
 void NativeWidgetSurface::accessibility_value_changed(std::string_view){}
 void NativeWidgetSurface::set_frame_paced(bool){}

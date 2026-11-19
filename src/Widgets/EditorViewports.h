@@ -56,6 +56,26 @@ struct EditorFrameRange final {
     std::int64_t first=0,end=0;
     friend bool operator==(const EditorFrameRange&,const EditorFrameRange&)=default;
 };
+// An unspecified rate still permits frame ticks. Time divisions require a
+// positive numerator and denominator from the owning document.
+struct EditorTimelineFrameRate final {
+    std::uint32_t numerator=0,denominator=1;
+    friend bool operator==(const EditorTimelineFrameRate&,const EditorTimelineFrameRate&)=default;
+
+    // Return the first frame in the half-open range that is nearest to a
+    // time division. Half-frame ties go to the later frame. The modular
+    // calculation avoids multiplying a long frame index by the rate.
+    [[nodiscard]] std::optional<std::int64_t> first_time_boundary(
+            EditorFrameRange range,std::uint32_t divisions_per_second)const noexcept{
+        if(!numerator||!denominator||!divisions_per_second||range.first<0||range.end<=range.first)return {};
+        const auto divisions=std::uint64_t(denominator)*divisions_per_second;
+        const auto remainder=(std::uint64_t(range.first)%numerator)*(divisions%numerator)%numerator;
+        if(2*remainder<=divisions)return range.first;
+        const auto offset=(numerator-remainder+divisions/2)/divisions;
+        if(offset>=std::uint64_t(range.end-range.first))return {};
+        return range.first+std::int64_t(offset);
+    }
+};
 class EditorTimelineViewport final {
 public:
     [[nodiscard]] const EditorTimelineViewportConfiguration& configuration()const noexcept{return value_;}
@@ -68,6 +88,29 @@ public:
         const auto total=value_.frame_count;if(total==0)return {};
         const auto first=std::clamp(std::int64_t(std::floor(value_.scroll/value_.pixels_per_frame)),std::int64_t(0),total);
         const auto end=value_.width==0?first:std::clamp(std::int64_t(std::ceil((value_.scroll+value_.width)/value_.pixels_per_frame)),first,total);
+        return {first,end};
+    }
+    // Frame boundaries use the same coordinate as the clip at that frame.
+    [[nodiscard]] double boundary_x(std::int64_t frame)const noexcept{
+        return double(frame)*value_.pixels_per_frame-value_.scroll;
+    }
+    // Locate the first boundary at or after a viewport coordinate. One past
+    // the terminal boundary is a valid sentinel for a half-open iteration.
+    [[nodiscard]] std::int64_t boundary_at_or_after(double x)const noexcept{
+        if(!std::isfinite(x))return value_.frame_count+1;
+        const auto last=value_.frame_count;
+        auto frame=std::int64_t(std::clamp(std::ceil((value_.scroll+x)/value_.pixels_per_frame),0.,double(last+1)));
+        if(frame>0&&boundary_x(frame-1)>=x)--frame;
+        if(frame<=last&&boundary_x(frame)<x)++frame;
+        return frame;
+    }
+    // A ruler includes the terminal boundary when it lands at the right edge.
+    // The content query remains a half-open range of frame cells.
+    [[nodiscard]] EditorFrameRange visible_boundaries()const noexcept{
+        if(value_.frame_count==0||value_.width==0)return {};
+        const auto first=boundary_at_or_after(0);
+        auto end=boundary_at_or_after(value_.width);
+        if(end<=value_.frame_count&&boundary_x(end)<=value_.width)++end;
         return {first,end};
     }
     [[nodiscard]] std::optional<std::int64_t> frame_at(double x)const noexcept{

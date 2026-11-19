@@ -28,4 +28,15 @@ Cocoa 가상 접근성 peer에는 텍스트 영역 역할·길이·선택·제�
 
 기존 공급자 계약은 `tests/text_input_provider.cpp`에서 검증한다.
 
+## 하드웨어 키의 반복과 숫자패드 정보
+
+`WidgetInput::key_repeat`는 눌린 상태가 이어져 발생한 `key_down`을 표시한다.
+`numeric_keypad`는 호스트가 식별한 숫자패드 키를 표시한다. 두 필드는
+`WidgetInput::key`와 `text`에 별도로 전달되며 앱은 단축키에서 사용할 수 있다.
+Cocoa·Win32·Wayland·웹은 호스트가 제공한 반복·키 위치 정보를 사용한다.
+UIKit은 HID 사용 코드별로 현재 눌린 키를 기록하고, 해제·취소·포커스 상실 시
+해당 기록을 지운다. `iiGUI.mobile_input`은 유지·해제·취소의 구분을 검사한다.
+Win32는 상단 숫자열의 논리적 숫자를 키 이벤트에 포함하며, 텍스트는 기존
+문자 입력 이벤트로 편집기에 들어간다.
+
 웹 호스트의 편집·조합 입력과 제한은 [웹 텍스트 입력과 조합](WebTextInput.md)을 따른다.

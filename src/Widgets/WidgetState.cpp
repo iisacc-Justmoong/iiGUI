@@ -135,6 +135,7 @@ struct WidgetState::Impl final {
         std::size_t return_focus=absent;
         std::uint64_t epoch=0;
         bool opened=false;
+        bool transient_feedback_suppressed=false;
         double anchor_x=0,anchor_y=0,scroll=0,content_height=0;
         std::size_t anchor_widget=absent;
         double anchor_offset_x=0,anchor_offset_y=0;
@@ -561,6 +562,22 @@ struct WidgetState::Impl final {
         for(auto p=i;p!=absent;p=nodes[p].parent) if(nodes[p].popup) return p;
         return absent;
     }
+    // Follow the widget and embedded-view owners so newly mounted content and
+    // submenus inherit the context menu's feedback policy.
+    bool transient_feedback_enabled(std::size_t i) const {
+        if(i==absent)return false;
+        for(auto p=i;p!=absent;p=nodes[p].parent){
+            const auto& popup=nodes[p].popup;
+            if(popup&&(popup->transient_feedback_suppressed||popup->options.style==MenuStyle::context))return false;
+        }
+        if(auto owner=embedding_owner.lock())return owner->impl_->transient_feedback_enabled(embedding_popup);
+        return true;
+    }
+    // The press target still owns capture and can activate on release. Only
+    // the callbacks that expose transient states are suppressed.
+    runtime::Task feedback_event(std::size_t i,runtime::Task ControlEvents::* event) const {
+        return transient_feedback_enabled(i)?nodes[i].events.*event:runtime::Task{};
+    }
     bool descendant(std::size_t i,std::size_t root) const {
         for(auto p=i;p!=absent;p=nodes[p].parent) if(p==root) return true;
         return false;
@@ -763,6 +780,7 @@ struct WidgetState::Impl final {
     WidgetColor action_ink(const Node& n)const{
         const auto& o=*n.action_surface;const auto i=std::size_t(&n-nodes.data());const auto base=o.text_color.value_or(appearance.primary);
         if(!effective_enabled(n))return o.disabled_text_color.value_or(text_ink(TextRole::disabled));
+        if(!transient_feedback_enabled(i))return base;
         if(pressed==i)return o.pressed_text_color.value_or(WidgetColor{base.red/1.2,base.green/1.2,base.blue/1.2,base.alpha});
         if(hovered!=absent&&descendant(hovered,i))return o.hover_text_color.value_or(WidgetColor{1,1,1,.9});return base;
     }
@@ -1805,7 +1823,7 @@ core::Result<void> WidgetState::action_options(std::size_t i,ActionOptions optio
         previous.enter_key_activation!=options.enter_key_activation;
     const bool enabled_options_changed=previous.enabled!=options.enabled||previous.interaction_enabled!=options.interaction_enabled;
     const bool cancel_enter=impl_->pressed==i&&impl_->pressed_key==WidgetKey::enter&&!options.enter_key_activation;
-    auto canceled=cancel_enter?n.events.canceled:runtime::Task{};
+    auto canceled=cancel_enter?impl_->feedback_event(i,&ControlEvents::canceled):runtime::Task{};
     if(cancel_enter){impl_->pressed=absent;impl_->pressed_key=WidgetKey::none;}
     const auto id=changed?n.id:std::string{};n.checked=options.checked;n.text=options.text;n.button.accessibility_name=options.accessibility_name;
     *n.action_surface=std::move(options);if(layout)impl_->invalidate(true,i);else if(visual||cancel_enter)impl_->invalidate();
@@ -2106,7 +2124,7 @@ void WidgetState::layout_ancestry(){
 core::Result<WidgetPressOrigin> WidgetState::press_origin(std::size_t i)const{
     if(auto r=ready();!r)return std::unexpected(r.error());
     if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Press target was not found");
-    if(impl_->pressed==absent||!impl_->descendant(impl_->pressed,i))return WidgetPressOrigin::none;
+    if(!impl_->transient_feedback_enabled(impl_->pressed)||!impl_->descendant(impl_->pressed,i))return WidgetPressOrigin::none;
     return impl_->pressed_key==WidgetKey::none?WidgetPressOrigin::pointer:WidgetPressOrigin::keyboard;
 }
 core::Result<WidgetInteraction> WidgetState::interaction(std::size_t i){
@@ -2117,7 +2135,11 @@ core::Result<WidgetInteraction> WidgetState::interaction(std::size_t i){
     auto bounds=impl_->visual_bounds(i);bounds.x+=float(offset.width);bounds.y+=float(offset.height);
     Rect clip{0,0,area.width,area.height};if(auto local=impl_->clip_rect(i)){local->x+=float(offset.width);local->y+=float(offset.height);clip=intersect(clip,*local);}
     const auto belongs=[&](std::size_t target){return target!=absent&&impl_->descendant(target,i);};
-    return WidgetInteraction{bounds,clip,{area.width,area.height},impl_->measure(i),true,impl_->logical_visible(i),impl_->effective_enabled(i),belongs(impl_->hovered)||impl_->popup_hovered(i),belongs(impl_->pressed),belongs(impl_->focused),impl_->nodes[i].popup&&impl_->nodes[i].popup->opened,impl_->blocked(i)};
+    const auto feedback=impl_->transient_feedback_enabled(i);
+    return WidgetInteraction{bounds,clip,{area.width,area.height},impl_->measure(i),true,
+        impl_->logical_visible(i),impl_->effective_enabled(i),feedback&&(belongs(impl_->hovered)||impl_->popup_hovered(i)),
+        belongs(impl_->pressed)&&impl_->transient_feedback_enabled(impl_->pressed),feedback&&belongs(impl_->focused),
+        impl_->nodes[i].popup&&impl_->nodes[i].popup->opened,impl_->blocked(i)};
 }
 core::Result<Size> WidgetState::measure(std::size_t i,double width){
     if(auto r=ready();!r)return std::unexpected(r.error());
@@ -2301,6 +2323,7 @@ core::Result<WidgetSnapshot> WidgetState::snapshot_chunk(std::size_t i,bool sync
     if(auto r=ready();!r)return std::unexpected(r.error());
     if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::closed,"Widget retired during snapshot preparation");
     const auto& n=impl_->nodes[i]; auto run=impl_->text_run(n);
+    const auto feedback=impl_->transient_feedback_enabled(i);
     constexpr const char* names[]{"VStack","HStack","Label","Button","ZStack","Spacer","CheckBox","RadioButton","ToggleSwitch","InputField","Slider","ProgressBar","TabBar","Tab","ComboBox","Stepper","SegmentedControl","Menu","MenuItem","MenuDivider","ColorPickerSurface","AbsoluteStack","Image","Popover","ScrollView","ContentHost","ActionSurface"};
     static_assert(std::size(names)==static_cast<unsigned>(WidgetKind::action_surface)+1);
     std::size_t segment_count=0;
@@ -2309,7 +2332,7 @@ core::Result<WidgetSnapshot> WidgetState::snapshot_chunk(std::size_t i,bool sync
     }
     auto result=WidgetSnapshot{.kind=n.kind,.id=n.id,.text=n.text,.native_class=std::string("iiGUI.")+names[static_cast<unsigned>(n.kind)],.size={n.bounds.width,n.bounds.height},
         .enabled=impl_->effective_enabled(i),.attached=impl_->presentation_surface()!=nullptr,.styled=impl_->appearance.styled,.font_family=n.menu_item && *n.menu_item->compact?impl_->resolved_compact_font_family:impl_->resolved_font_family,.font_size=run.font_size,.bounds=n.bounds,
-        .hovered=impl_->hovered==i,.pressed=impl_->pressed==i,.focused=impl_->focused==i&&!(impl_->embedded_view(i)&&impl_->embedded_view(i)->impl_->focused!=absent),.checked=n.checked,.read_only=n.field.read_only,
+        .hovered=feedback&&impl_->hovered==i,.pressed=feedback&&impl_->pressed==i,.focused=impl_->focused==i&&!(impl_->embedded_view(i)&&impl_->embedded_view(i)->impl_->focused!=absent),.checked=n.checked,.read_only=n.field.read_only,
         .value=n.kind==WidgetKind::slider?n.slider.value:n.progress.value,.minimum=n.kind==WidgetKind::slider?n.slider.minimum:n.progress.minimum,
         .maximum=n.kind==WidgetKind::slider?n.slider.maximum:n.progress.maximum,.placeholder=n.field.placeholder,.renderer="iiGUI",
         .icon_name=n.menu_item?n.menu_item->icon_name:n.kind==WidgetKind::tab?n.tab.icon_name:n.button.icon_name,.accessibility_name=n.popup&&n.popup->popover?n.popup->popover->accessibility_name:n.color?n.color->options.accessibility_name:n.kind==WidgetKind::stepper?n.stepper.accessibility_name:n.kind==WidgetKind::input_field?n.field.accessibility_name:n.kind==WidgetKind::slider?n.slider.accessibility_name:n.kind==WidgetKind::image?n.image.accessibility_name:n.button.accessibility_name,
@@ -2331,7 +2354,7 @@ core::Result<WidgetSnapshot> WidgetState::snapshot_chunk(std::size_t i,bool sync
     if(n.content){result.has_content=bool(n.content->view);result.content_generation=n.content->epoch;}
     result.child_count=n.children.size();
     if(n.kind==WidgetKind::label)result.foreground_color=n.label.color;
-    if(n.action_surface){result.accessibility_description=n.action_surface->accessibility_description;result.action_role=n.action_surface->role;result.custom_content=impl_->custom_action_content(n);result.text_underline=n.action_surface->underline;result.foreground_color=impl_->action_ink(n);result.hovered=impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i);if(n.action_surface->role==ActionRole::tab||n.action_surface->role==ActionRole::menu_item)result.selected=n.checked;}
+    if(n.action_surface){result.accessibility_description=n.action_surface->accessibility_description;result.action_role=n.action_surface->role;result.custom_content=impl_->custom_action_content(n);result.text_underline=n.action_surface->underline;result.foreground_color=impl_->action_ink(n);result.hovered=feedback&&impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i);if(n.action_surface->role==ActionRole::tab||n.action_surface->role==ActionRole::menu_item)result.selected=n.checked;}
     if(n.semantics){
         result.accessibility_semantics=n.semantics;
         if(n.semantics->role==AccessibilityRole::column_header_group)result.accessibility_actionable=false;
@@ -2582,7 +2605,7 @@ core::Result<void> WidgetState::visibility(std::size_t i,bool shown) {
     n.shown=shown;impl_->invalidate(true,i);
     auto input_cancel=!shown&&impl_->input_capture!=absent&&impl_->descendant(impl_->input_capture,i)?impl_->cancel_input_capture():runtime::Task{};
     auto blur=!shown && impl_->focused!=absent && impl_->descendant(impl_->focused,i)?impl_->change_focus(absent):runtime::Task{};
-    auto canceled=!shown && impl_->pressed!=absent && impl_->descendant(impl_->pressed,i)?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
+    auto canceled=!shown&&impl_->descendant(impl_->pressed,i)?impl_->feedback_event(impl_->pressed,&ControlEvents::canceled):runtime::Task{};
     if(!shown){if(impl_->pressed!=absent && impl_->descendant(impl_->pressed,i))impl_->pressed=absent;if(impl_->hovered!=absent && impl_->descendant(impl_->hovered,i))impl_->hovered=absent;}
     std::vector<runtime::Task> closed;
     if(!shown){auto opened=impl_->popups;for(auto p:opened)if(impl_->nodes[p].popup->opened && impl_->descendant(p,i)){auto callbacks=impl_->end_popup(p,false);for(auto& c:callbacks)closed.push_back(std::move(c));}}
@@ -2623,7 +2646,11 @@ core::Result<void> WidgetState::scroll_position_at(std::size_t i,double x,double
         const bool clear_hover=impl_->logical_visible(i)||
             (impl_->hovered!=absent&&impl_->descendant(impl_->hovered,i));
         view.offset=y;view.horizontal_offset=x;if(clear_hover)impl_->hovered=absent;impl_->invalidate(true);
-        if(pointer){impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);impl_->hovered=impl_->hit(pointer->x,pointer->y);}
+        if(pointer){
+            impl_->layout(impl_->surface?impl_->surface->size():impl_->viewport);
+            const auto target=impl_->hit(pointer->x,pointer->y);
+            impl_->hovered=impl_->transient_feedback_enabled(target)?target:absent;
+        }
         impl_->accessibility_changed();
     }
     return flush_viewports();
@@ -2721,6 +2748,11 @@ core::Result<void> WidgetState::measurement_handler(std::size_t i,std::function<
     if(i>=impl_->nodes.size())return core::fail(core::ErrorCode::not_found,"Measurement owner not found");
     auto& node=impl_->nodes[i];const bool changed=bool(node.measure_changed)!=bool(handler);node.measure_changed=std::move(handler);
     if(changed){node.delivered_measurement.reset();impl_->invalidate(true,i);}return {};
+}
+core::Result<void> WidgetState::set_native_pointer_hidden(bool hidden) {
+    if (auto result=ready(); !result) return result;
+    if (auto* surface=impl_->presentation_surface()) surface->set_native_pointer_hidden(hidden);
+    return {};
 }
 core::Result<void> WidgetState::drawing(std::size_t i,WidgetDrawing value){
     if(auto r=ready();!r)return r;
@@ -3088,7 +3120,7 @@ core::Result<void> WidgetState::enabled(std::size_t i,bool value) {
     const auto affected=[&](std::size_t target){return target!=absent&&impl_->descendant(target,i);};
     if(!value&&impl_->touch_context_pending&&affected(impl_->touch_context_target))impl_->cancel_touch_context();
     if(!value&&impl_->horizontal_gesture&&affected(impl_->horizontal_gesture->target)){impl_->horizontal_gesture.reset();++impl_->horizontal_revision;}
-    auto canceled=!value&&affected(impl_->pressed)?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
+    auto canceled=!value&&affected(impl_->pressed)?impl_->feedback_event(impl_->pressed,&ControlEvents::canceled):runtime::Task{};
     auto capture=!value&&affected(impl_->input_capture)?impl_->cancel_input_capture():runtime::Task{};
     const bool enabled_changed=n.enabled!=value;
     n.enabled=value;if(n.action_surface)n.action_surface->enabled=requested;auto blur=!value&&affected(impl_->focused)?impl_->change_focus(absent):runtime::Task{};if(!value){if(affected(impl_->pressed))impl_->pressed=absent;if(affected(impl_->hovered))impl_->hovered=absent;}
@@ -3172,7 +3204,7 @@ core::Result<void> WidgetState::focus_within(std::size_t i,std::optional<Rect> t
         if(!r)return r;
         if(auto live=ready();!live)return live;
     }
-    auto canceled=impl_->pressed!=absent && impl_->pressed!=i?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
+    auto canceled=impl_->pressed!=i?impl_->feedback_event(impl_->pressed,&ControlEvents::canceled):runtime::Task{};
     if(impl_->pressed!=i) impl_->pressed=absent;
     const bool changed=impl_->focused!=i;auto blur=impl_->change_focus(i);impl_->invalidate();
     if(changed){impl_->accessibility_changed();if(!impl_->active)return {};}
@@ -3434,7 +3466,14 @@ core::Result<void> WidgetState::route_host_content(WidgetInput& event,bool& hand
             }
         }else if(!capture&&!child_modal&&!in_popup&&(!inside||impl_->hit(event.x,event.y)!=i)){
             if(!child->impl_->popups.empty()&&(event.kind==WidgetInputKind::pointer_down||event.kind==WidgetInputKind::context_request)){auto local=event;local.x=raw_x;local.y=raw_y;auto result=child->input(local);if(!result)return result;if(!impl_->active)return {};}
-            if(event.kind==WidgetInputKind::pointer_move&&(child->impl_->hovered!=absent||!child->impl_->input_hover_path.empty())){auto result=child->input({.kind=WidgetInputKind::pointer_leave});if(!result)return result;if(!impl_->active)return {};}
+            // The window's leave event has coordinates outside this host.
+            // Retire hover even if a deeper generation owns its handler.
+            if ((event.kind == WidgetInputKind::pointer_move || event.kind == WidgetInputKind::pointer_leave) &&
+                (child->impl_->pointer_position || child->impl_->hovered != absent || !child->impl_->input_hover_path.empty())) {
+                auto result = child->input({.kind = WidgetInputKind::pointer_leave});
+                if (!result) return result;
+                if (!impl_->active) return {};
+            }
             continue;
         }
         if(!keyboard&&!capture&&!child_modal&&!in_popup){auto intercepted=route_input_handler(event);handler_checked=true;if(!intercepted)return std::unexpected(intercepted.error());if(*intercepted){handled=true;return {};}if(!impl_->active)return {};}
@@ -3510,7 +3549,9 @@ core::Result<void> WidgetState::route_content(WidgetInput& event,bool& handled,b
         if(in_child_popup||nested_capture||!child->impl_->popups.empty()){x=raw_x;y=raw_y;}
         const bool capture=child->impl_->captures_input()&&(event.kind==WidgetInputKind::pointer_move||event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::pointer_leave||event.kind==WidgetInputKind::pointer_cancel);
         if(!contains(r,point.width,point.height)&&!in_child_popup&&!capture&&child->impl_->popups.empty()){
-            if(event.kind==WidgetInputKind::pointer_move){auto result=child->input({.kind=WidgetInputKind::pointer_leave});if(!result)return result;}
+            if(event.kind==WidgetInputKind::pointer_move||event.kind==WidgetInputKind::pointer_leave){
+                auto result=child->input({.kind=WidgetInputKind::pointer_leave});if(!result)return result;
+            }
             return {};
         }
         if(event.kind==WidgetInputKind::scroll&&popup.popover->clip_content&&popup.content_anchor==absent&&child->impl_->popups.empty())return {};
@@ -3552,7 +3593,7 @@ core::Result<void> WidgetState::open_at(std::size_t i,double x,double y) {
     if(!already){if(auto r=create_popup_content(i);!r)return r;}
     const bool preserve=p.popover&&p.popover->preserve_input;
     auto input_cancel=preserve?runtime::Task{}:impl_->cancel_input_capture();
-    auto canceled=preserve||impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
+    auto canceled=preserve?runtime::Task{}:impl_->feedback_event(impl_->pressed,&ControlEvents::canceled);
     if(!already) {p.return_focus=impl_->focused;p.scroll=0;}
     p.opened=true;if(!already)impl_->begin_motion(p);p.anchor_x=x;p.anchor_y=y;p.anchor_widget=absent;const auto epoch=++p.epoch;
     std::erase_if(routes,[&](const auto &route) { return route.identity==impl_.get() && route.index==i; });
@@ -3611,6 +3652,18 @@ core::Result<void> WidgetState::context_menu(std::size_t i,Widget popup) {
         return core::fail(core::ErrorCode::invalid_argument,"Context menu must be a popup in this generation");
     impl_->nodes[i].context_menu=popup.index_;return {};
 }
+core::Result<void> WidgetState::suppress_popup_transient_feedback(std::size_t i) {
+    if(auto result=ready();!result)return result;
+    if(i>=impl_->nodes.size()||!impl_->nodes[i].popup)
+        return core::fail(core::ErrorCode::invalid_argument,"Transient feedback policy requires a popup");
+    auto& popup=*impl_->nodes[i].popup;
+    if(!popup.transient_feedback_suppressed){
+        popup.transient_feedback_suppressed=true;
+        if(impl_->descendant(impl_->hovered,i))impl_->hovered=absent;
+        impl_->invalidate();
+    }
+    return {};
+}
 core::Result<void> WidgetState::touch_context_options(std::size_t i,TouchContextOptions value){
     if(auto r=ready();!r)return r;
     if(i>=impl_->nodes.size()||value.delay<std::chrono::milliseconds::zero()||value.delay>std::chrono::minutes(5)||
@@ -3630,13 +3683,14 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
     const bool captured=impl_->input_capture!=absent&&(pointer||event.kind==WidgetInputKind::focus_lost||event.kind==WidgetInputKind::pointer_cancel);
     const bool pointed=pointer||event.kind==WidgetInputKind::scroll||event.kind==WidgetInputKind::context_request||event.kind==WidgetInputKind::drop;
     auto target=captured?impl_->input_capture:pointed?impl_->hit(event.x,event.y):impl_->focused;
+    const bool suppress_hover=event.kind==WidgetInputKind::pointer_move&&!captured&&target!=absent&&!impl_->transient_feedback_enabled(target);
     if(!captured&&(event.kind==WidgetInputKind::pointer_move||event.kind==WidgetInputKind::pointer_leave)){
         std::vector<std::size_t> next;
-        if(event.kind==WidgetInputKind::pointer_move)for(auto i=target;i!=absent;i=impl_->nodes[i].parent)
+        if(event.kind==WidgetInputKind::pointer_move&&!suppress_hover)for(auto i=target;i!=absent;i=impl_->nodes[i].parent)
             if(impl_->nodes[i].input_handler&&impl_->nodes[i].enabled&&impl_->logical_visible(i)&&!impl_->blocked(i))next.push_back(i);
         auto previous=std::exchange(impl_->input_hover_path,std::move(next));
         for(auto i:previous){
-            if(std::ranges::find(impl_->input_hover_path,i)!=impl_->input_hover_path.end()||i>=impl_->nodes.size()||!impl_->nodes[i].input_handler)continue;
+            if(std::ranges::find(impl_->input_hover_path,i)!=impl_->input_hover_path.end()||i>=impl_->nodes.size()||!impl_->nodes[i].input_handler||!impl_->transient_feedback_enabled(i))continue;
             auto handler=impl_->nodes[i].input_handler;auto local=event;local.kind=WidgetInputKind::pointer_leave;local.target=impl_->nodes[i].id;
             auto point=impl_->logical_point(i,event.x,event.y);local.x=point.width;local.y=point.height;
             local.local_position=WidgetPoint{point.width-impl_->nodes[i].bounds.x,point.height-impl_->nodes[i].bounds.y};
@@ -3644,7 +3698,7 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
             try{invoke([&]{result=handler(local);completed=true;});}catch(...){return core::fail(core::ErrorCode::failed,"Widget leave handler failed",std::current_exception());}
             if(!impl_->active||!completed)return true;if(!result)return std::unexpected(result.error());
         }
-        if(event.kind==WidgetInputKind::pointer_leave)return false;
+        if(event.kind==WidgetInputKind::pointer_leave||suppress_hover)return false;
     }
     if(target==absent&&!pointed&&!impl_->nodes.empty())target=0;
     if(event.kind==WidgetInputKind::pointer_up||event.kind==WidgetInputKind::focus_lost||event.kind==WidgetInputKind::pointer_cancel)impl_->input_capture=absent;
@@ -3682,7 +3736,7 @@ core::Result<bool> WidgetState::route_input_handler(const WidgetInput& event){
                 // A consuming surface still owns hover; do not mark a child it
                 // intercepted, or overwrite a newer reentrant pointer move.
                 const auto hit=impl_->hit(event.x,event.y);
-                const auto hovered=hit!=absent&&impl_->descendant(hit,index)?index:absent;
+                const auto hovered=impl_->transient_feedback_enabled(index)&&impl_->descendant(hit,index)?index:absent;
                 if(impl_->hovered!=hovered){impl_->hovered=hovered;impl_->invalidate();}
             }
             if(press&&impl_->input_capture==index&&impl_->nodes[index].input_handler&&impl_->nodes[index].enabled&&impl_->logical_visible(index)&&!impl_->blocked(index)){
@@ -3956,7 +4010,13 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
     }
     if(event.kind==WidgetInputKind::activate || event.kind==WidgetInputKind::focus || event.kind==WidgetInputKind::increment || event.kind==WidgetInputKind::decrement || event.kind==WidgetInputKind::close_popup) {
         auto it=impl_->ids.find(event.target); if(it==impl_->ids.end()) return core::fail(core::ErrorCode::not_found,"Input target was not found");
-        if(event.kind==WidgetInputKind::close_popup) return close_popup(it->second,true);
+        if(event.kind==WidgetInputKind::close_popup) {
+            const auto index=it->second;
+            const auto& popup=impl_->nodes[index].popup;
+            // Platform accessibility cancellation follows the same policy as Escape.
+            if(popup && (impl_->blocked(index) || (popup->popover && !popup->popover->dismiss_on_escape))) return {};
+            return close_popup(index,true);
+        }
         if(event.kind==WidgetInputKind::increment || event.kind==WidgetInputKind::decrement) {
             const auto index=it->second;auto& n=impl_->nodes[index];
             if(n.color){if(!n.enabled || !impl_->logical_visible(index) || impl_->blocked(index))return {};if(n.color->options.field<ColorField::hue_rail)return core::fail(core::ErrorCode::invalid_argument,"Only color rails have an increment action");const bool increase=event.kind==WidgetInputKind::increment;return n.color->key((increase != (n.color->options.field==ColorField::hue_rail))?WidgetKey::up:WidgetKey::down,false);}
@@ -3995,7 +4055,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
     if(!impl_->active)return {};
     if(event.kind==WidgetInputKind::pointer_cancel){
         const auto epoch=impl_->domain->pointer_epoch;
-        auto canceled=impl_->pressed!=absent&&impl_->pressed_key==WidgetKey::none?impl_->nodes[impl_->pressed].events.canceled:runtime::Task{};
+        auto canceled=impl_->pressed_key==WidgetKey::none?impl_->feedback_event(impl_->pressed,&ControlEvents::canceled):runtime::Task{};
         if(impl_->pressed_key==WidgetKey::none)impl_->pressed=absent;
         impl_->consume_release=false;
         if(!impl_->popups.empty()){
@@ -4215,7 +4275,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
     }
     if(event.kind==WidgetInputKind::key_cancel){
         if(impl_->pressed!=absent&&impl_->pressed_key==event.key&&event.key!=WidgetKey::none){
-            auto canceled=impl_->nodes[impl_->pressed].events.canceled;
+            auto canceled=impl_->feedback_event(impl_->pressed,&ControlEvents::canceled);
             impl_->pressed=absent;impl_->pressed_key=WidgetKey::none;impl_->invalidate();
             auto invoke=impl_->invoke;if(canceled)invoke(std::move(canceled));
         }
@@ -4298,7 +4358,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
         const auto top=impl_->popups.back();const auto options=*impl_->nodes[top].popup->popover;
         const bool inside=impl_->popup_contains(top,event.x,event.y);
         if(options.preserve_input&&event.kind==WidgetInputKind::key_down&&event.key==WidgetKey::escape&&options.dismiss_on_escape)return close_popup(top,true);
-        if(event.kind==WidgetInputKind::focus_lost){auto blur=impl_->change_focus(absent);auto canceled=impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;impl_->pressed=impl_->hovered=absent;impl_->invalidate();auto invoke=impl_->invoke;if(canceled)invoke(std::move(canceled));if(impl_->active&&blur)invoke(std::move(blur));return {};}
+        if(event.kind==WidgetInputKind::focus_lost){auto blur=impl_->change_focus(absent);auto canceled=impl_->feedback_event(impl_->pressed,&ControlEvents::canceled);impl_->pressed=impl_->hovered=absent;impl_->invalidate();auto invoke=impl_->invoke;if(canceled)invoke(std::move(canceled));if(impl_->active&&blur)invoke(std::move(blur));return {};}
         if(event.kind==WidgetInputKind::pointer_down&&!inside){
             bool in_other=false;for(auto p:impl_->popups)if(impl_->popup_contains(p,event.x,event.y)){in_other=true;break;}
             if(!in_other){std::vector<std::pair<std::size_t,std::uint64_t>> before;for(auto p:impl_->popups)before.emplace_back(p,impl_->nodes[p].popup->epoch);
@@ -4355,47 +4415,48 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
     } else if(event.kind==WidgetInputKind::scroll || event.kind==WidgetInputKind::context_request) return {};
     if(event.kind!=WidgetInputKind::focus_lost&&!event.text_service){if(auto handled=route_input_handler(event);!handled)return std::unexpected(handled.error());else if(*handled)return {};}
     const auto hit=impl_->hit(event.x,event.y);
+    const auto hover=impl_->transient_feedback_enabled(hit)?hit:absent;
     const auto move_slider=[&](std::size_t index,double v) -> core::Result<void> {
         auto& n=impl_->nodes[index]; if(v==n.slider.value) return {}; auto callback=n.moved;
         auto result=value(index,v); if(!result) return result;
         if(callback) { auto invoke=impl_->invoke; invoke([callback,v] { callback(v); }); } return {};
     };
     if(event.kind==WidgetInputKind::pointer_move) {
-        impl_->hovered=hit; impl_->invalidate();
-        if(!impl_->popups.empty()&&!impl_->nodes[impl_->popups.back()].popup->popover&&hit!=absent&&impl_->focused!=hit){impl_->focused=hit;impl_->accessibility_changed();}
+        impl_->hovered=hover; impl_->invalidate();
+        if(!impl_->popups.empty()&&!impl_->nodes[impl_->popups.back()].popup->popover&&hover!=absent&&impl_->focused!=hover){impl_->focused=hover;impl_->accessibility_changed();}
         if(impl_->pressed!=absent && impl_->nodes[impl_->pressed].kind==WidgetKind::slider) return move_slider(impl_->pressed,impl_->slider_value(impl_->pressed,event.x));
         if(impl_->pressed!=absent && impl_->nodes[impl_->pressed].color) {auto& n=impl_->nodes[impl_->pressed];const auto point=impl_->logical_point(impl_->pressed,event.x,event.y);return n.color->edit(n.bounds,point.width,point.height);}
     } else if(event.kind==WidgetInputKind::pointer_down) {
         impl_->pressed_key=WidgetKey::none;
         if(hit!=absent && impl_->nodes[hit].color){
-            auto canceled=impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
+            auto canceled=impl_->feedback_event(impl_->pressed,&ControlEvents::canceled);
             auto& n=impl_->nodes[hit];const auto point=impl_->logical_point(hit,event.x,event.y);const bool accepted=n.color->begin(n.bounds,point.width,point.height);
-            impl_->pressed=accepted?hit:absent;auto blur=accepted?impl_->pointer_focus(hit):runtime::Task{};if(accepted)impl_->hovered=hit;impl_->invalidate();
+            impl_->pressed=accepted?hit:absent;auto blur=accepted?impl_->pointer_focus(hit):runtime::Task{};if(accepted)impl_->hovered=hover;impl_->invalidate();
             auto invoke=impl_->invoke;if(canceled)invoke(std::move(canceled));if(blur)invoke(std::move(blur));
             if(!impl_->active || !accepted || impl_->pressed!=hit || impl_->focused!=hit)return {};
             const auto edited_point=impl_->logical_point(hit,event.x,event.y);return impl_->nodes[hit].color->edit(impl_->nodes[hit].bounds,edited_point.width,edited_point.height);
         }
-        auto canceled=impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
+        auto canceled=impl_->feedback_event(impl_->pressed,&ControlEvents::canceled);
         impl_->pressed=hit;impl_->pressed_focus_epoch=impl_->focus_epoch;
         const bool preserve_focus=hit!=absent&&impl_->nodes[hit].action_surface&&!impl_->nodes[hit].action_surface->pointer_focusable;
-        auto blur=impl_->pointer_focus(hit);impl_->hovered=hit;impl_->invalidate();auto invoke=impl_->invoke;
+        auto blur=impl_->pointer_focus(hit);impl_->hovered=hover;impl_->invalidate();auto invoke=impl_->invoke;
         if(canceled)invoke(std::move(canceled));if(blur)invoke(std::move(blur));
         if(!impl_->active || impl_->pressed!=hit ||
            (preserve_focus?impl_->focus_epoch!=impl_->pressed_focus_epoch:impl_->focused!=hit))return {};
         if(hit!=absent && impl_->nodes[hit].kind==WidgetKind::slider) return move_slider(hit,impl_->slider_value(hit,event.x));
-        auto pressed=hit==absent?runtime::Task{}:impl_->nodes[hit].events.pressed;
+        auto pressed=impl_->feedback_event(hit,&ControlEvents::pressed);
         if(pressed)invoke(std::move(pressed));
     } else if(event.kind==WidgetInputKind::pointer_up) {
         if(impl_->pressed!=absent&&impl_->pressed_key!=WidgetKey::none)return {};
         impl_->pressed_key=WidgetKey::none;
-        const auto down=impl_->pressed; impl_->pressed=absent; impl_->hovered=hit; impl_->invalidate();
+        const auto down=impl_->pressed; impl_->pressed=absent; impl_->hovered=hover; impl_->invalidate();
         if(down!=absent) {
             const auto& n=impl_->nodes[down];const auto kind=n.kind;
             if(n.color){const auto point=impl_->logical_point(down,event.x,event.y);return n.color->edit(n.bounds,point.width,point.height);}
             const auto direction=n.stepper.arrow==StepperArrow::up?1:n.stepper.arrow==StepperArrow::down?-1:impl_->logical_point(down,event.x,event.y).height<n.bounds.y+n.bounds.height/2?1:-1;
             const bool preserve_focus=n.action_surface&&!n.action_surface->pointer_focusable;
             const auto focus_epoch=impl_->pressed_focus_epoch,release_epoch=impl_->domain->pointer_epoch;
-            auto released=n.events.released;auto invoke=impl_->invoke;if(released) invoke(std::move(released));
+            auto released=impl_->feedback_event(down,&ControlEvents::released);auto invoke=impl_->invoke;if(released) invoke(std::move(released));
             const bool unfocused_action=preserve_focus&&impl_->active&&down<impl_->nodes.size()&&
                 impl_->nodes[down].action_surface&&!impl_->nodes[down].action_surface->pointer_focusable&&
                 impl_->focus_epoch==focus_epoch&&impl_->domain->pointer_epoch==release_epoch;
@@ -4405,7 +4466,7 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
         }
     } else if(event.kind==WidgetInputKind::pointer_leave) { impl_->hovered=absent; impl_->invalidate(); }
     else if(event.kind==WidgetInputKind::focus_lost || (event.kind==WidgetInputKind::key_down && event.key==WidgetKey::escape)) {
-        auto canceled=impl_->pressed==absent?runtime::Task{}:impl_->nodes[impl_->pressed].events.canceled;
+        auto canceled=impl_->feedback_event(impl_->pressed,&ControlEvents::canceled);
         runtime::Task escape;
         if(event.kind==WidgetInputKind::key_down)for(auto p=impl_->focused;p!=absent;p=impl_->nodes[p].parent)if(impl_->nodes[p].escape){escape=impl_->nodes[p].escape;break;}
         impl_->pressed=absent;auto blur=event.kind==WidgetInputKind::focus_lost?impl_->change_focus(absent):runtime::Task{};if(event.kind==WidgetInputKind::focus_lost)impl_->hovered=absent;
@@ -4534,9 +4595,9 @@ core::Result<void> WidgetState::input_impl(const WidgetInput& incoming,WidgetInp
             return move_slider(index,std::clamp(next,n.slider.minimum,n.slider.maximum));
         } else if(event.kind==WidgetInputKind::key_down && (event.key==WidgetKey::space || event.key==WidgetKey::enter)) {
             if(event.key==WidgetKey::enter&&n.action_surface&&!n.action_surface->enter_key_activation)return {};
-            if(impl_->pressed==absent) { impl_->pressed=index;impl_->pressed_key=event.key;impl_->invalidate();auto pressed=n.events.pressed;auto invoke=impl_->invoke;if(pressed) invoke(std::move(pressed)); }
+            if(impl_->pressed==absent) { impl_->pressed=index;impl_->pressed_key=event.key;impl_->invalidate();auto pressed=impl_->feedback_event(index,&ControlEvents::pressed);auto invoke=impl_->invoke;if(pressed) invoke(std::move(pressed)); }
         } else if(event.kind==WidgetInputKind::key_up && (event.key==WidgetKey::space || event.key==WidgetKey::enter) && impl_->pressed==index && impl_->pressed_key==event.key) {
-            impl_->pressed=absent;impl_->pressed_key=WidgetKey::none;impl_->invalidate();auto released=n.events.released;auto invoke=impl_->invoke;if(released) invoke(std::move(released));
+            impl_->pressed=absent;impl_->pressed_key=WidgetKey::none;impl_->invalidate();auto released=impl_->feedback_event(index,&ControlEvents::released);auto invoke=impl_->invoke;if(released) invoke(std::move(released));
             if(impl_->active) return activate(index);
         }
     }
@@ -4585,9 +4646,10 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
     const auto muted=WidgetColor{.1411764771*.75+primary.red*.25,.1411764771*.75+primary.green*.25,.1411764771*.75+primary.blue*.25,1};
     auto draw_menu_item=[&](auto& layer,std::size_t i) {
         const auto& n=impl_->nodes[i];const bool enabled=impl_->effective_enabled(i);const auto& o=*n.menu_item;const auto r=n.bounds;const bool compact=*o.compact,inactive=o.state==MenuItemState::inactive;
-        const bool selected=impl_->item_selected(i) || (n.parent!=absent && impl_->nodes[n.parent].popup && impl_->focused==i);
+        const bool feedback=impl_->transient_feedback_enabled(i);
+        const bool selected=impl_->item_selected(i) || (feedback&&n.parent!=absent&&impl_->nodes[n.parent].popup&&impl_->focused==i);
         const auto background=selected?(compact?primary:muted):inactive?WidgetColor{.1370945126,.1402995437,.1419020444,1}:
-            enabled && impl_->pressed==i?muted:enabled && impl_->hovered==i?WidgetColor{.1230252981,.1252803057,.1275353134,1}:WidgetColor{0,0,0,0};
+            enabled&&feedback&&impl_->pressed==i?muted:enabled&&feedback&&impl_->hovered==i?WidgetColor{.1230252981,.1252803057,.1275353134,1}:WidgetColor{0,0,0,0};
         layer_panel(layer,r,background,compact?0:4);
         auto label=impl_->text_run(n);label.color=color({1,1,1,inactive || enabled?(compact?1:.9):.3});
         auto shortcut=label;shortcut.text=impl_->shortcut(n);shortcut.font_size=compact?12:13;shortcut.font_weight=compact?600:500;shortcut.font_family=impl_->appearance.font_family;shortcut.color=color({1,1,1,inactive || enabled?.6:.3});
@@ -4666,7 +4728,9 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
             if(image.width>0&&image.height>0){ImageRun run{.bounds=image,.image=o.image,.source=uv};if(fit!=ImageFit::contain){run.radius=std::min(std::max(0.f,radius-pad),std::min(image.width,image.height)/2);if(pad==0&&o.border){run.border=color(*o.border);run.border_width=border;}}target.images.push_back(std::move(run));}return;
         }
         if(n.color){n.color->options.enabled=enabled;n.color->paint(target,r,impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1);return;}
-        if(n.color_button){target.images.push_back({r,n.color_button->paint({r.width,r.height},enabled&&impl_->hovered==i,enabled&&impl_->pressed==i,enabled&&impl_->focused==i,impl_->appearance.primary),{},enabled?1.f:.32f});return;}
+        const bool feedback=impl_->transient_feedback_enabled(i);
+        const bool hovered=feedback&&impl_->hovered==i,pressed=feedback&&impl_->pressed==i,focus_feedback=feedback&&impl_->focused==i;
+        if(n.color_button){target.images.push_back({r,n.color_button->paint({r.width,r.height},enabled&&hovered,enabled&&pressed,enabled&&focus_feedback,impl_->appearance.primary),{},enabled?1.f:.32f});return;}
         if(n.menu_item) {draw_menu_item(target,i);return;}
         if(n.divider) {draw_divider(target,n);return;}
         if(n.kind==WidgetKind::segmented_control) {
@@ -4686,14 +4750,14 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
             run.bounds.y+=(run.bounds.height-measure_text(run))/2;
             if(impl_->custom_action_content(n))run.text.clear();
         }else if(n.kind==WidgetKind::combo_box) {
-            panel(r,impl_->pressed==i?track:impl_->hovered==i?WidgetColor{.1753742844,.1819191724,.1841008067,1}:WidgetColor{.1555851549,.157072559,.1585599482,1},5);
+            panel(r,pressed?track:hovered?WidgetColor{.1753742844,.1819191724,.1841008067,1}:WidgetColor{.1555851549,.157072559,.1585599482,1},5);
             draw_stepper(target,{r.x+r.width-19,r.y+(r.height-18)/2,18,18},{.tone=n.combo.tone,.arrow=n.combo.arrow,.icon=n.combo.indicator},enabled,false,false);
             run.bounds.x+=8;run.bounds.width=std::max(0.f,r.width-27);run.bounds.y+=(r.height-measure_text(run))/2;run.color=color({1,1,1,1});
         } else if(n.kind==WidgetKind::stepper) {
-            draw_stepper(target,r,n.stepper,enabled,impl_->hovered==i,impl_->pressed==i);run.text.clear();
+            draw_stepper(target,r,n.stepper,enabled,hovered,pressed);run.text.clear();
         } else if(n.kind==WidgetKind::tab) {
             const auto base=n.tab.selected && n.tab.style==TabStyle::surface?WidgetColor{.155585,.157073,.15856,1}:WidgetColor{0,0,0,0};
-            panel(r,!enabled?WidgetColor{0,0,0,0}:impl_->pressed==i?WidgetColor{.137095,.140300,.141902,1}:impl_->hovered==i?WidgetColor{.123025,.125280,.127535,1}:base,n.tab.style==TabStyle::surface?4:0);
+            panel(r,!enabled?WidgetColor{0,0,0,0}:pressed?WidgetColor{.137095,.140300,.141902,1}:hovered?WidgetColor{.123025,.125280,.127535,1}:base,n.tab.style==TabStyle::surface?4:0);
             if(n.tab.selected && n.tab.style==TabStyle::underline) panel({r.x,r.y+r.height-2,r.width,2},impl_->appearance.primary);
             const auto icon=float(n.tab.icon_size);
             target.images.push_back({{r.x+12,r.y+(r.height-icon)/2,icon,icon},n.tab.icon,{},enabled?1.f:.3f});
@@ -4724,9 +4788,9 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
                 .1411764770746231*(1-amount)+primary.blue*amount,1};
             if(n.button.background_image && !n.checked) {
                 auto image_rect=r;
-                if(impl_->focused==i){image_rect.x+=1;image_rect.y+=1;image_rect.width=std::max(0.f,r.width-2);image_rect.height=std::max(0.f,r.height-2);}
+                if(focus_feedback){image_rect.x+=1;image_rect.y+=1;image_rect.width=std::max(0.f,r.width-2);image_rect.height=std::max(0.f,r.height-2);}
                 target.images.push_back({image_rect,n.button.background_image,{},enabled?1.f:.32f});
-            } else panel(r,!enabled?disabled:impl_->pressed==i?down:n.checked?selected:impl_->hovered==i?hover:base,n.button.help?r.height/2:float(n.button.corner_radius.value_or(impl_->appearance.button_radius)));
+            } else panel(r,!enabled?disabled:pressed?down:n.checked?selected:hovered?hover:base,n.button.help?r.height/2:float(n.button.corner_radius.value_or(impl_->appearance.button_radius)));
             if(n.button.style&&n.button.style->border&&n.button.style->border_width>0){const auto radius=std::min(n.button.help?r.height/2:float(n.button.corner_radius.value_or(impl_->appearance.button_radius)),std::min(r.width,r.height)/2);const auto c=color(*n.button.style->border);target.panels.push_back({r,c,c,radius,float(std::min(n.button.style->border_width,double(std::min(r.width,r.height)/2)))});}
             if(n.button.left_padding||n.button.right_padding||n.button.content_spacing||n.button.indicator_size){
                 const auto& o=n.button;const float pad=float(o.horizontal_padding.value_or(o.icon_mode?2:impl_->appearance.button_padding));
@@ -4763,7 +4827,7 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
             const auto& style=n.field.style;const float inset=style?float(style->horizontal_padding):8;
             const auto base=style&&style->background?*style->background:WidgetColor{.155585,.157073,.15856,enabled?1:.36};
             const auto hover=style?style->hover_background.value_or(base):WidgetColor{.175374,.181919,.184101,1};
-            panel(r,impl_->hovered==i?hover:base,style?float(style->corner_radius):8);
+            panel(r,hovered?hover:base,style?float(style->corner_radius):8);
             run.bounds={r.x+inset,r.y,std::max(0.f,r.width-inset*2),r.height};run.bounds.y+=(r.height-measure_text(run))/2;
             if(n.marked_present){const auto begin=std::min(n.anchor,n.cursor),end=std::max(n.anchor,n.cursor);run.text.replace(begin,end-begin,n.marked);}
             const auto displayed=run.text;
@@ -4791,7 +4855,7 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
             const auto b=span?std::clamp((n.progress.value-n.progress.minimum)/span,0.0,1.0):0;
             panel({r.x+float(std::min(a,b))*r.width,r.y,float(std::abs(b-a))*r.width,r.height},impl_->appearance.primary,float(n.progress.height/2)); return;
         }
-        if(impl_->focused==i && interactive(n.kind) && (!n.action_surface||n.action_surface->focus_ring) && (n.kind!=WidgetKind::input_field||!n.field.style||n.field.style->focus_ring)) {
+        if(focus_feedback && interactive(n.kind) && (!n.action_surface||n.action_surface->focus_ring) && (n.kind!=WidgetKind::input_field||!n.field.style||n.field.style->focus_ring)) {
             const auto c=impl_->appearance.primary;
             if(n.action_surface){const auto ink=color(c);target.panels.push_back({r,ink,ink,float(std::min(n.action_surface->corner_radius,double(std::min(r.width,r.height)/2))),1.5f});}
             else if(n.kind==WidgetKind::button) {
@@ -4844,7 +4908,11 @@ CanvasFrame WidgetState::frame(Size size,std::size_t* popup_start,const CaptureF
         if(draw&&!provided)use_clip(impl_->clip_rect(i));
         if(provided){
             const auto source=n.paint_source==absent?i:n.paint_source;const auto& owner=impl_->nodes[source];
-            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),impl_->hovered!=absent&&impl_->descendant(impl_->hovered,source),impl_->pressed==source,impl_->focused==source,owner.checked,impl_->nodes[owner.default_content==absent?source:owner.default_content].children.size(),impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1,impl_->resolved_font_family,impl_->appearance.text_styles};
+            const bool feedback=impl_->transient_feedback_enabled(source);
+            const WidgetPaintState state{{n.bounds.width,n.bounds.height},impl_->effective_enabled(i),
+                feedback&&impl_->descendant(impl_->hovered,source),feedback&&impl_->pressed==source,feedback&&impl_->focused==source,
+                owner.checked,impl_->nodes[owner.default_content==absent?source:owner.default_content].children.size(),
+                impl_->presentation_surface()?impl_->presentation_surface()->backing_scale():1,impl_->resolved_font_family,impl_->appearance.text_styles};
             struct Guard{bool& local;bool& domain;Guard(bool& l,bool& d):local(l),domain(d){local=domain=true;}~Guard(){local=domain=false;}}guard{impl_->painting,impl_->domain->painting};
             // Explicit subtree captures preserve their fresh-provider contract;
             // ordinary presentation retains an unchanged widget's drawing.

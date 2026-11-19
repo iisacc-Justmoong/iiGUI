@@ -36,11 +36,11 @@ int main(){
     const auto check_neutral=[&](double opacity,double blur){
         auto frame=take(tree->drawing_snapshot({200,100}));bool found=false;
         for(const auto& layer:frame.overlays)if(layer.backdrop){
-            require(!layer.backdrop->underlay&&layer.backdrop->tint.alpha==opacity&&layer.backdrop->blur_radius==blur,
+            require(!layer.backdrop->underlay&&std::abs(layer.backdrop->tint.alpha-opacity)<1e-6&&layer.backdrop->blur_radius==blur,
                     "Neutral window material created an accent underlay or lost its density");found=true;
         }
         require(found,"Neutral window material was not drawn");
     };
-    check_neutral(.75,64);neutral.density=ii::gui::MaterialDensity::glass25;good(surface->set_options(neutral));
-    check_neutral(.25,16);tree->close();
+    check_neutral(.75,64);neutral.density=ii::gui::MaterialDensity::glass85;good(surface->set_options(neutral));
+    check_neutral(.85,16);tree->close();
 }

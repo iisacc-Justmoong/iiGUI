@@ -53,6 +53,8 @@ public:
 #if defined(_WIN32)
     virtual std::optional<std::intptr_t> native_result(const void*) = 0;
 #endif
+    // Suppress the OS pointer on this surface while a widget draws its own.
+    virtual void set_native_pointer_hidden(bool) {}
 };
 using WidgetSurfaceFactory = std::function<std::unique_ptr<WidgetSurface>(void*, WidgetSurfaceCallbacks)>;
 } // namespace ii::gui::detail

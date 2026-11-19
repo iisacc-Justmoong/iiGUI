@@ -1,5 +1,5 @@
 # Build output and temporary installation data have separate owned locations.
-foreach(_required SOURCE BUILD RESOURCE_ROOT CORE_BUILD LVUI_BUILD GUI_BUILD)
+foreach(_required SOURCE BUILD RESOURCE_ROOT CORE_BUILD GUI_BUILD)
     if(NOT DEFINED ${_required})
         message(FATAL_ERROR "Missing ${_required}")
     endif()
@@ -23,7 +23,7 @@ file(MAKE_DIRECTORY "${_root}")
 if(EXISTS "${_relocated}")
     message(FATAL_ERROR "Consumer verification destination already exists; use another build/ location")
 endif()
-foreach(_project IN ITEMS "${CORE_BUILD}" "${LVUI_BUILD}" "${GUI_BUILD}")
+foreach(_project IN ITEMS "${CORE_BUILD}" "${GUI_BUILD}")
     execute_process(COMMAND "${CMAKE_COMMAND}" --install "${_project}" --prefix "${_stage}"
         RESULT_VARIABLE _result OUTPUT_VARIABLE _output ERROR_VARIABLE _error)
     if(NOT _result EQUAL 0)
@@ -44,7 +44,7 @@ endif()
 list(APPEND _clean_env --)
 set(_vulkan_args)
 foreach(_variable Vulkan_INCLUDE_DIR Vulkan_LIBRARY)
-    # Native SDK dependencies are external to the relocated Core/LVUI/iiGUI prefix.
+    # Native SDK dependencies are external to the relocated Core/iiGUI prefix.
     # Reuse this kit's target paths, never discover a different host Vulkan SDK.
     file(STRINGS "${GUI_BUILD}/CMakeCache.txt" _cache_line REGEX "^${_variable}:[^=]*=")
     if(_cache_line)
@@ -57,7 +57,7 @@ execute_process(COMMAND ${_clean_env} "${CMAKE_COMMAND}" -S "${_root}/source" -B
     "-DCMAKE_PREFIX_PATH=${_relocated}" -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
     -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
-    -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
+    -DCMAKE_DISABLE_FIND_PACKAGE_LVUI=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt5=ON -DCMAKE_DISABLE_FIND_PACKAGE_Qt6=ON
     -DCMAKE_DISABLE_FIND_PACKAGE_iiFileProviderNative=ON
     -DCMAKE_DISABLE_FIND_PACKAGE_iiFileProviderCoreIO=ON
     RESULT_VARIABLE _result OUTPUT_VARIABLE _output ERROR_VARIABLE _error)
@@ -66,9 +66,7 @@ if(NOT _result EQUAL 0)
 endif()
 file(STRINGS "${_build}/CMakeCache.txt" _gui_dir REGEX "^iiGUI_DIR:PATH=")
 file(STRINGS "${_build}/CMakeCache.txt" _core_dir REGEX "^iiSDKCore_DIR:PATH=")
-file(STRINGS "${_build}/CMakeCache.txt" _lvui_dir REGEX "^LVUI_DIR:PATH=")
 if(NOT _gui_dir STREQUAL "iiGUI_DIR:PATH=${_relocated}/lib/cmake/iiGUI" OR
-   NOT _lvui_dir STREQUAL "LVUI_DIR:PATH=${_relocated}/lib/cmake/LVUI" OR
    NOT _core_dir STREQUAL "iiSDKCore_DIR:PATH=${_relocated}/lib/cmake/iiSDKCore")
     message(FATAL_ERROR "Consumer resolved a package outside its relocated prefix: ${_gui_dir}; ${_core_dir}")
 endif()
@@ -78,8 +76,7 @@ if(NOT _result EQUAL 0)
     message(FATAL_ERROR "Consumer build failed: ${_output}\n${_error}")
 endif()
 file(STRINGS "${_build}/compile_commands.json" _commands)
-cmake_path(GET SOURCE PARENT_PATH _sdk_source)
-if(_commands MATCHES "${SOURCE}/include" OR _commands MATCHES "${SOURCE}/src" OR _commands MATCHES "${_sdk_source}/LVUI/include")
+if(_commands MATCHES "${SOURCE}/include" OR _commands MATCHES "${SOURCE}/src")
     message(FATAL_ERROR "Installed consumer accessed iiGUI source-tree headers")
 endif()
 if(SKIP_EXECUTION)

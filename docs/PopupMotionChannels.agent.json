@@ -10,9 +10,9 @@
   },
   "source": {
     "path": "docs/PopupMotionChannels.md",
-    "sha256": "f382eb8c4baa1e705ac014c2e0630645a6df215ccee5540593ef86876a15bae8",
-    "bytes": 2375,
-    "line_count": 30,
+    "sha256": "4764b74a858ceededf0b8263949b1141aff40f6cf8761bbdbce6ab78748f1e22",
+    "bytes": 2696,
+    "line_count": 34,
     "encoding": "utf-8",
     "language": "ko"
   },
@@ -100,6 +100,20 @@
       "start_line": 27,
       "end_line": 30,
       "raw": "검사는 실제 창이나 GPU를 열지 않는 위젯 트리와 주입한 Core 프레임 시계에서\n각 트랙의 중간값·최종값, 닫기·재열기, 모션 설정 변경, 잘못된 설정, 기존 단일\n트랙 호환성과 퇴역을 확인한다. 이는 운영체제별 애니메이션·렌더링 확인을 의미하지\n않는다.\n"
+    },
+    {
+      "id": "b000012",
+      "kind": "blank",
+      "start_line": 31,
+      "end_line": 31,
+      "raw": "\n"
+    },
+    {
+      "id": "b000013",
+      "kind": "paragraph",
+      "start_line": 32,
+      "end_line": 34,
+      "raw": "접근성 취소 입력은 Escape와 같은 팝업 닫기 정책을 적용한다. 취소가 허용된 팝업에\n입력을 전달하며, 위쪽 모달이 막고 있는 팝업으로 취소가 전달되지 않는다. 팝업을\n소유한 앱 코드는 `Widget::close_popup()`으로 수명주기에 맞춰 닫을 수 있다.\n"
     }
   ],
   "outline": [

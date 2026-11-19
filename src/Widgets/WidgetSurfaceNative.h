@@ -28,6 +28,9 @@ public:
     GraphicsInfo info() override;
     PixelBuffer capture() override;
     bool native_event(const void*) override;
+#if defined(_WIN32) || (defined(__APPLE__) && !TARGET_OS_IPHONE) || (defined(__linux__) && !defined(__ANDROID__))
+    void set_native_pointer_hidden(bool) override;
+#endif
 #if defined(_WIN32)
     std::optional<std::intptr_t> native_result(const void*) override;
 #endif
