@@ -353,10 +353,10 @@ For cross consumption add `-DTOOLCHAIN=/path/to/toolchain.cmake` and
 
 ## License
 
-SPDX-License-Identifier: MIT
+SPDX-License-Identifier: Apache-2.0
 
 The original code and documentation in this repository are licensed under the
-[MIT License](LICENSE). Third-party code, libraries, fonts, tools, and model
+[Apache License 2.0](LICENSE). Third-party code, libraries, fonts, tools, and model
 weights retain their respective licenses.
 
 ## Source header layout
